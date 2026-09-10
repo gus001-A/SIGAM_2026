@@ -55,9 +55,7 @@ defineExpose({ abrir });
                 <a-select
                     v-model:value="form.equipo_id"
                     :options="equipoOpciones"
-                    show-search
-                    option-filter-prop="label"
-                    placeholder="Buscar por código o descripción"
+                    placeholder="Selecciona el equipo"
                 />
             </a-form-item>
 

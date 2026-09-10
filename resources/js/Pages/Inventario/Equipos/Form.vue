@@ -144,12 +144,12 @@ const cancelar = () =>
                             </a-col>
                             <a-col :xs="24" :sm="8">
                                 <a-form-item label="Tipo">
-                                    <a-select v-model:value="form.tipo_id" :options="catalogos.tipos" :field-names="{ label: 'nombre', value: 'id' }" allow-clear show-search option-filter-prop="nombre" />
+                                    <a-select v-model:value="form.tipo_id" :options="catalogos.tipos" :field-names="{ label: 'nombre', value: 'id' }" allow-clear />
                                 </a-form-item>
                             </a-col>
                             <a-col :xs="24" :sm="8">
                                 <a-form-item label="Marca">
-                                    <a-select v-model:value="form.marca_id" :options="catalogos.marcas" :field-names="{ label: 'nombre', value: 'id' }" allow-clear show-search option-filter-prop="nombre" />
+                                    <a-select v-model:value="form.marca_id" :options="catalogos.marcas" :field-names="{ label: 'nombre', value: 'id' }" allow-clear />
                                 </a-form-item>
                             </a-col>
                             <a-col :xs="24" :sm="8">
@@ -179,8 +179,6 @@ const cancelar = () =>
                                         v-model:value="form.sucursal_id"
                                         :options="catalogos.sucursales"
                                         :field-names="{ label: 'nombre', value: 'id' }"
-                                        show-search
-                                        option-filter-prop="nombre"
                                         @change="form.ubicacion_id = undefined"
                                     />
                                 </a-form-item>
@@ -198,7 +196,7 @@ const cancelar = () =>
                             </a-col>
                             <a-col :xs="24" :sm="12">
                                 <a-form-item label="Responsable">
-                                    <a-select v-model:value="form.responsable_id" :options="responsablesOpciones" allow-clear show-search option-filter-prop="label" />
+                                    <a-select v-model:value="form.responsable_id" :options="responsablesOpciones" allow-clear />
                                 </a-form-item>
                             </a-col>
                             <a-col v-if="cambioUbicacion" :xs="24" :sm="12">
@@ -214,7 +212,7 @@ const cancelar = () =>
                         <CampoEspecificaciones v-model="form.especificaciones" class="mb-4" />
 
                         <a-form-item label="Normas aplicables">
-                            <a-select v-model:value="form.normas" :options="normasOpciones" mode="multiple" allow-clear option-filter-prop="label" />
+                            <a-select v-model:value="form.normas" :options="normasOpciones" mode="multiple" :show-search="false" allow-clear />
                         </a-form-item>
                         <a-form-item label="Observaciones" name="notas" :validate-status="est('notas')" :help="form.errors.notas">
                             <a-textarea v-model:value="form.notas" :auto-size="{ minRows: 2, maxRows: 6 }" show-count :maxlength="2000" />
@@ -226,7 +224,7 @@ const cancelar = () =>
                     <a-card size="small" class="mb-4 sec sec--adq">
                         <template #title><DollarOutlined /> Adquisición</template>
                         <a-form-item label="Proveedor">
-                            <a-select v-model:value="form.proveedor_id" :options="catalogos.proveedores" :field-names="{ label: 'razon_social', value: 'id' }" allow-clear show-search option-filter-prop="razon_social" />
+                            <a-select v-model:value="form.proveedor_id" :options="catalogos.proveedores" :field-names="{ label: 'razon_social', value: 'id' }" allow-clear />
                         </a-form-item>
                         <a-form-item label="Fecha de adquisición" name="fecha_adquisicion" :validate-status="est('fecha_adquisicion')" :help="form.errors.fecha_adquisicion">
                             <a-input v-model:value="form.fecha_adquisicion" type="date" :max="new Date().toISOString().slice(0, 10)" />

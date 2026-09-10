@@ -448,7 +448,7 @@ body {
 .ant-input-number,
 .ant-picker,
 .ant-select-selector {
-    border-radius: 9px !important;
+    border-radius: 10px !important;
     border-color: var(--sigam-borde) !important;
     transition: border-color 0.16s ease, box-shadow 0.16s ease !important;
 }
@@ -937,6 +937,287 @@ input[type='datetime-local'] {
 .ant-dropdown-menu-item-selected {
     background: var(--sigam-navy-050) !important;
     color: var(--sigam-navy) !important;
+}
+
+/* ==================================================================
+   SIGAM · Listas desplegables (Select) y formularios — pulido fino
+   ================================================================== */
+
+/* ---------- Campo Select (cerrado) — estilo RIC / PrimeVue Aura --- */
+.ant-select-single .ant-select-selector,
+.ant-select-multiple .ant-select-selector {
+    border-radius: 8px !important;
+    border-color: #d9dfe7 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+.ant-select:not(.ant-select-disabled):hover .ant-select-selector {
+    border-color: #b6c0cd !important;
+}
+.ant-select-focused:not(.ant-select-disabled) .ant-select-selector {
+    border-color: var(--sigam-navy) !important;
+    box-shadow: 0 0 0 1px var(--sigam-navy) !important;
+}
+.ant-select-selection-placeholder {
+    color: #94a3b8;
+}
+.ant-select-arrow {
+    color: #94a3b8;
+    inset-inline-end: 12px;
+}
+.ant-select-clear {
+    color: #94a3b8;
+    background: #fff;
+    border-radius: 999px;
+    inset-inline-end: 12px;
+}
+.ant-select-disabled .ant-select-selector {
+    background: #f4f6f8 !important;
+    color: var(--sigam-tenue);
+}
+
+/* Etiquetas del modo múltiple — chip neutro estilo RIC */
+.ant-select-multiple .ant-select-selection-item {
+    background: #eef2f7;
+    border: 1px solid #dde3ea;
+    border-radius: 6px;
+    color: #334155;
+    font-weight: 500;
+    padding-inline-start: 8px;
+}
+.ant-select-multiple .ant-select-selection-item-remove {
+    color: #64748b;
+    opacity: 0.7;
+}
+.ant-select-multiple .ant-select-selection-item-remove:hover {
+    opacity: 1;
+}
+
+/* ---------- Panel emergente del Select — estilo RIC / Aura -------- */
+.ant-select-dropdown {
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1),
+        0 2px 4px -2px rgba(15, 23, 42, 0.1);
+    animation: sigam-fade-in 0.12s ease both;
+}
+.ant-select-dropdown .ant-select-item {
+    border-radius: 6px;
+    min-height: 0;
+    padding: 8px 12px;
+    color: #334155;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.ant-select-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+.ant-select-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled),
+.ant-select-dropdown
+    .ant-select-item-option-selected:not(.ant-select-item-option-disabled)
+    .ant-select-item-option-content {
+    background: color-mix(in srgb, var(--sigam-navy) 10%, transparent);
+    color: var(--sigam-navy);
+    font-weight: 600;
+}
+.ant-select-dropdown
+    .ant-select-item-option-selected.ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+    background: color-mix(in srgb, var(--sigam-navy) 16%, transparent);
+}
+.ant-select-dropdown
+    .ant-select-item-option-selected:not(.ant-select-item-option-disabled)
+    .ant-select-item-option-state {
+    color: var(--sigam-navy);
+}
+.ant-select-dropdown .ant-select-item-option-disabled {
+    color: #aab6c2;
+}
+.ant-select-dropdown .ant-select-item-group {
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.ant-select-dropdown .ant-select-item-empty {
+    padding: 14px 0;
+    color: #94a3b8;
+}
+.ant-select-dropdown .rc-virtual-list-scrollbar-thumb {
+    background: #cbd5e1 !important;
+}
+
+/* ---------- Cascader / TreeSelect: mismo lenguaje ---------------- */
+.ant-cascader-dropdown,
+.ant-tree-select-dropdown {
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1),
+        0 2px 4px -2px rgba(15, 23, 42, 0.1);
+}
+.ant-cascader-dropdown .ant-cascader-menu-item,
+.ant-select-tree .ant-select-tree-node-content-wrapper {
+    border-radius: 6px;
+    color: #334155;
+}
+.ant-cascader-dropdown .ant-cascader-menu-item-active:not(.ant-cascader-menu-item-disabled),
+.ant-select-tree .ant-select-tree-node-content-wrapper:hover {
+    background: #f1f5f9 !important;
+}
+.ant-cascader-dropdown .ant-cascader-checkbox-checked .ant-cascader-checkbox-inner,
+.ant-select-tree
+    .ant-select-tree-node-selected
+    .ant-select-tree-node-content-wrapper {
+    background: color-mix(in srgb, var(--sigam-navy) 10%, transparent) !important;
+    color: var(--sigam-navy);
+    font-weight: 600;
+}
+
+/* ---------- AutoComplete ---------------------------------------- */
+.ant-select-dropdown .ant-select-item-option-content {
+    white-space: normal;
+    line-height: 1.4;
+}
+
+/* ==================================================================
+   SIGAM · Formularios — encabezados, campos y ayuda
+   ================================================================== */
+
+/* Etiquetas */
+.ant-form-vertical .ant-form-item-label {
+    padding-bottom: 5px;
+}
+.ant-form-item-label > label {
+    font-weight: 600;
+    font-size: 12.5px;
+    color: var(--sigam-navy);
+    letter-spacing: 0.005em;
+}
+.ant-form-item-label > label .anticon {
+    color: var(--sigam-teal);
+    margin-inline-end: 5px;
+}
+.ant-form-item-label > label.ant-form-item-required::before {
+    color: #d64545;
+    font-size: 13px;
+}
+.ant-form-item-label > label .ant-form-item-optional {
+    color: var(--sigam-tenue);
+    font-style: normal;
+    font-weight: 500;
+}
+.ant-form-item-label
+    > label
+    .ant-form-item-tooltip {
+    color: var(--sigam-navy-500);
+}
+
+/* Texto de ayuda / extra / error */
+.ant-form-item .ant-form-item-explain,
+.ant-form-item .ant-form-item-extra {
+    font-size: 11.5px;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+.ant-form-item .ant-form-item-extra {
+    color: var(--sigam-tenue);
+}
+.ant-form-item-explain-error {
+    color: #d64545;
+}
+.ant-form-item-has-error .ant-input,
+.ant-form-item-has-error .ant-input-affix-wrapper,
+.ant-form-item-has-error .ant-input-number,
+.ant-form-item-has-error .ant-picker,
+.ant-form-item-has-error .ant-select .ant-select-selector {
+    border-color: #e3888a !important;
+    box-shadow: 0 0 0 3px rgba(214, 69, 69, 0.12) !important;
+}
+
+/* Prefijos/sufijos con icono */
+.ant-input-affix-wrapper .ant-input-prefix .anticon,
+.ant-input-affix-wrapper .ant-input-suffix .anticon {
+    color: var(--sigam-navy-500);
+}
+.ant-input-affix-wrapper > input.ant-input {
+    padding-inline-start: 8px;
+}
+
+/* Número: botones de paso más discretos */
+.ant-input-number-handler-wrap {
+    border-radius: 0 10px 10px 0;
+    background: #fbfcfe;
+}
+.ant-input-number-handler:hover .ant-input-number-handler-up-inner,
+.ant-input-number-handler:hover .ant-input-number-handler-down-inner {
+    color: var(--sigam-teal);
+}
+
+/* Área de texto */
+.ant-input-textarea-show-count .ant-input-data-count {
+    font-size: 11px;
+    color: var(--sigam-tenue);
+    bottom: -20px;
+}
+textarea.ant-input {
+    border-radius: 10px !important;
+    line-height: 1.55;
+}
+
+/* Interruptor y casillas con color de marca */
+.ant-switch.ant-switch-checked {
+    background: var(--sigam-teal);
+}
+.ant-checkbox-wrapper:hover .ant-checkbox-inner,
+.ant-radio-wrapper:hover .ant-radio-inner {
+    border-color: var(--sigam-teal);
+}
+
+/* Tarjeta de sección: cabecera con acento e icono */
+.ant-form .ant-card {
+    overflow: visible;
+}
+.ant-form .ant-card + .ant-card {
+    margin-top: 16px;
+}
+
+/* Botón de envío fijo al pie de la columna lateral */
+.ant-form .ant-col > .ant-card:last-child .ant-btn-block[html-type='submit'] {
+    box-shadow: 0 10px 22px -12px rgba(23, 58, 95, 0.55);
+}
+
+/* Divisor dentro de formularios */
+.ant-form .ant-divider-horizontal {
+    margin: 14px 0;
+    border-color: var(--sigam-borde-suave);
+}
+
+/* Grupo de radios tipo botón: cohesión con la marca */
+.ant-radio-group .ant-radio-button-wrapper:first-child {
+    border-start-start-radius: 9px;
+    border-end-start-radius: 9px;
+}
+.ant-radio-group .ant-radio-button-wrapper:last-child {
+    border-start-end-radius: 9px;
+    border-end-end-radius: 9px;
+}
+
+/* Subida de archivos */
+.ant-upload-wrapper .ant-upload-drag {
+    border-radius: 14px;
+    border-color: var(--sigam-borde);
+    background: #fbfcfe;
+    transition: border-color 0.16s ease, background 0.16s ease;
+}
+.ant-upload-wrapper .ant-upload-drag:hover {
+    border-color: var(--sigam-teal);
+    background: var(--sigam-teal-050);
+}
+.ant-upload-wrapper .ant-upload-drag .ant-upload-drag-icon .anticon {
+    color: var(--sigam-teal);
 }
 
 @media (prefers-reduced-motion: reduce) {

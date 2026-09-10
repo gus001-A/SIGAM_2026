@@ -475,7 +475,7 @@ const menuTransiciones = computed(() =>
         <a-modal v-model:open="modalTecnico" title="Asignar técnico" ok-text="Asignar" cancel-text="Cancelar" :confirm-loading="formTecnico.processing" @ok="asignarTecnico">
             <a-form layout="vertical" class="pt-2">
                 <a-form-item label="Técnico" :validate-status="formTecnico.errors.tecnico_id ? 'error' : undefined" :help="formTecnico.errors.tecnico_id">
-                    <a-select v-model:value="formTecnico.tecnico_id" :options="catalogos.tecnicos?.map((t) => ({ value: t.id, label: t.nombre }))" show-search option-filter-prop="label" />
+                    <a-select v-model:value="formTecnico.tecnico_id" :options="catalogos.tecnicos?.map((t) => ({ value: t.id, label: t.nombre }))" />
                 </a-form-item>
                 <a-form-item>
                     <a-checkbox v-model:checked="formTecnico.es_principal">Responsable principal</a-checkbox>
@@ -492,8 +492,6 @@ const menuTransiciones = computed(() =>
                     <a-select
                         v-model:value="formMaterial.material_id"
                         :options="catalogos.materiales?.map((x) => ({ value: x.id, label: x.nombre }))"
-                        show-search
-                        option-filter-prop="label"
                         allow-clear
                         placeholder="Opcional — o captura la descripción abajo"
                         @change="onMaterialSel"

@@ -78,8 +78,6 @@ const cancelar = () =>
                                         v-model:value="form.equipo_id"
                                         :options="catalogos.equipos"
                                         :field-names="{ label: 'codigo_activo', value: 'id' }"
-                                        show-search
-                                        option-filter-prop="codigo_activo"
                                         :disabled="editando"
                                     />
                                 </a-form-item>
@@ -142,8 +140,6 @@ const cancelar = () =>
                                         :options="catalogos.normas"
                                         :field-names="{ label: 'codigo', value: 'id' }"
                                         allow-clear
-                                        show-search
-                                        option-filter-prop="codigo"
                                     />
                                 </a-form-item>
                             </a-col>
@@ -177,8 +173,6 @@ const cancelar = () =>
                                 :options="catalogos.tecnicos"
                                 :field-names="{ label: 'nombre', value: 'id' }"
                                 allow-clear
-                                show-search
-                                option-filter-prop="nombre"
                             />
                         </a-form-item>
                         <a-form-item label="Estado">

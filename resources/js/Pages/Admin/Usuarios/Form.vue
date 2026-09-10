@@ -98,8 +98,6 @@ const cancelar = () =>
                                         :options="catalogos.sucursales"
                                         :field-names="{ label: 'nombre', value: 'id' }"
                                         allow-clear
-                                        show-search
-                                        option-filter-prop="nombre"
                                         placeholder="Sin sucursal asignada"
                                     />
                                 </a-form-item>

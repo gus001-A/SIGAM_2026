@@ -105,8 +105,6 @@ const cancelar = () =>
                                 v-model:value="form.responsable_id"
                                 :options="responsables"
                                 allow-clear
-                                show-search
-                                option-filter-prop="label"
                                 placeholder="Sin asignar"
                             />
                         </a-form-item>

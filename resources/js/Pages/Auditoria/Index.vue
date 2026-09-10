@@ -136,8 +136,6 @@ const exportarCsv = () => {
                     :options="opcionesFiltro[column.filtroClave].value"
                     size="small"
                     allow-clear
-                    show-search
-                    option-filter-prop="label"
                     placeholder="Todos"
                     style="width: 100%"
                     @change="aplicar()"

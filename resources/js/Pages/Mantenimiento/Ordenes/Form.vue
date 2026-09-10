@@ -44,7 +44,7 @@ const enviar = () => form.post(route('mantenimientos.store'));
                 <a-card>
                     <a-form :model="form" :rules="reglas" layout="vertical" @finish="enviar">
                         <a-form-item label="Equipo" name="equipo_id" :validate-status="est('equipo_id')" :help="form.errors.equipo_id">
-                            <a-select v-model:value="form.equipo_id" :options="equipoOpciones" show-search option-filter-prop="label" placeholder="Buscar equipo" />
+                            <a-select v-model:value="form.equipo_id" :options="equipoOpciones" placeholder="Selecciona el equipo" />
                         </a-form-item>
 
                         <a-row :gutter="16">

@@ -44,9 +44,7 @@ const enviar = () => form.post(route('solicitudes.store'));
                             <a-select
                                 v-model:value="form.equipo_id"
                                 :options="equipoOpciones"
-                                show-search
-                                option-filter-prop="label"
-                                placeholder="Buscar equipo por código o descripción"
+                                placeholder="Selecciona el equipo por código o descripción"
                             />
                         </a-form-item>
 
