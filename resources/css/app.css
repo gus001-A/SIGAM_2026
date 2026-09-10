@@ -1,0 +1,950 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==================================================================
+   SIGAM · Estilos globales y capa de pulido sobre Ant Design Vue
+   Paleta tomada del logotipo: azul marino #173a5f + verde azulado #1f9e86
+   ================================================================== */
+
+:root {
+    --sigam-fuente: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+        Roboto, sans-serif;
+
+    --sigam-navy: #173a5f;
+    --sigam-navy-700: #0f2c4a;
+    --sigam-navy-500: #2b5480;
+    --sigam-navy-050: #eaf0f6;
+    --sigam-navy-100: #dae5f0;
+
+    --sigam-teal: #1f9e86;
+    --sigam-teal-700: #16806c;
+    --sigam-teal-050: #e6f5f1;
+
+    --sigam-grad: linear-gradient(120deg, #173a5f 0%, #1c6b78 60%, #1f9e86 100%);
+
+    --sigam-borde: #dde4ec;
+    --sigam-borde-suave: #e9eef4;
+    --sigam-texto: #1c2b3a;
+    --sigam-tenue: #5a6b7d;
+    --sigam-fondo: #f4f7fa;
+
+    --sigam-sombra-sm: 0 1px 2px rgba(17, 34, 51, 0.04),
+        0 1px 3px rgba(17, 34, 51, 0.07);
+    --sigam-sombra-md: 0 4px 12px -4px rgba(17, 34, 51, 0.1),
+        0 14px 34px -14px rgba(17, 34, 51, 0.14);
+    --sigam-sombra-lg: 0 20px 46px -14px rgba(17, 34, 51, 0.26);
+
+    /* alias antiguos, por compatibilidad con componentes ya escritos */
+    --sigam-azul: var(--sigam-navy);
+    --sigam-azul-osc: var(--sigam-navy-700);
+    --sigam-azul-claro: var(--sigam-navy-050);
+}
+
+html,
+body {
+    margin: 0;
+    font-family: var(--sigam-fuente);
+    -webkit-font-smoothing: antialiased;
+    background: #ffffff;
+}
+
+#app {
+    min-height: 100vh;
+}
+
+.ant-app,
+.ant-layout {
+    font-family: var(--sigam-fuente);
+}
+
+::selection {
+    background: rgba(31, 158, 134, 0.22);
+}
+
+/* ---------- Animaciones base ---------------------------------------- */
+@keyframes sigam-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+@keyframes sigam-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+@keyframes sigam-pop {
+    0% {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    60% {
+        transform: scale(1.01);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+@keyframes sigam-ring {
+    0%, 60%, 100% { transform: rotate(0); }
+    5%, 25% { transform: rotate(-14deg); }
+    15%, 35% { transform: rotate(12deg); }
+    45% { transform: rotate(-6deg); }
+    55% { transform: rotate(4deg); }
+}
+@keyframes sigam-shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
+@keyframes sigam-slide {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 220% 50%; }
+}
+@keyframes sigam-grad-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        transition-duration: 0.001ms !important;
+    }
+}
+
+/* ---------- Entrada de página -------------------------------------- */
+.app-content__body > * {
+    animation: sigam-fade-up 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ================= Tarjetas ================= */
+.ant-card {
+    border: 1px solid var(--sigam-borde);
+    border-radius: 14px;
+    box-shadow: var(--sigam-sombra-sm);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease,
+        transform 0.2s ease;
+}
+.ant-card:hover {
+    box-shadow: var(--sigam-sombra-md);
+}
+.ant-card > .ant-card-head {
+    border-bottom: 1px solid var(--sigam-borde-suave);
+    min-height: 46px;
+    padding: 0 18px;
+}
+.ant-card > .ant-card-head .ant-card-head-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--sigam-navy);
+    padding: 12px 0;
+}
+.ant-card-head .ant-card-extra {
+    padding: 12px 0;
+}
+.ant-card > .ant-card-body {
+    padding: 18px;
+}
+.ant-card-small > .ant-card-head {
+    padding: 0 14px;
+    min-height: 42px;
+}
+.ant-card-small > .ant-card-body {
+    padding: 14px;
+}
+
+/* ===== Fila de tarjetas-estadística (patrón unificado de fichas) ===== */
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+.stat-row .stat {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #fff;
+    border: 1px solid var(--sigam-borde);
+    border-radius: 14px;
+    box-shadow: var(--sigam-sombra-sm);
+    position: relative;
+    overflow: hidden;
+}
+.stat-row .stat::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--acc, var(--sigam-navy));
+}
+.stat-row .stat__ic {
+    width: 40px;
+    height: 40px;
+    flex: none;
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: var(--acc, var(--sigam-navy));
+    background: color-mix(in srgb, var(--acc, #173a5f) 13%, #fff);
+}
+.stat-row .stat__v {
+    font-size: 19px;
+    font-weight: 800;
+    color: var(--sigam-navy);
+    line-height: 1.1;
+}
+.stat-row .stat__l {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--sigam-tenue);
+}
+
+/* Bloque de notas / texto largo dentro de fichas */
+.notas {
+    white-space: pre-line;
+    font-size: 13px;
+    color: var(--sigam-texto);
+    background: var(--sigam-navy-050);
+    border-radius: 10px;
+    padding: 11px 13px;
+    margin: 0;
+}
+
+/* Lista de sub-elementos con icono (ubicaciones, etc.) */
+.ubic-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.ubic-it {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--sigam-borde-suave);
+}
+.ubic-it:last-child {
+    border-bottom: none;
+}
+.ubic-it__ic {
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--sigam-teal);
+    background: var(--sigam-teal-050);
+    font-size: 13px;
+}
+.ubic-it__t {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+.ubic-it__n {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--sigam-texto);
+}
+.ubic-it__c {
+    font-size: 11.5px;
+    color: var(--sigam-tenue);
+}
+
+/* Tarjeta con estadística: acento de color a la izquierda */
+.ant-card:has(.ant-statistic) {
+    position: relative;
+    overflow: hidden;
+}
+.ant-card:has(.ant-statistic)::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--sigam-grad);
+}
+.ant-card:has(.ant-statistic) .ant-statistic-title {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    color: var(--sigam-tenue);
+    margin-bottom: 4px;
+}
+.ant-card:has(.ant-statistic) .ant-statistic-content {
+    font-weight: 800;
+    color: var(--sigam-navy);
+    letter-spacing: -0.02em;
+}
+.ant-statistic-content-prefix {
+    color: var(--sigam-teal);
+    margin-inline-end: 8px;
+}
+
+/* ================= Descripciones (fichas) ================= */
+.ant-descriptions-bordered .ant-descriptions-view {
+    border: 1px solid var(--sigam-borde);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.ant-descriptions-bordered .ant-descriptions-item-label {
+    background: var(--sigam-navy-050);
+    font-weight: 600;
+    color: var(--sigam-navy);
+    width: 38%;
+}
+.ant-descriptions-bordered .ant-descriptions-row > th,
+.ant-descriptions-bordered .ant-descriptions-row > td {
+    border-inline-end-color: var(--sigam-borde-suave);
+    border-bottom-color: var(--sigam-borde-suave);
+    padding: 9px 14px;
+}
+
+/* ================= Pestañas ================= */
+.ant-tabs-top > .ant-tabs-nav {
+    margin-bottom: 14px;
+}
+.ant-tabs-tab {
+    font-weight: 600;
+    color: var(--sigam-tenue);
+    transition: color 0.18s ease;
+}
+.ant-tabs-tab:hover {
+    color: var(--sigam-navy);
+}
+.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: var(--sigam-navy);
+}
+.ant-tabs-ink-bar {
+    background: var(--sigam-grad);
+    height: 3px !important;
+    border-radius: 3px;
+}
+.ant-tabs-tab .anticon {
+    margin-inline-end: 6px;
+}
+
+/* ================= Botones ================= */
+.ant-btn {
+    border-radius: 10px;
+    font-weight: 600;
+    box-shadow: none;
+    transition: transform 0.14s cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease,
+        color 0.18s ease, filter 0.18s ease;
+}
+.ant-btn:not(.ant-btn-sm):not(.ant-btn-lg) {
+    height: 36px;
+    padding-inline: 15px;
+}
+.ant-btn-primary {
+    background: var(--sigam-grad);
+    background-size: 150% 150%;
+    background-position: 0% 50%;
+    border-color: transparent;
+    box-shadow: 0 8px 18px -8px rgba(23, 58, 95, 0.5);
+}
+.ant-btn-primary:not(:disabled):hover {
+    background-position: 100% 50%;
+    box-shadow: 0 12px 24px -8px rgba(23, 58, 95, 0.55);
+    transform: translateY(-1px);
+    color: #fff !important;
+}
+.ant-btn-primary:not(:disabled):active {
+    transform: translateY(0);
+}
+.ant-btn-default {
+    border-color: var(--sigam-borde);
+    color: #33495e;
+}
+.ant-btn-default:not(:disabled):hover {
+    border-color: var(--sigam-navy);
+    color: var(--sigam-navy);
+    background: var(--sigam-navy-050);
+}
+.ant-btn-dangerous {
+    color: #d64545;
+}
+.ant-btn-primary.ant-btn-dangerous {
+    background: #d64545 !important;
+    color: #fff !important;
+    box-shadow: 0 8px 18px -8px rgba(214, 69, 69, 0.5);
+}
+.ant-btn-primary.ant-btn-dangerous:not(:disabled):hover {
+    background: #c23b3b !important;
+    box-shadow: 0 12px 24px -8px rgba(214, 69, 69, 0.55);
+    transform: translateY(-1px);
+}
+.ant-btn-dangerous:not(.ant-btn-primary):not(:disabled):hover {
+    background: #fdecec;
+    border-color: #d64545;
+    color: #c23b3b;
+}
+.ant-btn-lg {
+    height: 46px;
+    border-radius: 12px;
+    font-size: 15px;
+}
+.ant-btn.ant-btn-background-ghost.ant-btn-primary {
+    color: var(--sigam-navy);
+    border-color: var(--sigam-navy);
+    background: transparent;
+}
+.ant-btn.ant-btn-background-ghost.ant-btn-primary:hover {
+    background: var(--sigam-navy-050);
+}
+
+/* ================= Etiquetas ================= */
+.ant-tag {
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 11px;
+    line-height: 18px;
+    padding-inline: 9px;
+    border: none;
+}
+.ant-tag-green {
+    background: var(--sigam-teal-050);
+    color: var(--sigam-teal-700);
+}
+.ant-tag-blue {
+    background: var(--sigam-navy-050);
+    color: var(--sigam-navy);
+}
+
+/* ================= Formularios ================= */
+.ant-form-vertical .ant-form-item-label > label {
+    font-weight: 600;
+    font-size: 12.5px;
+    color: #34485c;
+    height: auto;
+}
+.ant-form-item {
+    margin-bottom: 16px;
+}
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-number,
+.ant-picker,
+.ant-select-selector {
+    border-radius: 9px !important;
+    border-color: var(--sigam-borde) !important;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease !important;
+}
+.ant-input:hover,
+.ant-input-affix-wrapper:hover,
+.ant-input-number:hover,
+.ant-select:hover .ant-select-selector {
+    border-color: var(--sigam-teal) !important;
+}
+.ant-input:focus,
+.ant-input-focused,
+.ant-input-affix-wrapper-focused,
+.ant-input-number-focused,
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused {
+    border-color: var(--sigam-navy) !important;
+    box-shadow: 0 0 0 3px rgba(31, 158, 134, 0.16) !important;
+}
+.ant-radio-group.ant-radio-group-solid .ant-radio-button-wrapper-checked {
+    background: var(--sigam-navy);
+    border-color: var(--sigam-navy);
+}
+.ant-radio-group.ant-radio-group-solid
+    .ant-radio-button-wrapper-checked:hover {
+    background: var(--sigam-navy-700);
+}
+.ant-checkbox-checked .ant-checkbox-inner,
+.ant-switch.ant-switch-checked {
+    background: var(--sigam-teal);
+}
+
+/* Sección de formulario: título de tarjeta con acento */
+.ant-form .ant-card > .ant-card-head .ant-card-head-title::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 14px;
+    border-radius: 2px;
+    background: var(--sigam-grad);
+    margin-right: 9px;
+    vertical-align: -2px;
+}
+
+/* Sección de formulario con icono (clase .sec) — patrón unificado */
+.ant-card.sec > .ant-card-head .ant-card-head-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ant-card.sec > .ant-card-head .ant-card-head-title::before {
+    display: none !important;
+}
+.ant-card.sec > .ant-card-head .ant-card-head-title .anticon {
+    color: var(--sigam-teal);
+    font-size: 15px;
+}
+.ant-card.sec {
+    border-top: 3px solid var(--sigam-navy-100);
+}
+
+.ant-col .ant-card:last-child .ant-btn-lg.ant-btn-block {
+    position: sticky;
+    bottom: 0;
+}
+
+/* ================= Timeline ================= */
+.ant-timeline .ant-timeline-item-head {
+    border-width: 2px;
+}
+.ant-timeline .ant-timeline-item-content {
+    font-size: 13px;
+}
+
+/* ================= Listas dentro de fichas ================= */
+.ant-card .ant-list-item {
+    padding-block: 11px;
+    border-radius: 10px;
+    transition: background 0.14s ease, padding 0.14s ease;
+}
+.ant-card .ant-list-item.cursor-pointer:hover {
+    background: var(--sigam-navy-050);
+    padding-inline: 10px;
+}
+.ant-list-item-meta-avatar .anticon {
+    font-size: 17px;
+    color: var(--sigam-navy);
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sigam-teal-050);
+    border-radius: 10px;
+}
+.ant-list-item-meta-title {
+    font-weight: 600;
+}
+.ant-list-item-meta-description {
+    font-size: 12.5px;
+}
+
+/* ================= Empty / Alert / Modal ================= */
+.ant-empty {
+    padding: 14px 0;
+}
+.ant-alert {
+    border-radius: 10px;
+    align-items: flex-start;
+}
+.ant-alert-info {
+    background: var(--sigam-navy-050);
+    border-color: var(--sigam-navy-100);
+}
+.ant-alert-info .ant-alert-icon {
+    color: var(--sigam-navy);
+}
+.ant-modal .ant-modal-content {
+    border-radius: 16px;
+    box-shadow: var(--sigam-sombra-lg);
+    padding: 0;
+    overflow: hidden;
+}
+.ant-modal .ant-modal-header {
+    padding: 15px 20px;
+    margin: 0;
+    border-bottom: 1px solid var(--sigam-borde-suave);
+    background: linear-gradient(120deg, var(--sigam-navy-050), #fff 85%);
+    position: relative;
+}
+.ant-modal .ant-modal-header::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--sigam-grad);
+}
+.ant-modal .ant-modal-title {
+    font-weight: 700;
+    color: var(--sigam-navy);
+    font-size: 14.5px;
+}
+.ant-modal .ant-modal-close {
+    top: 14px;
+    inset-inline-end: 14px;
+    border-radius: 8px;
+}
+.ant-modal .ant-modal-close:hover {
+    background: var(--sigam-navy-100);
+}
+.ant-modal .ant-modal-body {
+    padding: 20px;
+}
+.ant-modal-confirm .ant-modal-body {
+    padding: 22px;
+}
+.ant-modal .ant-modal-footer {
+    padding: 12px 20px;
+    margin: 0;
+    border-top: 1px solid var(--sigam-borde-suave);
+    background: #fbfcfe;
+}
+.ant-modal-root .ant-modal-wrap {
+    animation: sigam-fade-in 0.18s ease;
+}
+.ant-modal-root .ant-modal {
+    animation: sigam-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ================= Dropdown ================= */
+.ant-dropdown-menu {
+    border-radius: 12px;
+    box-shadow: var(--sigam-sombra-lg) !important;
+    padding: 6px;
+}
+.ant-dropdown-menu .ant-dropdown-menu-item {
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-weight: 500;
+}
+.ant-dropdown-menu .ant-dropdown-menu-item:not(.ant-dropdown-menu-item-danger):hover {
+    background: var(--sigam-navy-050);
+    color: var(--sigam-navy);
+}
+
+/* ================= Mensajes flotantes ================= */
+.ant-message-notice-content {
+    border-radius: 10px;
+    box-shadow: var(--sigam-sombra-md);
+    font-weight: 500;
+}
+
+/* ================= Avatares ================= */
+.ant-avatar {
+    font-weight: 700;
+}
+.ant-avatar-lg,
+.ant-avatar[style*='background'] {
+    background: var(--sigam-grad) !important;
+}
+
+/* ================= Paginación ================= */
+.ant-pagination .ant-pagination-item {
+    border-radius: 8px;
+    font-weight: 600;
+}
+.ant-pagination .ant-pagination-item-active {
+    border-color: var(--sigam-navy);
+    background: var(--sigam-navy);
+}
+.ant-pagination .ant-pagination-item-active a {
+    color: #fff;
+}
+.ant-pagination .ant-pagination-item:not(.ant-pagination-item-active):hover a {
+    color: var(--sigam-navy);
+}
+
+/* ================= Segmented ================= */
+.ant-segmented {
+    background: var(--sigam-navy-050);
+    border-radius: 10px;
+    padding: 3px;
+}
+.ant-segmented .ant-segmented-item-selected {
+    box-shadow: 0 2px 6px -1px rgba(17, 34, 51, 0.14);
+    color: var(--sigam-navy);
+    font-weight: 600;
+}
+
+/* ================= Selector de fecha / calendario ================= */
+.ant-picker-dropdown .ant-picker-panel-container {
+    border-radius: 14px;
+    box-shadow: var(--sigam-sombra-lg);
+    overflow: hidden;
+}
+.ant-picker-dropdown .ant-picker-header {
+    border-bottom: 1px solid var(--sigam-borde-suave);
+}
+.ant-picker-dropdown .ant-picker-content th {
+    color: var(--sigam-tenue);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+.ant-picker-dropdown .ant-picker-cell-in-view.ant-picker-cell-today .ant-picker-cell-inner::before {
+    border-color: var(--sigam-teal);
+}
+.ant-picker-dropdown .ant-picker-cell-selected .ant-picker-cell-inner,
+.ant-picker-dropdown .ant-picker-cell-range-start .ant-picker-cell-inner,
+.ant-picker-dropdown .ant-picker-cell-range-end .ant-picker-cell-inner {
+    background: var(--sigam-navy) !important;
+}
+.ant-picker-dropdown .ant-picker-cell-in-range .ant-picker-cell-inner {
+    background: var(--sigam-navy-050);
+}
+.ant-picker-dropdown .ant-picker-today-btn,
+.ant-picker-dropdown .ant-picker-now-btn {
+    color: var(--sigam-teal-700);
+}
+.ant-picker-dropdown .ant-picker-time-panel-column
+    > li.ant-picker-time-panel-cell-selected
+    .ant-picker-time-panel-cell-inner {
+    background: var(--sigam-navy-050);
+    color: var(--sigam-navy);
+    font-weight: 700;
+}
+
+/* Inputs nativos de fecha/hora — se alinean con el resto de la UI */
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'] {
+    font-family: inherit;
+}
+.ant-input[type='date'],
+.ant-input[type='time'],
+.ant-input[type='datetime-local'] {
+    line-height: 1.4;
+}
+
+/* ==================================================================
+   SIGAM · Capa de pulido extra (más diseño en todo el sistema)
+   ================================================================== */
+
+/* ---------- Fondo y entrada de contenido -------------------------- */
+.app-content__body {
+    background:
+        radial-gradient(1100px 380px at 12% -8%, rgba(31, 158, 134, 0.06), transparent 60%),
+        radial-gradient(900px 360px at 100% 0%, rgba(23, 58, 95, 0.06), transparent 55%);
+}
+.app-content__body > * {
+    animation: sigam-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ---------- Tarjetas: más profundidad y acento superior ---------- */
+.ant-card {
+    border-color: var(--sigam-borde);
+    box-shadow: 0 1px 2px rgba(17, 34, 51, 0.04), 0 10px 30px -22px rgba(17, 34, 51, 0.28);
+}
+.ant-card:hover {
+    box-shadow: 0 4px 10px -4px rgba(17, 34, 51, 0.08), 0 26px 48px -26px rgba(17, 34, 51, 0.32);
+    transform: translateY(-2px);
+}
+.ant-card > .ant-card-head {
+    background: linear-gradient(180deg, #fbfcfe, #fff);
+}
+
+/* Tarjeta de sección de detalle (usa <SeccionFicha>) — sin hover-lift molesto */
+.ant-card:has(.sf) {
+    transform: none;
+}
+.ant-card:has(.sf):hover {
+    transform: none;
+}
+
+/* ---------- Botones: relieve y micro-interacción ---------------- */
+.ant-btn-primary {
+    letter-spacing: 0.01em;
+}
+.ant-btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 45%);
+    pointer-events: none;
+}
+.ant-btn-default:not(:disabled):active,
+.ant-btn-primary:not(:disabled):active {
+    transform: translateY(1px) scale(0.99);
+}
+
+/* ---------- Etiquetas más suaves --------------------------------- */
+.ant-tag {
+    line-height: 19px;
+    padding-inline: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.ant-tag .anticon {
+    font-size: 10px;
+}
+.ant-tag-red,
+.ant-tag-error {
+    background: #fdecec;
+    color: #c23b3b;
+}
+.ant-tag-orange,
+.ant-tag-warning,
+.ant-tag-gold {
+    background: #fdf1e3;
+    color: #a86717;
+}
+.ant-tag-purple,
+.ant-tag-geekblue {
+    background: #efe9fb;
+    color: #6b4bc9;
+}
+.ant-tag-cyan {
+    background: #e2f4f2;
+    color: #16806c;
+}
+
+/* ---------- Tablas: encabezado, hover con acento --------------- */
+.tabla-inertia .ant-table-thead > tr > th {
+    background: linear-gradient(180deg, #f1f5fa, var(--sigam-navy-050));
+}
+.tabla-inertia .ant-table-tbody > tr.ant-table-row:hover > td {
+    background: var(--sigam-navy-050);
+}
+.tabla-inertia .ant-pagination-item-active {
+    background: var(--sigam-grad);
+    border-color: transparent;
+}
+
+/* ---------- Inputs: foco con anillo teal ---------------------- */
+.ant-input:focus,
+.ant-input-focused,
+.ant-input-affix-wrapper-focused,
+.ant-input-number-focused,
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused {
+    box-shadow: 0 0 0 3px rgba(31, 158, 134, 0.18) !important;
+}
+.ant-form-item-label > label {
+    color: var(--sigam-navy);
+}
+
+/* ---------- Pestañas: barra inferior con degradado ----------- */
+.ant-tabs-top > .ant-tabs-nav::before {
+    border-bottom-color: var(--sigam-borde-suave);
+}
+.ant-tabs-tab + .ant-tabs-tab {
+    margin-left: 22px;
+}
+.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+    text-shadow: none;
+    font-weight: 700;
+}
+
+/* ---------- Estado vacío con más carácter -------------------- */
+.ant-empty {
+    padding: 26px 0;
+}
+.ant-empty .ant-empty-image {
+    height: 62px;
+    opacity: 0.85;
+}
+.ant-empty .ant-empty-description {
+    color: var(--sigam-tenue);
+    font-size: 13px;
+    margin-top: 6px;
+}
+
+/* ---------- Timeline con puntos de color -------------------- */
+.ant-timeline .ant-timeline-item-head {
+    border-color: var(--sigam-teal);
+    box-shadow: 0 0 0 3px var(--sigam-teal-050);
+}
+.ant-timeline .ant-timeline-item-tail {
+    border-inline-start-color: var(--sigam-borde);
+}
+
+/* ---------- Descripciones ---------------------------------- */
+.ant-descriptions-bordered .ant-descriptions-view {
+    box-shadow: var(--sigam-sombra-sm);
+}
+
+/* ---------- Alertas más redondas -------------------------- */
+.ant-alert {
+    border-radius: 12px;
+}
+.ant-alert-warning {
+    background: #fdf6ec;
+    border-color: #f6e2c4;
+}
+.ant-alert-error {
+    background: #fdeeee;
+    border-color: #f6d3d3;
+}
+.ant-alert-success {
+    background: var(--sigam-teal-050);
+    border-color: #c7e9e0;
+}
+
+/* ---------- Spin / carga con color de marca --------------- */
+.ant-spin-dot-item {
+    background-color: var(--sigam-teal);
+}
+
+/* ---------- Scrollbars globales -------------------------- */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #c9d4df transparent;
+}
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-thumb {
+    background: #c9d4df;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #adbccb;
+    background-clip: content-box;
+}
+
+/* ---------- Avatares con borde sutil -------------------- */
+.ant-avatar {
+    box-shadow: 0 4px 12px -6px rgba(23, 58, 95, 0.45);
+}
+
+/* ---------- Segmented / radios más marcados ------------ */
+.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+    background: var(--sigam-grad) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+    box-shadow: 0 6px 14px -8px rgba(23, 58, 95, 0.5);
+}
+
+/* ---------- Dropdowns / menús ------------------------- */
+.ant-dropdown-menu-item-selected {
+    background: var(--sigam-navy-050) !important;
+    color: var(--sigam-navy) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ant-card:hover { transform: none; }
+    .barra__fill { animation: none !important; }
+}
+
+/* Los bloques del contenido no deben encogerse (el scroll vive en el body) */
+.app-content__body > *:not(.dti) {
+    flex-shrink: 0;
+}
