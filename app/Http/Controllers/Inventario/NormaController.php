@@ -87,7 +87,7 @@ class NormaController extends Controller
     {
         $this->authorize('normas.ver');
 
-        $norma->load(['documento', 'equipos:id,codigo_activo,descripcion']);
+        $norma->load(['documento', 'documentos', 'equipos:id,codigo_activo,descripcion']);
         $norma->loadCount(['equipos', 'planes', 'mantenimientos']);
 
         return Inertia::render('Normas/Show', ['norma' => $norma]);

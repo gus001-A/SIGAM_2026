@@ -6,6 +6,7 @@ import {
     DeleteOutlined,
     DownloadOutlined,
     EditOutlined,
+    EyeOutlined,
     FileProtectOutlined,
     FileTextOutlined,
     NumberOutlined,
@@ -17,6 +18,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
 import FichaEncabezado from '@/Components/FichaEncabezado.vue';
 import ListaDatos from '@/Components/ListaDatos.vue';
+import ListaDocumentos from '@/Components/ListaDocumentos.vue';
 import SeccionFicha from '@/Components/SeccionFicha.vue';
 import { usePermisos } from '@/composables/usePermisos';
 
@@ -34,6 +36,10 @@ const revisionVencida = computed(
 );
 
 const irA = (n, p) => router.visit(route(n, p));
+
+const esImagenOficial = computed(() => /^image\//.test(props.norma.documento?.tipo_mime || ''));
+const previsualizandoOficial = ref(false);
+const urlVerOficial = computed(() => (props.norma.documento ? route('documentos.ver', props.norma.documento.id) : null));
 
 const datos = computed(() => [
     { icono: FileProtectOutlined, label: 'Nombre', valor: props.norma.nombre, color: '#173a5f' },
@@ -111,13 +117,22 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
                         <p class="notas">{{ norma.descripcion }}</p>
                     </SeccionFicha>
                     <SeccionFicha v-if="norma.documento" titulo="Documento oficial" :icono="FileTextOutlined" color="#0d84c9">
-                        <div class="doc-of">
-                            <span class="doc-of__ic"><FileTextOutlined /></span>
+                        <button type="button" class="doc-of" @click="esImagenOficial ? (previsualizandoOficial = true) : null">
+                            <span class="doc-of__ic">
+                                <img v-if="esImagenOficial" :src="urlVerOficial" alt="" />
+                                <FileTextOutlined v-else />
+                            </span>
                             <span class="doc-of__n">{{ norma.documento.nombre_original }}</span>
-                            <a :href="route('documentos.download', norma.documento.id)" target="_blank">
+                            <a-button v-if="esImagenOficial" size="small" @click.stop="previsualizandoOficial = true">
+                                <template #icon><EyeOutlined /></template>Ver
+                            </a-button>
+                            <a v-else :href="urlVerOficial" target="_blank" @click.stop>
+                                <a-button size="small"><template #icon><EyeOutlined /></template>Ver</a-button>
+                            </a>
+                            <a :href="route('documentos.download', norma.documento.id)" target="_blank" @click.stop>
                                 <a-button size="small"><template #icon><DownloadOutlined /></template>Descargar</a-button>
                             </a>
-                        </div>
+                        </button>
                     </SeccionFicha>
                 </a-card>
             </a-col>
@@ -140,6 +155,30 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
             </a-col>
         </a-row>
 
+        <a-card size="small" class="mt-4">
+            <SeccionFicha :titulo="`Anexos adicionales (${norma.documentos?.length ?? 0})`" :icono="FileTextOutlined" color="#6b4bc9">
+                <ListaDocumentos
+                    :documentos="norma.documentos ?? []"
+                    relacionable-tipo="norma"
+                    :relacionable-id="norma.id"
+                    :roles="['evidencia', 'certificado', 'referencia']"
+                    :puede-subir="puede('documentos.crear')"
+                    :puede-eliminar="puede('documentos.desactivar')"
+                />
+            </SeccionFicha>
+        </a-card>
+
+        <a-modal
+            :open="previsualizandoOficial"
+            :footer="null"
+            :width="620"
+            centered
+            :title="norma.documento?.nombre_original"
+            @cancel="previsualizandoOficial = false"
+        >
+            <img v-if="norma.documento" :src="urlVerOficial" :alt="norma.documento.nombre_original" class="doc-of__prev" />
+        </a-modal>
+
         <ConfirmarDialog ref="confirmar" />
     </AppLayout>
 </template>
@@ -149,10 +188,13 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
     display: flex;
     align-items: center;
     gap: 10px;
+    width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--sigam-borde);
     border-radius: 11px;
     background: var(--sigam-navy-050);
+    cursor: default;
+    font-family: inherit;
 }
 .doc-of__ic {
     width: 32px;
@@ -162,17 +204,31 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
     color: #0d6ca6;
     background: #e8f3fb;
+}
+.doc-of__ic img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 .doc-of__n {
     flex: 1;
     min-width: 0;
+    text-align: left;
     font-size: 13px;
     font-weight: 600;
     color: var(--sigam-texto);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.doc-of__prev {
+    display: block;
+    width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    background: #0f2c4a;
 }
 </style>

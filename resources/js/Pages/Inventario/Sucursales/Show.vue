@@ -16,7 +16,9 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
 import FichaEncabezado from '@/Components/FichaEncabezado.vue';
 import ListaDatos from '@/Components/ListaDatos.vue';
+import ListaDocumentos from '@/Components/ListaDocumentos.vue';
 import SeccionFicha from '@/Components/SeccionFicha.vue';
+import { FileTextOutlined } from '@ant-design/icons-vue';
 import { DollarOutlined, IdcardOutlined, ShopOutlined } from '@ant-design/icons-vue';
 import { usePermisos } from '@/composables/usePermisos';
 
@@ -147,6 +149,19 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
                 </a-card>
             </a-col>
         </a-row>
+
+        <a-card size="small" class="mt-4">
+            <SeccionFicha :titulo="`Documentos (${sucursal.documentos?.length ?? 0})`" :icono="FileTextOutlined" color="#6b4bc9">
+                <ListaDocumentos
+                    :documentos="sucursal.documentos ?? []"
+                    relacionable-tipo="sucursal"
+                    :relacionable-id="sucursal.id"
+                    :roles="['contrato', 'plano', 'permiso', 'certificado']"
+                    :puede-subir="puede('documentos.crear')"
+                    :puede-eliminar="puede('documentos.desactivar')"
+                />
+            </SeccionFicha>
+        </a-card>
 
         <ConfirmarDialog ref="confirmar" />
     </AppLayout>

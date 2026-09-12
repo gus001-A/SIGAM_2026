@@ -30,7 +30,10 @@ const caracteristicas = [
                 <span class="au-brand__ring" aria-hidden="true" />
 
                 <div class="au-brand__inner">
-                    <img src="/images/logo-sigam-blanco.png" alt="SIGAM" class="au-brand__logo" />
+                    <div class="au-brand__logobox">
+                        <img src="/images/logo-sigam-blanco.png" alt="SIGAM" class="au-brand__logo" />
+                    </div>
+                    <p class="au-brand__kicker">Sistema Integral de Gestión de Activos y Mantenimiento</p>
                     <h2 class="au-brand__title">
                         Gestión integral de <span>activos y mantenimiento</span> hospitalario
                     </h2>
@@ -61,7 +64,7 @@ const caracteristicas = [
 
                     <p v-if="$slots.footer" class="au-card__foot"><slot name="footer" /></p>
                 </div>
-                <p class="au-legal">© {{ new Date().getFullYear() }} SIGAM · Sistema de Inventario y Gestión de Mantenimientos</p>
+                <p class="au-legal">© {{ new Date().getFullYear() }} SIGAM — Sistema Integral de Gestión de Activos y Mantenimiento</p>
             </main>
         </div>
     </a-config-provider>
@@ -86,6 +89,16 @@ const caracteristicas = [
     padding: 56px 132px 56px 7%;
     color: #fff;
     background: linear-gradient(158deg, #0d3f77 0%, #1e5eb8 52%, #0b6b60 100%);
+}
+.au-brand::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+    background-size: 42px 42px;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 26%, #000 74%, transparent);
+    mask-image: linear-gradient(180deg, transparent, #000 26%, #000 74%, transparent);
 }
 .au-brand::after {
     content: '';
@@ -141,12 +154,30 @@ const caracteristicas = [
 }
 @keyframes au-slide-in { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
 
+.au-brand__logobox {
+    display: inline-flex;
+    align-items: center;
+    padding: 18px 26px;
+    margin-bottom: 22px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 20px 44px -20px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+}
 .au-brand__logo {
-    height: 34px;
+    height: 76px;
     width: auto;
     display: block;
-    margin-bottom: 30px;
-    opacity: 0.96;
+    filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.3));
+}
+.au-brand__kicker {
+    margin: 0 0 18px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #8de4d3;
 }
 .au-brand__title {
     font-size: clamp(1.7rem, 2.6vw, 2.3rem);

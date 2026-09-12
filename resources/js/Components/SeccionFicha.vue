@@ -29,7 +29,9 @@ defineProps({
 }
 .sf__t {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    row-gap: 4px;
     gap: 8px;
     margin: 0 0 10px;
     font-weight: 800;

@@ -2,14 +2,12 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-    ]);
-});
+/**
+ * La raíz del sitio no tiene una página propia: manda directo al inicio de
+ * sesión (o al dashboard si ya hay sesión activa).
+ */
+Route::get('/', fn () => redirect()->route(auth()->check() ? 'dashboard' : 'login'));
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

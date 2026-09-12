@@ -128,6 +128,7 @@ const atenuar = computed(() => `${props.color}1a`);
 }
 .fe__acciones {
     flex: none;
+    max-width: 100%;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;

@@ -393,12 +393,22 @@ onBeforeUnmount(() => {
 .tabla-inertia .ant-table-cell-fix-right {
     background: #fff;
 }
-/* Sin sombra/línea marcada entre la columna fija y el resto */
-.tabla-inertia .ant-table-cell-fix-right-first::after,
-.tabla-inertia .ant-table-cell-fix-left-last::after,
-.tabla-inertia .ant-table-ping-right .ant-table-cell-fix-right-first::after,
-.tabla-inertia .ant-table-ping-left .ant-table-cell-fix-left-last::after {
-    box-shadow: none !important;
+/* En escritorio la tabla suele caber completa: se quita la sombra de
+   "hay más columnas" para no ensuciar la columna de acciones fija.
+   En pantallas angostas SÍ hace falta — es la única pista de que se
+   puede deslizar para ver el resto de las columnas. */
+@media (min-width: 900px) {
+    .tabla-inertia .ant-table-cell-fix-right-first::after,
+    .tabla-inertia .ant-table-cell-fix-left-last::after,
+    .tabla-inertia .ant-table-ping-right .ant-table-cell-fix-right-first::after,
+    .tabla-inertia .ant-table-ping-left .ant-table-cell-fix-left-last::after {
+        box-shadow: none !important;
+    }
+}
+/* Scroll horizontal más fluido al tacto */
+.tabla-inertia .ant-table-content,
+.tabla-inertia .ant-table-body {
+    -webkit-overflow-scrolling: touch;
 }
 
 /* --- Scroll interno --- */

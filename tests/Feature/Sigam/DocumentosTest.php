@@ -3,6 +3,8 @@
 namespace Tests\Feature\Sigam;
 
 use App\Models\Equipo;
+use App\Models\Norma;
+use App\Models\Proveedor;
 use App\Models\Sucursal;
 use App\Models\Usuario;
 use Database\Seeders\CatalogosSeeder;
@@ -58,5 +60,28 @@ class DocumentosTest extends TestCase
             ->assertRedirect();
 
         $this->assertSoftDeleted($documento);
+    }
+
+    /** Regresión: a Norma le faltaba el trait TieneDocumentos y no aceptaba adjuntos. */
+    public function test_puede_adjuntar_documentos_a_una_norma_una_sucursal_y_un_proveedor(): void
+    {
+        $norma = Norma::create(['codigo' => 'NOM-DOC', 'nombre' => 'Norma con anexos', 'estado' => 'activo']);
+        $sucursal = Sucursal::where('codigo', 'S1')->firstOrFail();
+        $proveedor = Proveedor::create(['razon_social' => 'Proveedor Doc SA', 'estado' => 'activo']);
+
+        foreach ([
+            ['norma', $norma],
+            ['sucursal', $sucursal],
+            ['proveedor', $proveedor],
+        ] as [$tipo, $entidad]) {
+            $this->actingAs($this->admin)->post(route('documentos.store'), [
+                'archivo' => UploadedFile::fake()->create("anexo-{$tipo}.pdf", 100, 'application/pdf'),
+                'relacionable_tipo' => $tipo,
+                'relacionable_id' => $entidad->id,
+                'visibilidad' => 'privado',
+            ])->assertRedirect();
+
+            $this->assertSame(1, $entidad->fresh()->documentos()->count());
+        }
     }
 }

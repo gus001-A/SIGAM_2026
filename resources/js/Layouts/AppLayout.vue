@@ -14,6 +14,7 @@ import {
     FileTextOutlined,
     FormOutlined,
     LogoutOutlined,
+    MenuOutlined,
     SafetyCertificateOutlined,
     SettingOutlined,
     ShopOutlined,
@@ -23,6 +24,7 @@ import {
 } from '@ant-design/icons-vue';
 import { antdLocale, antTheme } from '@/theme';
 import { usePermisos } from '@/composables/usePermisos';
+import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
 import PanelNotificaciones from '@/Components/PanelNotificaciones.vue';
 
 const props = defineProps({
@@ -142,6 +144,13 @@ const onMenu = ({ key }) => {
     router.visit(route(key));
 };
 
+// --- Menú móvil (panel deslizante con hamburguesa) -----------------
+const menuMovilAbierto = ref(false);
+const onMenuMovil = (info) => {
+    menuMovilAbierto.value = false;
+    onMenu(info);
+};
+
 // --- Encabezado ------------------------------------------------
 const tituloPagina = computed(() => props.titulo || page.props.titulo || 'SIGAM');
 const iniciales = computed(() => {
@@ -165,7 +174,16 @@ onMounted(() => {
     router.on('navigate', cargarNoLeidas);
 });
 
-const cerrarSesion = () => router.post(route('logout'));
+const confirmar = ref(null);
+const cerrarSesion = async () => {
+    const ok = await confirmar.value.abrir({
+        titulo: 'Cerrar sesión',
+        mensaje: '¿Seguro que quieres salir de SIGAM? Tendrás que iniciar sesión de nuevo para continuar.',
+        confirmar: 'Cerrar sesión',
+        peligro: true,
+    });
+    if (ok) router.post(route('logout'));
+};
 const onUserMenu = ({ key }) => {
     if (key === 'perfil') router.visit(route('profile.edit'));
     if (key === 'auditoria') router.visit(route('auditoria.index'));
@@ -200,8 +218,18 @@ watch(
         <a-app>
             <a-layout class="app-shell">
                 <a-layout-header class="app-nav">
-                    <div class="app-nav__brand" @click="router.visit(route('dashboard'))">
-                        <img src="/images/logo-sigam.png" alt="SIGAM" class="app-nav__logo" />
+                    <div class="app-nav__izq">
+                        <a-button
+                            type="text"
+                            class="app-nav__burger"
+                            aria-label="Abrir menú"
+                            @click="menuMovilAbierto = true"
+                        >
+                            <template #icon><MenuOutlined /></template>
+                        </a-button>
+                        <div class="app-nav__brand" @click="router.visit(route('dashboard'))">
+                            <img src="/images/logo-sigam.png" alt="SIGAM" class="app-nav__logo" />
+                        </div>
                     </div>
 
                     <a-menu
@@ -246,6 +274,28 @@ watch(
                     </div>
                 </a-layout-content>
             </a-layout>
+
+            <ConfirmarDialog ref="confirmar" />
+
+            <a-drawer
+                v-model:open="menuMovilAbierto"
+                placement="left"
+                :width="280"
+                :closable="false"
+                root-class-name="app-nav-drawer"
+            >
+                <template #title>
+                    <img src="/images/logo-sigam.png" alt="SIGAM" class="app-nav-drawer__logo" />
+                </template>
+                <a-menu
+                    mode="inline"
+                    :items="menuItems"
+                    :selected-keys="selectedKeys"
+                    :default-open-keys="grupoActivo ? [grupoActivo.clave] : []"
+                    class="app-nav-drawer__menu"
+                    @click="onMenuMovil"
+                />
+            </a-drawer>
         </a-app>
     </a-config-provider>
 </template>
@@ -287,12 +337,28 @@ watch(
     animation: sigam-slide 7s linear infinite;
     opacity: 0.9;
 }
-.app-nav__brand {
+.app-nav__izq {
     justify-self: start;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+.app-nav__burger {
+    display: none;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    color: var(--sigam-navy);
+}
+.app-nav__brand {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 6px 12px;
+    min-width: 0;
     border-radius: 12px;
     cursor: pointer;
     transition: background 0.16s ease;
@@ -418,6 +484,7 @@ watch(
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    overflow-x: hidden;
     padding-bottom: 22px;
     scrollbar-width: thin;
 }
@@ -431,16 +498,39 @@ watch(
     background-clip: content-box;
 }
 
+/* Por debajo de este ancho el menú horizontal ya no cabe (se traslapa con
+   el logo y el usuario) — se oculta y se usa la hamburguesa + panel. */
+@media (max-width: 1180px) {
+    .app-nav {
+        grid-template-columns: auto 1fr auto;
+    }
+    .app-nav__menu.ant-menu-horizontal {
+        display: none !important;
+    }
+    .app-nav__burger {
+        display: inline-flex !important;
+    }
+}
+
 @media (max-width: 720px) {
     .app-user__nombre {
         display: none;
     }
     .app-nav {
         padding: 0 10px;
-        gap: 8px;
+        gap: 6px;
+    }
+    .app-nav__brand {
+        padding: 6px 8px;
     }
     .app-content {
         padding: 14px 12px 0;
+    }
+}
+
+@media (max-width: 420px) {
+    .app-nav__logo {
+        height: 24px;
     }
 }
 </style>
@@ -578,6 +668,50 @@ watch(
     padding: 8px 11px;
 }
 .app-user__menu .ant-dropdown-menu-item .anticon {
+    color: var(--sigam-teal);
+}
+
+/* ---------- Panel deslizante del menú (móvil / tablet) ---------- */
+.app-nav-drawer .ant-drawer-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--sigam-borde-suave);
+}
+.app-nav-drawer .ant-drawer-body {
+    padding: 10px;
+}
+.app-nav-drawer__logo {
+    height: 26px;
+    width: auto;
+    display: block;
+}
+.app-nav-drawer__menu.ant-menu {
+    border-inline-end: none !important;
+}
+.app-nav-drawer__menu.ant-menu-inline .ant-menu-item,
+.app-nav-drawer__menu.ant-menu-inline .ant-menu-submenu-title {
+    border-radius: 10px;
+    margin-block: 3px;
+    font-weight: 600;
+    color: #4b5b6d;
+}
+.app-nav-drawer__menu .ant-menu-item .anticon,
+.app-nav-drawer__menu .ant-menu-submenu-title .anticon {
+    color: #8a97a6;
+}
+.app-nav-drawer__menu .ant-menu-item-selected {
+    background: var(--sigam-grad) !important;
+    color: #fff !important;
+    font-weight: 700;
+}
+.app-nav-drawer__menu .ant-menu-item-selected .anticon,
+.app-nav-drawer__menu .ant-menu-item-selected .ant-menu-title-content {
+    color: #fff !important;
+}
+.app-nav-drawer__menu .ant-menu-submenu-open > .ant-menu-submenu-title {
+    color: var(--sigam-navy);
+    background: var(--sigam-navy-050);
+}
+.app-nav-drawer__menu .ant-menu-submenu-open > .ant-menu-submenu-title .anticon {
     color: var(--sigam-teal);
 }
 </style>

@@ -19,7 +19,9 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
 import FichaEncabezado from '@/Components/FichaEncabezado.vue';
 import ListaDatos from '@/Components/ListaDatos.vue';
+import ListaDocumentos from '@/Components/ListaDocumentos.vue';
 import SeccionFicha from '@/Components/SeccionFicha.vue';
+import { FileTextOutlined } from '@ant-design/icons-vue';
 import { usePermisos } from '@/composables/usePermisos';
 
 const props = defineProps({
@@ -113,6 +115,19 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
                 </a-card>
             </a-col>
         </a-row>
+
+        <a-card size="small" class="mt-4">
+            <SeccionFicha :titulo="`Documentos (${proveedor.documentos?.length ?? 0})`" :icono="FileTextOutlined" color="#6b4bc9">
+                <ListaDocumentos
+                    :documentos="proveedor.documentos ?? []"
+                    relacionable-tipo="proveedor"
+                    :relacionable-id="proveedor.id"
+                    :roles="['contrato', 'cotización', 'factura', 'certificado']"
+                    :puede-subir="puede('documentos.crear')"
+                    :puede-eliminar="puede('documentos.desactivar')"
+                />
+            </SeccionFicha>
+        </a-card>
 
         <ConfirmarDialog ref="confirmar" />
     </AppLayout>

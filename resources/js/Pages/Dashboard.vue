@@ -505,6 +505,28 @@ const estados = computed(() => {
     color: var(--sigam-navy);
 }
 
+/* ---------- Responsivo ---------- */
+@media (max-width: 560px) {
+    .hero {
+        padding: 18px;
+    }
+    .hero__saludo {
+        font-size: 19px;
+    }
+    .hero__acc {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        width: 100%;
+    }
+    .hero__btn {
+        justify-content: center;
+    }
+    .kpi {
+        padding: 13px 14px;
+    }
+}
+
 /* ---------- Vacíos ---------- */
 .vacio-mini {
     display: flex;
