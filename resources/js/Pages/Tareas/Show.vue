@@ -36,7 +36,7 @@ const tab = ref('resumen');
 const confirmar = ref(null);
 
 const ETIQUETA_ESTADO = { en_proceso: 'Iniciar tarea', realizada: 'Marcar como realizada', cancelada: 'Cancelar tarea' };
-const COLOR_ESTADO = { pendiente: 'default', en_proceso: 'processing', realizada: 'success', cancelada: 'error' };
+const COLOR_ESTADO = { pendiente: 'gold', en_proceso: 'blue', realizada: 'green', cancelada: 'red' };
 const ETIQUETA_ESTADO_TAG = { pendiente: 'Pendiente', en_proceso: 'En proceso', realizada: 'Realizada', cancelada: 'Cancelada' };
 
 const fecha = (v) => (v ? new Date(v).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'No especificado');

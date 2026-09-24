@@ -102,6 +102,7 @@ const cerrarEvento = () => (eventoSeleccionado.value = null);
 
 const ETIQUETA_TIPO_EVENTO = { orden: 'Orden de mantenimiento', ocurrencia: 'Preventivo programado', tarea: 'Tarea' };
 const ETIQUETA_ESTADO_TAREA = { pendiente: 'Pendiente', en_proceso: 'En proceso', realizada: 'Realizada', cancelada: 'Cancelada' };
+const COLOR_ESTADO_TAREA = { pendiente: 'gold', en_proceso: 'blue', realizada: 'green', cancelada: 'red' };
 
 const estadoEvento = (ev) => {
     if (!ev) return '';
@@ -109,6 +110,7 @@ const estadoEvento = (ev) => {
     if (ev.tipo_evento === 'orden') return ev.estado_nombre ?? ev.estado;
     return ev.estado;
 };
+const colorEstadoEvento = (ev) => (ev?.tipo_evento === 'tarea' ? (COLOR_ESTADO_TAREA[ev.estado] ?? 'default') : 'default');
 
 const fechaHora = (v) => (v ? dayjs(v).format('D [de] MMMM, YYYY h:mm A') : null);
 
@@ -243,7 +245,7 @@ const tarjetas = computed(() => [
             </template>
             <div v-if="eventoSeleccionado" class="evt-body">
                 <div class="evt-desc">{{ eventoSeleccionado.titulo }}</div>
-                <a-tag v-if="estadoEvento(eventoSeleccionado)" class="mb-3">{{ estadoEvento(eventoSeleccionado) }}</a-tag>
+                <a-tag v-if="estadoEvento(eventoSeleccionado)" :color="colorEstadoEvento(eventoSeleccionado)" class="mb-3">{{ estadoEvento(eventoSeleccionado) }}</a-tag>
                 <ListaDatos :datos="datosEvento" compacto />
                 <div class="evt-acciones">
                     <a-button type="primary" @click="verCompleto">

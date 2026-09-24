@@ -31,6 +31,8 @@ class DashboardController extends Controller
 {
     private const CACHE_SEGUNDOS = 60;
 
+    private const MAXIMO_POR_PANEL = 6;
+
     public function index(Request $request): Response
     {
         $this->authorize('dashboard.ver');
@@ -81,26 +83,26 @@ class DashboardController extends Controller
                 ->whereIn('estado_id', $abiertos)
                 ->whereNotNull('programado_inicio')
                 ->orderBy('programado_inicio')
-                ->limit(10)
+                ->limit(self::MAXIMO_POR_PANEL)
                 ->get(['id', 'folio', 'equipo_id', 'ubicacion_id', 'tipo_id', 'prioridad_id', 'estado_id', 'programado_inicio']),
             'urgencias' => Mantenimiento::query()
                 ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'estado:id,nombre'])
                 ->whereIn('estado_id', $abiertos)
                 ->whereHas('prioridad', fn ($q) => $q->whereIn('clave', $prioridadesUrgentes))
                 ->latest('id')
-                ->limit(10)
+                ->limit(self::MAXIMO_POR_PANEL)
                 ->get(['id', 'folio', 'equipo_id', 'ubicacion_id', 'estado_id', 'programado_inicio']),
             'preventivos_proximos' => OcurrenciaPlanMantenimiento::query()
                 ->with([
                     'plan.equipo:id,codigo_activo',
-                    'plan.ubicacion:id,nombre',
+                    'plan.ubicacion:id,nombre,codigo',
                     'plan.sucursal:id,nombre',
                     'plan.tipo:id,nombre',
                 ])
                 ->whereNull('mantenimiento_id')
                 ->whereDate('fecha_programada', '>=', today())
                 ->orderBy('fecha_programada')
-                ->limit(10)
+                ->limit(self::MAXIMO_POR_PANEL)
                 ->get(),
             'tareas_proximas' => Tarea::query()
                 ->with([
@@ -110,7 +112,7 @@ class DashboardController extends Controller
                 ->whereIn('estado', ['pendiente', 'en_proceso'])
                 ->tap($soloMisTareas)
                 ->orderBy('fecha_limite')
-                ->limit(10)
+                ->limit(self::MAXIMO_POR_PANEL)
                 ->get(['id', 'titulo', 'descripcion', 'fecha_limite', 'estado', 'prioridad_id']),
         ];
     }

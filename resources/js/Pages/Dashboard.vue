@@ -103,6 +103,36 @@ const colorDias = (v) => {
     if (d <= 7) return 'warning';
     return 'success';
 };
+
+/** Igual que etiquetaDias pero abreviada (11 M 23 D en vez de "En 11 meses y 23 días"), para las tarjetas del panel de preventivos. */
+const tiempoAbrev = (v) => {
+    const d = diasRestantes(v);
+    if (d === null) return '';
+    if (d < 0) return 'Vencido';
+    if (d === 0) return 'Hoy';
+    if (d === 1) return 'Mañana';
+    if (d <= 30) return `${d} D`;
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const objetivo = new Date(v);
+    objetivo.setHours(0, 0, 0, 0);
+
+    let meses = (objetivo.getFullYear() - hoy.getFullYear()) * 12 + (objetivo.getMonth() - hoy.getMonth());
+    let dias = objetivo.getDate() - hoy.getDate();
+    if (dias < 0) {
+        meses -= 1;
+        dias += new Date(objetivo.getFullYear(), objetivo.getMonth(), 0).getDate();
+    }
+
+    const partes = [];
+    if (meses > 0) partes.push(`${meses} M`);
+    if (dias > 0) partes.push(`${dias} D`);
+    return partes.join(' ') || '0 D';
+};
+
+const COLOR_ESTADO_TAREA = { pendiente: 'gold', en_proceso: 'blue', realizada: 'green', cancelada: 'red' };
+const ETIQUETA_ESTADO_TAREA = { pendiente: 'Pendiente', en_proceso: 'En proceso', realizada: 'Realizada', cancelada: 'Cancelada' };
 </script>
 
 <template>
@@ -208,23 +238,31 @@ const colorDias = (v) => {
                         <template #extra>
                             <span class="panel-contador" style="--bc: #e08a1e">{{ preventivos_proximos.length }}</span>
                         </template>
-                        <div v-if="preventivos_proximos.length" class="prev-grid">
+                        <div v-if="preventivos_proximos.length" class="filas">
                             <button
                                 v-for="(item, i) in preventivos_proximos"
                                 :key="i"
                                 type="button"
-                                class="prev-card"
+                                class="fila fila--doble"
                                 @click="router.visit(route('planes.show', item.plan.id))"
                             >
-                                <span class="prev-card__ic">
+                                <span class="fila__ic" style="--c: #e08a1e">
                                     <ToolOutlined v-if="item.plan?.equipo" />
                                     <EnvironmentOutlined v-else />
                                 </span>
-                                <span class="prev-card__c">
-                                    <span class="prev-card__t">{{ item.plan?.equipo?.codigo_activo ?? item.plan?.ubicacion?.nombre ?? 'Sin destino' }}</span>
-                                    <span class="prev-card__s">{{ [item.plan?.tipo?.nombre, item.plan?.sucursal?.nombre].filter(Boolean).join(' · ') || 'Programado' }}: {{ fecha(item.fecha_programada) }}</span>
+                                <span class="fila__c">
+                                    <span class="fila__linea">
+                                        <span class="fila__t">
+                                            {{ item.plan?.equipo?.codigo_activo ?? item.plan?.ubicacion?.codigo ?? '—' }}
+                                            · {{ item.plan?.tipo?.nombre ?? 'Preventivo' }}
+                                        </span>
+                                        <a-tag class="fila__chip" :color="colorDias(item.fecha_programada)">{{ tiempoAbrev(item.fecha_programada) }}</a-tag>
+                                    </span>
+                                    <span class="fila__linea">
+                                        <span class="fila__s">{{ item.plan?.sucursal?.nombre ?? '—' }}</span>
+                                        <span class="fila__s">{{ fecha(item.fecha_programada) }}</span>
+                                    </span>
                                 </span>
-                                <a-tag :color="colorDias(item.fecha_programada)">{{ etiquetaDias(item.fecha_programada) }}</a-tag>
                             </button>
                         </div>
                         <div v-else class="vacio-mini">
@@ -257,6 +295,7 @@ const colorDias = (v) => {
                                     <span class="fila__t">{{ item.titulo || item.descripcion }}</span>
                                     <span class="fila__s">{{ item.responsables?.map((r) => r.nombre).join(', ') || 'Sin responsable' }}</span>
                                 </span>
+                                <a-tag :color="COLOR_ESTADO_TAREA[item.estado] ?? 'default'">{{ ETIQUETA_ESTADO_TAREA[item.estado] ?? item.estado }}</a-tag>
                                 <a-tag v-if="item.prioridad" :color="item.prioridad.color || 'default'">{{ item.prioridad.nombre }}</a-tag>
                                 <a-tag :color="colorDias(item.fecha_limite)">{{ etiquetaDias(item.fecha_limite) }}</a-tag>
                             </button>
@@ -549,60 +588,37 @@ const colorDias = (v) => {
     color: #d64545;
 }
 
-/* ---------- Grid de preventivos ---------- */
-.prev-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: 10px;
+/* ---------- Filas de dos líneas (preventivos: código+tipo / sucursal+fecha) ---------- */
+.fila--doble {
+    align-items: flex-start;
 }
-.prev-card {
+.fila--doble .fila__c {
+    gap: 3px;
+}
+.fila__linea {
     display: flex;
     align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--sigam-borde-suave);
-    border-radius: 11px;
-    background: #fff;
-    font-family: inherit;
-    text-align: left;
-    cursor: pointer;
-    transition: border-color 0.13s ease, box-shadow 0.13s ease, transform 0.13s ease;
+    justify-content: space-between;
+    gap: 8px;
 }
-.prev-card:hover {
-    border-color: var(--sigam-navy-100);
-    box-shadow: var(--sigam-sombra-sm);
-    transform: translateY(-2px);
-}
-.prev-card__ic {
-    width: 33px;
-    height: 33px;
-    flex: none;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    color: #e08a1e;
-    background: color-mix(in srgb, #e08a1e 14%, #fff);
-}
-.prev-card__c {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
+.fila__linea .fila__t {
     flex: 1;
+    min-width: 0;
 }
-.prev-card__t {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--sigam-texto);
+.fila__linea .fila__s {
+    flex: none;
+    white-space: nowrap;
+}
+.fila__linea .fila__s:first-child {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.prev-card__s {
-    font-size: 11.5px;
-    color: var(--sigam-tenue);
+.fila__chip {
+    flex: none;
+    margin-inline-end: 0 !important;
 }
 
 /* ---------- Responsivo ---------- */

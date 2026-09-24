@@ -4,16 +4,16 @@ import { Head } from '@inertiajs/vue3';
 import { antdLocale, antTheme } from '@/theme';
 
 defineProps({
-    title: { type: String, default: 'SIGAM' },
+    title: { type: String, default: 'SIGAMM' },
 });
 
 const currentYear = new Date().getFullYear();
 
-// El logo transparente (logo-sigam.png, 480×108) se ve pixelado al mostrarse
-// grande sobre el panel oscuro; logo-web.jpg es la versión de mayor detalle
-// (640×190, trae su propia leyenda) pero con fondo claro no transparente —
-// por eso va en una tarjeta blanca sólida en vez del vidrio esmerilado que
-// usa RIC, para que ese fondo no se note como un recuadro encima del navy.
+// El logo (logo-web-transparente.png) es un JPEG comprimido de origen; sobre
+// un panel oscuro con mucho contraste se notaban los bordes "escalonados" de
+// la compresión. Sobre fondo claro, igual que su fondo original, esos bordes
+// prácticamente no se notan — por eso todo el panel va en blanco en vez de
+// navy oscuro.
 const logoExists = ref(true);
 </script>
 
@@ -25,80 +25,51 @@ const logoExists = ref(true);
         <div class="w-full max-w-5xl bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-white/20 relative">
             <div class="absolute -inset-0.5 bg-gradient-to-r from-[#173a5f] via-[#1f9e86] to-[#173a5f] rounded-3xl blur-xl opacity-20 animate-pulse-slow" />
 
-            <!-- Columna izquierda: identidad de SIGAM -->
-            <div class="md:w-1/2 bg-gradient-to-br from-[#0f2c4a] via-[#173a5f] to-[#0f2c4a] p-10 md:p-14 flex flex-col justify-center items-center text-white relative overflow-hidden">
-                <div class="absolute -top-20 -right-20 w-72 h-72 bg-gradient-to-br from-[#1f9e86]/30 to-[#173a5f]/30 rounded-full blur-3xl animate-float" />
-                <div class="absolute -bottom-20 -left-20 w-72 h-72 bg-gradient-to-tr from-[#173a5f]/30 to-[#1f9e86]/30 rounded-full blur-3xl animate-float" style="animation-delay: 2s" />
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-r from-[#1f9e86]/10 to-[#0d84c9]/10 rounded-full blur-3xl animate-pulse-slow" />
+            <!-- Columna izquierda: identidad de SIGAMM -->
+            <div class="md:w-1/2 bg-gradient-to-br from-white via-[#f7fafc] to-[#eef5f2] p-10 md:p-14 flex flex-col justify-center items-center text-center relative overflow-hidden border-b md:border-b-0 md:border-r border-[#e6ecf1]">
+                <div class="absolute -top-20 -right-20 w-72 h-72 bg-gradient-to-br from-[#1f9e86]/12 to-[#173a5f]/8 rounded-full blur-3xl animate-float" />
+                <div class="absolute -bottom-20 -left-20 w-72 h-72 bg-gradient-to-tr from-[#173a5f]/10 to-[#1f9e86]/12 rounded-full blur-3xl animate-float" style="animation-delay: 2s" />
 
-                <span
-                    v-for="i in 25" :key="i" class="particle"
-                    :style="{
-                        left: Math.random() * 100 + '%',
-                        top: Math.random() * 100 + '%',
-                        width: (Math.random() * 4 + 1) + 'px',
-                        height: (Math.random() * 4 + 1) + 'px',
-                        animationDelay: (Math.random() * 10) + 's',
-                        animationDuration: (Math.random() * 15 + 10) + 's',
-                        opacity: Math.random() * 0.3 + 0.1,
-                    }"
-                />
-
-                <div class="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                <div class="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                <div class="absolute left-0 top-0 w-0.5 h-full bg-gradient-to-b from-transparent via-white/10 to-transparent" />
-                <div class="absolute right-0 top-0 w-0.5 h-full bg-gradient-to-b from-transparent via-white/10 to-transparent" />
-
-                <div class="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-white/10 rounded-tl-xl" />
-                <div class="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-white/10 rounded-tr-xl" />
-                <div class="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-white/10 rounded-bl-xl" />
-                <div class="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-white/10 rounded-br-xl" />
+                <div class="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-[#173a5f]/10 rounded-tl-xl" />
+                <div class="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-[#173a5f]/10 rounded-tr-xl" />
+                <div class="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-[#173a5f]/10 rounded-bl-xl" />
+                <div class="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-[#173a5f]/10 rounded-br-xl" />
 
                 <div class="relative z-10 text-center">
-                    <div class="mb-8 flex justify-center group">
-                        <div class="relative">
-                            <div class="absolute inset-0 bg-gradient-to-r from-[#1f9e86] via-[#0d84c9] to-[#1f9e86] rounded-3xl blur-2xl group-hover:blur-3xl transition-all duration-700 opacity-60 group-hover:opacity-100" />
-                            <div class="relative bg-white rounded-3xl p-5 border border-white/20 shadow-2xl transition-all duration-500 group-hover:scale-105">
-                                <img
-                                    v-if="logoExists"
-                                    src="/images/logo-web.jpg"
-                                    alt="SIGAM"
-                                    class="h-24 w-auto max-w-[260px] object-contain rounded-lg drop-shadow-2xl"
-                                    @error="logoExists = false"
-                                />
-                                <div v-else class="w-28 h-28 bg-[#173a5f]/10 rounded-2xl flex items-center justify-center">
-                                    <span class="text-4xl font-bold text-[#173a5f]">SIGAM</span>
-                                </div>
-                            </div>
-                            <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-16 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent rounded-full" />
+                    <div class="mb-6 flex justify-center">
+                        <img
+                            v-if="logoExists"
+                            src="/images/logo-web-transparente.png"
+                            alt="SIGAMM"
+                            class="w-full max-w-[460px] h-auto object-contain logo-icono"
+                            @error="logoExists = false"
+                        />
+                        <div v-else class="w-24 h-24 rounded-2xl bg-[#173a5f]/10 flex items-center justify-center">
+                            <span class="text-3xl font-bold text-[#173a5f]">SM</span>
                         </div>
                     </div>
 
-                    <h1 class="text-5xl md:text-6xl font-bold mb-3 tracking-tight">
-                        <span class="bg-gradient-to-r from-white via-[#bfe3d9] to-white bg-clip-text text-transparent">SIGAM</span>
-                    </h1>
+                    <div class="h-1 w-20 bg-gradient-to-r from-[#173a5f] to-[#1f9e86] mx-auto rounded-full mb-6" />
 
-                    <div class="h-1 w-20 bg-gradient-to-r from-[#5eead4]/50 to-[#0d84c9]/50 mx-auto rounded-full mb-6" />
-
-                    <p class="text-[#cfe0ef]/90 text-lg font-light leading-relaxed">
-                        Sistema Integral<br />
-                        <span class="font-medium text-white">de Gestión de Activos y Mantenimiento</span>
+                    <p class="text-[#4b5b6d] text-base font-light leading-relaxed max-w-[300px] mx-auto">
+                        Sistema Integral de gestión de
+                        <span class="font-semibold text-[#173a5f]">Activos, Mantenimiento y Minutas</span>
                     </p>
 
                     <div class="flex items-center justify-center gap-4 mt-10 mb-6">
-                        <div class="w-12 h-px bg-gradient-to-r from-transparent via-[#5eead4]/20 to-transparent" />
-                        <div class="w-1.5 h-1.5 rounded-full bg-[#5eead4]/30" />
-                        <div class="w-12 h-px bg-gradient-to-r from-transparent via-[#5eead4]/20 to-transparent" />
+                        <div class="w-12 h-px bg-gradient-to-r from-transparent via-[#173a5f]/20 to-transparent" />
+                        <div class="w-1.5 h-1.5 rounded-full bg-[#1f9e86]/50" />
+                        <div class="w-12 h-px bg-gradient-to-r from-transparent via-[#173a5f]/20 to-transparent" />
                     </div>
 
-                    <div class="mt-6 text-white/20 text-xs tracking-wider">
-                        <p>&copy; SIGAM {{ currentYear }}</p>
+                    <div class="mt-6 text-[#94a3b8] text-xs tracking-wider">
+                        <p>&copy; SIGAMM {{ currentYear }}</p>
                     </div>
                 </div>
             </div>
 
             <!-- Columna derecha: formulario -->
-            <div class="md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white/90 backdrop-blur-sm relative">
+            <div class="md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white relative">
                 <div class="absolute -top-20 -right-20 w-48 h-48 bg-gradient-to-br from-[#eaf0f6] to-[#e6f5f1] rounded-full blur-2xl" />
                 <div class="absolute -bottom-20 -left-20 w-48 h-48 bg-gradient-to-tr from-[#e6f5f1] to-[#eaf0f6] rounded-full blur-2xl" />
 
@@ -138,30 +109,18 @@ const logoExists = ref(true);
     0%, 100% { opacity: 0.2; transform: scale(1); }
     50% { opacity: 0.6; transform: scale(1.1); }
 }
-@keyframes particleFloat {
-    0% { transform: translateY(0px) scale(0); opacity: 0; }
-    20% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { transform: translateY(-200px) scale(1); opacity: 0; }
-}
 .animate-float {
     animation: float 8s ease-in-out infinite;
 }
 .animate-pulse-slow {
     animation: pulse-slow 6s ease-in-out infinite;
 }
-.particle {
-    position: absolute;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    animation: particleFloat linear infinite;
-    pointer-events: none;
-    backdrop-filter: blur(4px);
+.logo-icono {
+    filter: drop-shadow(0 10px 18px rgba(23, 58, 95, 0.18));
 }
 @media (prefers-reduced-motion: reduce) {
     .animate-float,
-    .animate-pulse-slow,
-    .particle {
+    .animate-pulse-slow {
         animation: none !important;
     }
 }

@@ -66,7 +66,7 @@ const opcionesEstado = [
     { value: 'realizada', label: 'Realizada' },
     { value: 'cancelada', label: 'Cancelada' },
 ];
-const colorEstado = (e) => ({ pendiente: 'default', en_proceso: 'processing', realizada: 'success', cancelada: 'error' })[e] ?? 'default';
+const colorEstado = (e) => ({ pendiente: 'gold', en_proceso: 'blue', realizada: 'green', cancelada: 'red' })[e] ?? 'default';
 const opciones = (l, label = 'nombre') => (l ?? []).map((o) => ({ label: o[label], value: o.id }));
 const opcionesFiltro = {
     estado: computed(() => opcionesEstado),

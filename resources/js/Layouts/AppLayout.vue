@@ -263,7 +263,7 @@ watch(
                             <template #icon><MenuOutlined /></template>
                         </a-button>
                         <div class="app-nav__brand" @click="router.visit(route('dashboard'))">
-                            <img src="/images/logo-sigam.png" alt="SIGAM" class="app-nav__logo" />
+                            <img src="/images/logo-web-transparente.png" alt="SIGAMM" class="app-nav__logo" />
                         </div>
                     </div>
 
@@ -323,7 +323,7 @@ watch(
                 root-class-name="app-nav-drawer"
             >
                 <template #title>
-                    <img src="/images/logo-sigam.png" alt="SIGAM" class="app-nav-drawer__logo" />
+                    <img src="/images/logo-web-transparente.png" alt="SIGAMM" class="app-nav-drawer__logo" />
                 </template>
                 <a-menu
                     mode="inline"
