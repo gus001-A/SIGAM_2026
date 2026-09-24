@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HistorialUbicacionEquipo extends Model
 {
-    use HasFactory;
+    use ConvierteMayusculas, HasFactory;
 
     protected $table = 'historial_ubicacion_equipo';
 
@@ -17,6 +18,11 @@ class HistorialUbicacionEquipo extends Model
     protected $fillable = [
         'equipo_id', 'ubicacion_origen_id', 'ubicacion_destino_id', 'cambiado_por', 'motivo', 'cambiado_at',
     ];
+
+    protected function camposMayusculas(): array
+    {
+        return ['motivo'];
+    }
 
     protected function casts(): array
     {

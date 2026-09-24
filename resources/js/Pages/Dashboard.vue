@@ -4,30 +4,26 @@ import { Head, router, usePage } from '@inertiajs/vue3';
 import {
     ApartmentOutlined,
     ArrowRightOutlined,
-    BarChartOutlined,
     CalendarOutlined,
+    CheckSquareOutlined,
     ClockCircleOutlined,
     DollarOutlined,
+    EnvironmentOutlined,
+    ExclamationCircleOutlined,
     FileTextOutlined,
-    FormOutlined,
-    PlusOutlined,
-    RiseOutlined,
     ThunderboltOutlined,
     ToolOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import SeccionFicha from '@/Components/SeccionFicha.vue';
-import { usePermisos } from '@/composables/usePermisos';
 
 const props = defineProps({
     tarjetas: { type: Object, default: () => ({}) },
-    por_estado: { type: Object, default: () => ({}) },
     agenda: { type: Array, default: () => [] },
     urgencias: { type: Array, default: () => [] },
     preventivos_proximos: { type: Array, default: () => [] },
+    tareas_proximas: { type: Array, default: () => [] },
 });
-
-const { puede } = usePermisos();
 const page = usePage();
 const nombre = computed(() => (page.props.auth.user?.nombre ?? page.props.auth.user?.name ?? '').split(' ')[0]);
 
@@ -45,35 +41,68 @@ const moneda = (v) =>
     new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(v || 0);
 
 const kpis = computed(() => [
-    { titulo: 'Equipos', valor: props.tarjetas.total_equipos ?? 0, icon: ToolOutlined, color: '#0d84c9', ruta: 'equipos.index' },
+    { titulo: 'Equipos', valor: props.tarjetas.total_equipos ?? 0, icon: ToolOutlined, color: '#0d84c9', ruta: 'equipos.por_sucursal' },
     { titulo: 'Valor de inventario', valor: moneda(props.tarjetas.valor_inventario), icon: DollarOutlined, color: '#1f9e86' },
     { titulo: 'Mantenimientos pendientes', valor: props.tarjetas.mantenimientos_pendientes ?? 0, icon: ClockCircleOutlined, color: '#173a5f', ruta: 'mantenimientos.index' },
     { titulo: 'Órdenes urgentes', valor: props.tarjetas.urgentes ?? 0, icon: ThunderboltOutlined, color: '#d64545' },
     { titulo: 'Preventivos vencidos', valor: props.tarjetas.preventivos_vencidos ?? 0, icon: CalendarOutlined, color: '#e08a1e', ruta: 'planes.index' },
     { titulo: 'Solicitudes abiertas', valor: props.tarjetas.solicitudes_abiertas ?? 0, icon: FileTextOutlined, color: '#6b4bc9', ruta: 'solicitudes.index' },
+    { titulo: 'Tareas pendientes', valor: props.tarjetas.tareas_pendientes ?? 0, icon: CheckSquareOutlined, color: '#0d84c9', ruta: 'tareas.index' },
+    { titulo: 'Tareas vencidas', valor: props.tarjetas.tareas_vencidas ?? 0, icon: ExclamationCircleOutlined, color: '#d64545', ruta: 'tareas.index' },
 ]);
 
-const accesos = computed(() =>
+const alertasHero = computed(() =>
     [
-        { label: 'Nuevo equipo', icon: ToolOutlined, ruta: 'equipos.create', permiso: 'equipos.crear', color: '#0d84c9' },
-        { label: 'Nueva solicitud', icon: FormOutlined, ruta: 'solicitudes.index', permiso: 'solicitudes.crear', color: '#6b4bc9' },
-        { label: 'Nueva orden', icon: ToolOutlined, ruta: 'mantenimientos.index', permiso: 'mantenimientos.crear', color: '#1f9e86' },
-        { label: 'Calendario', icon: CalendarOutlined, ruta: 'calendario.index', permiso: 'mantenimientos.ver', color: '#e08a1e' },
-        { label: 'Reportes', icon: BarChartOutlined, ruta: 'reportes.index', permiso: 'reportes.ver', color: '#173a5f' },
-    ].filter((a) => puede(a.permiso)),
+        props.tarjetas.urgentes ? { texto: `${props.tarjetas.urgentes} orden${props.tarjetas.urgentes === 1 ? '' : 'es'} urgente${props.tarjetas.urgentes === 1 ? '' : 's'}`, ruta: 'mantenimientos.index' } : null,
+        props.tarjetas.preventivos_vencidos ? { texto: `${props.tarjetas.preventivos_vencidos} preventivo${props.tarjetas.preventivos_vencidos === 1 ? '' : 's'} vencido${props.tarjetas.preventivos_vencidos === 1 ? '' : 's'}`, ruta: 'planes.index' } : null,
+        props.tarjetas.tareas_vencidas ? { texto: `${props.tarjetas.tareas_vencidas} tarea${props.tarjetas.tareas_vencidas === 1 ? '' : 's'} vencida${props.tarjetas.tareas_vencidas === 1 ? '' : 's'}`, ruta: 'tareas.index' } : null,
+    ].filter(Boolean),
 );
 
 const fecha = (v) => (v ? new Date(v).toLocaleDateString('es-MX') : '—');
 const ir = (ruta, params) => ruta && router.visit(route(ruta, params));
 
-const estados = computed(() => {
-    const entradas = Object.entries(props.por_estado || {});
-    const max = Math.max(1, ...entradas.map(([, n]) => n));
-    const PALETA = ['#0d84c9', '#1f9e86', '#6b4bc9', '#e08a1e', '#d64545', '#173a5f', '#16806c'];
-    return entradas
-        .sort(([, a], [, b]) => b - a)
-        .map(([nombre, total], i) => ({ nombre, total, pct: (100 * total) / max, color: PALETA[i % PALETA.length] }));
-});
+const diasRestantes = (v) => {
+    if (!v) return null;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const objetivo = new Date(v);
+    objetivo.setHours(0, 0, 0, 0);
+    return Math.round((objetivo - hoy) / 86400000);
+};
+const etiquetaDias = (v) => {
+    const d = diasRestantes(v);
+    if (d === null) return '';
+    if (d < 0) return 'Vencido';
+    if (d === 0) return 'Hoy';
+    if (d === 1) return 'Mañana';
+    if (d <= 30) return `En ${d} días`;
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const objetivo = new Date(v);
+    objetivo.setHours(0, 0, 0, 0);
+
+    let meses = (objetivo.getFullYear() - hoy.getFullYear()) * 12 + (objetivo.getMonth() - hoy.getMonth());
+    let dias = objetivo.getDate() - hoy.getDate();
+    if (dias < 0) {
+        meses -= 1;
+        dias += new Date(objetivo.getFullYear(), objetivo.getMonth(), 0).getDate();
+    }
+
+    const partes = [];
+    if (meses > 0) partes.push(`${meses} ${meses === 1 ? 'mes' : 'meses'}`);
+    if (dias > 0) partes.push(`${dias} ${dias === 1 ? 'día' : 'días'}`);
+
+    return `En ${partes.join(' y ')}`;
+};
+const colorDias = (v) => {
+    const d = diasRestantes(v);
+    if (d === null) return 'default';
+    if (d <= 3) return 'error';
+    if (d <= 7) return 'warning';
+    return 'success';
+};
 </script>
 
 <template>
@@ -84,18 +113,11 @@ const estados = computed(() => {
             <div class="hero__txt">
                 <div class="hero__saludo">{{ saludo }}, {{ nombre || 'bienvenido' }}</div>
                 <div class="hero__fecha">{{ hoy }}</div>
-            </div>
-            <div v-if="accesos.length" class="hero__acc">
-                <button
-                    v-for="a in accesos"
-                    :key="a.label"
-                    type="button"
-                    class="hero__btn"
-                    @click="ir(a.ruta)"
-                >
-                    <span class="hero__btn-ic"><component :is="a.icon" /></span>
-                    {{ a.label }}
-                </button>
+                <div v-if="alertasHero.length" class="hero__alertas">
+                    <button v-for="a in alertasHero" :key="a.texto" type="button" class="hero__alerta" @click="ir(a.ruta)">
+                        <ExclamationCircleOutlined /> {{ a.texto }}
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -120,10 +142,13 @@ const estados = computed(() => {
 
         <a-row :gutter="[16, 16]" class="mt-4">
             <a-col :xs="24" :lg="12">
-                <a-card size="small" class="panel">
+                <a-card size="small" class="panel" style="--acc: #0d84c9">
                     <SeccionFicha titulo="Agenda de próximos trabajos" :icono="CalendarOutlined" color="#0d84c9">
                         <template #extra>
-                            <a class="panel__link" @click="ir('mantenimientos.index')">Ver todos <ArrowRightOutlined /></a>
+                            <span class="panel__extra">
+                                <span class="panel-contador" style="--bc: #0d84c9">{{ agenda.length }}</span>
+                                <a class="panel__link" @click="ir('mantenimientos.index')">Ver todos <ArrowRightOutlined /></a>
+                            </span>
                         </template>
                         <div v-if="agenda.length" class="filas">
                             <button
@@ -135,7 +160,7 @@ const estados = computed(() => {
                             >
                                 <span class="fila__ic" style="--c: #0d84c9"><ToolOutlined /></span>
                                 <span class="fila__c">
-                                    <span class="fila__t">{{ item.folio }} · {{ item.equipo?.codigo_activo ?? '' }}</span>
+                                    <span class="fila__t">{{ item.folio }} · {{ item.equipo?.codigo_activo ?? item.ubicacion?.nombre ?? '' }}</span>
                                     <span class="fila__s">{{ item.tipo?.nombre }} — {{ fecha(item.programado_inicio) }}</span>
                                 </span>
                                 <a-tag :color="item.prioridad?.color || 'default'">{{ item.prioridad?.nombre }}</a-tag>
@@ -149,8 +174,11 @@ const estados = computed(() => {
             </a-col>
 
             <a-col :xs="24" :lg="12">
-                <a-card size="small" class="panel">
+                <a-card size="small" class="panel" style="--acc: #d64545">
                     <SeccionFicha titulo="Urgencias abiertas" :icono="ThunderboltOutlined" color="#d64545">
+                        <template #extra>
+                            <span class="panel-contador" style="--bc: #d64545">{{ urgencias.length }}</span>
+                        </template>
                         <div v-if="urgencias.length" class="filas">
                             <button
                                 v-for="item in urgencias"
@@ -161,7 +189,7 @@ const estados = computed(() => {
                             >
                                 <span class="fila__ic" style="--c: #d64545"><ThunderboltOutlined /></span>
                                 <span class="fila__c">
-                                    <span class="fila__t">{{ item.folio }} · {{ item.equipo?.codigo_activo ?? '' }}</span>
+                                    <span class="fila__t">{{ item.folio }} · {{ item.equipo?.codigo_activo ?? item.ubicacion?.nombre ?? '' }}</span>
                                     <span class="fila__s">{{ item.estado?.nombre }}</span>
                                 </span>
                                 <ArrowRightOutlined class="fila__go" />
@@ -175,16 +203,29 @@ const estados = computed(() => {
             </a-col>
 
             <a-col :xs="24" :lg="12">
-                <a-card size="small" class="panel">
+                <a-card size="small" class="panel" style="--acc: #e08a1e">
                     <SeccionFicha titulo="Preventivos próximos" :icono="CalendarOutlined" color="#e08a1e">
-                        <div v-if="preventivos_proximos.length" class="filas">
-                            <div v-for="(item, i) in preventivos_proximos" :key="i" class="fila fila--plano">
-                                <span class="fila__ic" style="--c: #e08a1e"><CalendarOutlined /></span>
-                                <span class="fila__c">
-                                    <span class="fila__t">{{ item.plan?.equipo?.codigo_activo ?? 'Equipo' }}</span>
-                                    <span class="fila__s">Programado: {{ fecha(item.fecha_programada) }}</span>
+                        <template #extra>
+                            <span class="panel-contador" style="--bc: #e08a1e">{{ preventivos_proximos.length }}</span>
+                        </template>
+                        <div v-if="preventivos_proximos.length" class="prev-grid">
+                            <button
+                                v-for="(item, i) in preventivos_proximos"
+                                :key="i"
+                                type="button"
+                                class="prev-card"
+                                @click="router.visit(route('planes.show', item.plan.id))"
+                            >
+                                <span class="prev-card__ic">
+                                    <ToolOutlined v-if="item.plan?.equipo" />
+                                    <EnvironmentOutlined v-else />
                                 </span>
-                            </div>
+                                <span class="prev-card__c">
+                                    <span class="prev-card__t">{{ item.plan?.equipo?.codigo_activo ?? item.plan?.ubicacion?.nombre ?? 'Sin destino' }}</span>
+                                    <span class="prev-card__s">{{ [item.plan?.tipo?.nombre, item.plan?.sucursal?.nombre].filter(Boolean).join(' · ') || 'Programado' }}: {{ fecha(item.fecha_programada) }}</span>
+                                </span>
+                                <a-tag :color="colorDias(item.fecha_programada)">{{ etiquetaDias(item.fecha_programada) }}</a-tag>
+                            </button>
                         </div>
                         <div v-else class="vacio-mini">
                             <CalendarOutlined /> Sin preventivos programados
@@ -194,19 +235,34 @@ const estados = computed(() => {
             </a-col>
 
             <a-col :xs="24" :lg="12">
-                <a-card size="small" class="panel">
-                    <SeccionFicha titulo="Órdenes por estado" :icono="RiseOutlined" color="#1f9e86">
-                        <div v-if="estados.length" class="barras">
-                            <div v-for="e in estados" :key="e.nombre" class="barra" :style="{ '--c': e.color }">
-                                <span class="barra__nom">{{ e.nombre }}</span>
-                                <span class="barra__track">
-                                    <span class="barra__fill" :style="{ width: e.pct + '%' }" />
+                <a-card size="small" class="panel" style="--acc: #6b4bc9">
+                    <SeccionFicha titulo="Tareas próximas" :icono="CheckSquareOutlined" color="#6b4bc9">
+                        <template #extra>
+                            <span class="panel__extra">
+                                <span class="panel-contador" style="--bc: #6b4bc9">{{ tareas_proximas.length }}</span>
+                                <a class="panel__link" @click="ir('tareas.index')">Ver todas <ArrowRightOutlined /></a>
+                            </span>
+                        </template>
+                        <div v-if="tareas_proximas.length" class="filas">
+                            <button
+                                v-for="item in tareas_proximas"
+                                :key="item.id"
+                                type="button"
+                                class="fila"
+                                :class="{ 'fila--alerta': diasRestantes(item.fecha_limite) < 0 }"
+                                @click="router.visit(route('tareas.show', item.id))"
+                            >
+                                <span class="fila__ic" style="--c: #6b4bc9"><CheckSquareOutlined /></span>
+                                <span class="fila__c">
+                                    <span class="fila__t">{{ item.titulo || item.descripcion }}</span>
+                                    <span class="fila__s">{{ item.responsables?.map((r) => r.nombre).join(', ') || 'Sin responsable' }}</span>
                                 </span>
-                                <span class="barra__val">{{ e.total }}</span>
-                            </div>
+                                <a-tag v-if="item.prioridad" :color="item.prioridad.color || 'default'">{{ item.prioridad.nombre }}</a-tag>
+                                <a-tag :color="colorDias(item.fecha_limite)">{{ etiquetaDias(item.fecha_limite) }}</a-tag>
+                            </button>
                         </div>
-                        <div v-else class="vacio-mini">
-                            <RiseOutlined /> Sin órdenes registradas
+                        <div v-else class="vacio-mini vacio-mini--ok">
+                            <CheckSquareOutlined /> Sin tareas pendientes
                         </div>
                     </SeccionFicha>
                 </a-card>
@@ -261,40 +317,48 @@ const estados = computed(() => {
 .hero__fecha::first-letter {
     text-transform: uppercase;
 }
-.hero__acc {
+.hero__alertas {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    position: relative;
+    gap: 6px;
+    margin-top: 10px;
 }
-.hero__btn {
+.hero__alerta {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 13px;
-    border-radius: 11px;
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    background: rgba(255, 255, 255, 0.12);
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.14);
     color: #fff;
-    font-size: 12.5px;
-    font-weight: 600;
+    font-size: 11.5px;
+    font-weight: 700;
     cursor: pointer;
-    transition: background 0.15s ease, transform 0.15s ease;
+    transition: background 0.15s ease;
+    animation: sigam-fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.hero__btn:hover {
-    background: rgba(255, 255, 255, 0.24);
-    transform: translateY(-2px);
+.hero__alerta:hover {
+    background: rgba(0, 0, 0, 0.26);
 }
-.hero__btn-ic {
-    font-size: 13px;
-    opacity: 0.9;
+.hero__alerta .anticon {
+    color: #ffd7d7;
 }
-
 /* ---------- KPIs ---------- */
 .kpis {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 14px;
+}
+@media (max-width: 1100px) {
+    .kpis {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 480px) {
+    .kpis {
+        grid-template-columns: 1fr;
+    }
 }
 .kpi {
     display: flex;
@@ -384,6 +448,30 @@ const estados = computed(() => {
 /* ---------- Paneles ---------- */
 .panel {
     height: 100%;
+    border-top: 3px solid var(--acc, var(--sigam-teal));
+    border-radius: 10px;
+    transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+.panel:hover {
+    box-shadow: var(--sigam-sombra-sm);
+}
+.panel__extra {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.panel-contador {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 21px;
+    height: 21px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 800;
+    background: color-mix(in srgb, var(--bc, var(--sigam-navy)) 13%, #fff);
+    color: var(--bc, var(--sigam-navy));
 }
 .panel__link {
     font-size: 12px;
@@ -461,48 +549,60 @@ const estados = computed(() => {
     color: #d64545;
 }
 
-/* ---------- Barras (órdenes por estado) ---------- */
-.barras {
-    display: flex;
-    flex-direction: column;
-    gap: 11px;
-}
-.barra {
+/* ---------- Grid de preventivos ---------- */
+.prev-grid {
     display: grid;
-    grid-template-columns: 120px 1fr 30px;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 10px;
+}
+.prev-card {
+    display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 12.5px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--sigam-borde-suave);
+    border-radius: 11px;
+    background: #fff;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.13s ease, box-shadow 0.13s ease, transform 0.13s ease;
 }
-.barra__nom {
-    color: var(--sigam-texto);
+.prev-card:hover {
+    border-color: var(--sigam-navy-100);
+    box-shadow: var(--sigam-sombra-sm);
+    transform: translateY(-2px);
+}
+.prev-card__ic {
+    width: 33px;
+    height: 33px;
+    flex: none;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #e08a1e;
+    background: color-mix(in srgb, #e08a1e 14%, #fff);
+}
+.prev-card__c {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+.prev-card__t {
+    font-size: 13px;
     font-weight: 600;
+    color: var(--sigam-texto);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-transform: capitalize;
 }
-.barra__track {
-    height: 10px;
-    border-radius: 999px;
-    background: var(--sigam-navy-050);
-    overflow: hidden;
-}
-.barra__fill {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--c) 55%, #fff), var(--c));
-    min-width: 6px;
-    animation: barra-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes barra-in {
-    from { width: 0 !important; }
-}
-.barra__val {
-    text-align: right;
-    font-weight: 800;
-    color: var(--sigam-navy);
+.prev-card__s {
+    font-size: 11.5px;
+    color: var(--sigam-tenue);
 }
 
 /* ---------- Responsivo ---------- */
@@ -513,15 +613,6 @@ const estados = computed(() => {
     .hero__saludo {
         font-size: 19px;
     }
-    .hero__acc {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 8px;
-        width: 100%;
-    }
-    .hero__btn {
-        justify-content: center;
-    }
     .kpi {
         padding: 13px 14px;
     }
@@ -530,11 +621,18 @@ const estados = computed(() => {
 /* ---------- Vacíos ---------- */
 .vacio-mini {
     display: flex;
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-    padding: 18px 0;
+    padding: 30px 0 22px;
     color: var(--sigam-tenue);
     font-size: 12.5px;
+    text-align: center;
+}
+.vacio-mini .anticon {
+    font-size: 26px;
+    opacity: 0.35;
 }
 .vacio-mini--ok {
     color: var(--sigam-teal-700);

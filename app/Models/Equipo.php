@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneDocumentos;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,7 +18,7 @@ use Illuminate\Support\Str;
  */
 class Equipo extends Model
 {
-    use EsAuditable, HasFactory, SoftDeletes, TieneDocumentos;
+    use ConvierteMayusculas, EsAuditable, HasFactory, SoftDeletes, TieneDocumentos;
 
     protected $table = 'equipos';
 
@@ -27,6 +28,7 @@ class Equipo extends Model
         'sucursal_id', 'ubicacion_id', 'proveedor_id', 'responsable_id', 'estado_id',
         'fecha_adquisicion', 'numero_factura', 'valor_adquisicion', 'garantia_hasta',
         'especificaciones', 'vida_util', 'notas',
+        'motivo_baja', 'baja_por', 'baja_en',
     ];
 
     protected function casts(): array
@@ -36,6 +38,7 @@ class Equipo extends Model
             'fecha_adquisicion' => 'date',
             'garantia_hasta' => 'date',
             'valor_adquisicion' => 'decimal:2',
+            'baja_en' => 'datetime',
         ];
     }
 
@@ -51,6 +54,11 @@ class Equipo extends Model
     public function auditoriaModulo(): string
     {
         return 'equipos';
+    }
+
+    protected function camposMayusculas(): array
+    {
+        return ['codigo_activo', 'codigo_barras', 'descripcion', 'modelo', 'numero_serie', 'numero_factura', 'vida_util', 'notas', 'motivo_baja'];
     }
 
     public function tipo(): BelongsTo
@@ -81,6 +89,11 @@ class Equipo extends Model
     public function responsable(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'responsable_id');
+    }
+
+    public function bajaPor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'baja_por');
     }
 
     public function estado(): BelongsTo

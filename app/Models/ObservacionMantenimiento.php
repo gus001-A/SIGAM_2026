@@ -2,19 +2,25 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ObservacionMantenimiento extends Model
 {
-    use HasFactory;
+    use ConvierteMayusculas, HasFactory;
 
     protected $table = 'observaciones_mantenimiento';
 
     public $timestamps = false;
 
     protected $fillable = ['mantenimiento_id', 'usuario_id', 'tipo', 'cuerpo', 'created_at'];
+
+    protected function camposMayusculas(): array
+    {
+        return ['cuerpo'];
+    }
 
     protected function casts(): array
     {

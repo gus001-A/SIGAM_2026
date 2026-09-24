@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneDocumentos;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,12 +15,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class SolicitudMantenimiento extends Model
 {
-    use EsAuditable, HasFactory, TieneDocumentos;
+    use ConvierteMayusculas, EsAuditable, HasFactory, TieneDocumentos;
 
     protected $table = 'solicitudes_mantenimiento';
 
     protected $fillable = [
-        'folio', 'equipo_id', 'sucursal_id', 'solicitado_por', 'prioridad_id', 'estado_id',
+        'folio', 'equipo_id', 'ubicacion_id', 'sucursal_id', 'solicitado_por', 'prioridad_id', 'estado_id',
         'descripcion', 'fecha_requerida', 'solicitado_at', 'revisado_por', 'revisado_at', 'motivo_rechazo',
     ];
 
@@ -37,9 +38,19 @@ class SolicitudMantenimiento extends Model
         return 'solicitudes';
     }
 
+    protected function camposMayusculas(): array
+    {
+        return ['descripcion', 'motivo_rechazo'];
+    }
+
     public function equipo(): BelongsTo
     {
         return $this->belongsTo(Equipo::class);
+    }
+
+    public function ubicacion(): BelongsTo
+    {
+        return $this->belongsTo(Ubicacion::class);
     }
 
     public function sucursal(): BelongsTo

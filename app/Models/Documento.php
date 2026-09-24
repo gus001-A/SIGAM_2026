@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Storage;
  */
 class Documento extends Model
 {
-    use HasFactory, SoftDeletes;
+    use ConvierteMayusculas, HasFactory, SoftDeletes;
 
     protected $table = 'documentos';
 
@@ -22,6 +23,11 @@ class Documento extends Model
         'disco', 'ruta', 'nombre_original', 'titulo', 'categoria',
         'tipo_mime', 'tamano', 'checksum', 'visibilidad', 'vence_at', 'subido_por',
     ];
+
+    protected function camposMayusculas(): array
+    {
+        return ['nombre_original', 'titulo'];
+    }
 
     protected function casts(): array
     {

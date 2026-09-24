@@ -18,6 +18,10 @@ class TipoMantenimientoController extends CatalogoController
 
     protected bool $generaClave = true;
 
+    protected array $buscables = ['nombre', 'descripcion'];
+
+    protected array $filtrosExactos = ['categoria'];
+
     protected function consulta(): Builder
     {
         return TipoMantenimiento::query()->withCount(['planes', 'mantenimientos']);

@@ -19,6 +19,10 @@ class EstadoMantenimientoController extends CatalogoController
 
     protected array $ordenablesExtra = ['orden'];
 
+    protected array $buscables = ['nombre', 'descripcion'];
+
+    protected array $filtrosExactos = ['es_abierto', 'es_terminal'];
+
     protected function reglas(Request $request, ?Model $registro = null): array
     {
         return [

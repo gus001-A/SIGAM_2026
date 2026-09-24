@@ -9,6 +9,7 @@ use App\Models\Norma;
 use App\Models\Proveedor;
 use App\Models\SolicitudMantenimiento;
 use App\Models\Sucursal;
+use App\Models\Tarea;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -29,6 +30,7 @@ class DocumentoController extends Controller
         'norma' => Norma::class,
         'mantenimiento' => Mantenimiento::class,
         'solicitud' => SolicitudMantenimiento::class,
+        'tarea' => Tarea::class,
     ];
 
     public function store(Request $request): RedirectResponse

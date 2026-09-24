@@ -25,6 +25,7 @@ import { usePermisos } from '@/composables/usePermisos';
 const props = defineProps({
     sucursal: { type: Object, required: true },
     valorActivos: { type: Number, default: 0 },
+    sello: { type: Object, default: null },
 });
 
 const { puede } = usePermisos();
@@ -72,7 +73,7 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
     <Head :title="sucursal.nombre" />
 
     <AppLayout>
-        <FichaEncabezado :titulo="sucursal.nombre" :subtitulo="sucursal.codigo" :icono="ShopOutlined" volver="sucursales.index">
+        <FichaEncabezado :titulo="sucursal.nombre" :subtitulo="sucursal.codigo" :icono="ShopOutlined" volver="sucursales.index" :sello="sello">
             <template #tags>
                 <a-tag :color="inactiva ? 'default' : 'green'">{{ inactiva ? 'Inactiva' : 'Activa' }}</a-tag>
             </template>
@@ -114,7 +115,7 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
                         <p class="notas">{{ sucursal.notas }}</p>
                     </SeccionFicha>
                     <a-space class="mt-2" wrap>
-                        <a-button size="small" @click="router.visit(route('equipos.index', { sucursal_id: sucursal.id }))">
+                        <a-button size="small" @click="router.visit(route('equipos.por_sucursal', { sucursal_id: sucursal.id }))">
                             <template #icon><ToolOutlined /></template>
                             Ver equipos
                         </a-button>

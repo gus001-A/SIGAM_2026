@@ -6,15 +6,17 @@ import {
     EditOutlined,
     EyeOutlined,
     FilterOutlined,
+    InfoCircleOutlined,
     PlusOutlined,
     UndoOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTableInertia from '@/Components/DataTableInertia.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
+import CeldaRegistro from '@/Components/CeldaRegistro.vue';
 import { usePermisos } from '@/composables/usePermisos';
 import { useTablaInertia } from '@/composables/useTablaInertia';
-import { etiquetaRol, colorRol } from '@/utils/roles';
+import { etiquetaRol, colorRol, colorHexRol, listaRoles } from '@/utils/roles';
 
 const props = defineProps({
     usuarios: { type: Object, required: true },
@@ -25,6 +27,9 @@ const props = defineProps({
 
 const { puede, usuario: yo } = usePermisos();
 
+const modalRoles = ref(false);
+const roles = listaRoles();
+
 const { filtros, orden, cargando, filtrar, aplicar, limpiar, hayFiltros, onCambioTabla } = useTablaInertia('usuarios.index', {
     filtros: {
         nombre: props.filtros.nombre ?? '',
@@ -32,6 +37,7 @@ const { filtros, orden, cargando, filtrar, aplicar, limpiar, hayFiltros, onCambi
         sucursal_id: props.filtros.sucursal_id ?? undefined,
         rol: props.filtros.rol ?? undefined,
         estado: props.filtros.estado ?? undefined,
+        registrado_por: props.filtros.registrado_por ?? '',
     },
     orden: { campo: props.orden.campo ?? 'nombre', dir: props.orden.dir ?? 'asc' },
 });
@@ -52,6 +58,7 @@ const columns = [
     { title: 'Roles', key: 'roles', filtro: 'select', filtroClave: 'rol', width: 220 },
     { title: 'Último acceso', key: 'ultimo_acceso_at', dataIndex: 'ultimo_acceso_at', sorter: true, width: 150 },
     { title: 'Estado', key: 'estado', filtro: 'select', filtroClave: 'estado', width: 120 },
+    { title: 'Registrado por', key: 'registrado', filtro: 'texto', filtroClave: 'registrado_por', width: 150 },
     { title: '', key: 'acciones', align: 'right', width: 130, fixed: 'right' },
 ];
 
@@ -81,6 +88,10 @@ const reactivar = (usuario) => router.put(route('usuarios.restore', usuario.id),
         descripcion="Cuentas del personal con sus roles, permisos y sucursal asignada."
     >
         <template #acciones>
+            <a-button @click="modalRoles = true">
+                <template #icon><InfoCircleOutlined /></template>
+                ¿Qué puede hacer cada rol?
+            </a-button>
             <a-button v-if="hayFiltros()" @click="limpiar">
                 <template #icon><FilterOutlined /></template>
                 Limpiar filtros
@@ -138,6 +149,10 @@ const reactivar = (usuario) => router.put(route('usuarios.restore', usuario.id),
                     </a-tag>
                 </template>
 
+                <template v-else-if="column.key === 'registrado'">
+                    <CeldaRegistro :usuario="record.creado_por" :fecha="record.creado_en" />
+                </template>
+
                 <template v-else-if="column.key === 'acciones'">
                     <a-space :size="2">
                         <a-tooltip title="Ver detalle">
@@ -169,5 +184,53 @@ const reactivar = (usuario) => router.put(route('usuarios.restore', usuario.id),
         </DataTableInertia>
 
         <ConfirmarDialog ref="confirmar" />
+
+        <a-modal v-model:open="modalRoles" title="Permisos por rol" :footer="null" width="620px" wrap-class-name="modal-roles-wrap">
+            <p class="leyenda-roles__intro">Principales facultades de cada rol dentro del sistema.</p>
+            <div class="leyenda-roles">
+                <div
+                    v-for="r in roles"
+                    :key="r.slug"
+                    class="leyenda-roles__card"
+                    :style="{ '--rol-color': colorHexRol(r.slug) }"
+                >
+                    <span class="leyenda-roles__titulo">{{ r.etiqueta }}</span>
+                    <span class="leyenda-roles__desc">{{ r.descripcion }}</span>
+                </div>
+            </div>
+        </a-modal>
     </AppLayout>
 </template>
+
+<style scoped>
+.leyenda-roles__intro {
+    margin: -4px 0 14px;
+    font-size: 12.5px;
+    color: var(--sigam-tenue);
+}
+.leyenda-roles {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.leyenda-roles__card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--rol-color) 6%, #fff);
+    border: 1px solid color-mix(in srgb, var(--rol-color) 20%, #fff);
+    border-left: 4px solid var(--rol-color);
+}
+.leyenda-roles__titulo {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: var(--rol-color);
+}
+.leyenda-roles__desc {
+    font-size: 13px;
+    color: var(--sigam-texto);
+    line-height: 1.5;
+}
+</style>

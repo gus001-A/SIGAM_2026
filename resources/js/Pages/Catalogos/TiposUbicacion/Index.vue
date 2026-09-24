@@ -12,7 +12,7 @@ defineProps({
 const columnas = [
     { key: 'nombre', title: 'Tipo de ubicación', filtro: 'texto', sorter: true, width: 260 },
     { key: 'clave', title: 'Clave', tipo: 'tag', width: 180 },
-    { key: 'descripcion', title: 'Descripción', width: 320 },
+    { key: 'descripcion', title: 'Descripción', filtro: 'texto', width: 320 },
     { key: 'ubicaciones_count', title: 'Ubicaciones', tipo: 'count', align: 'right', width: 120 },
 ];
 

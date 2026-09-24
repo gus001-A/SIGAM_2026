@@ -1,368 +1,211 @@
 <script setup>
+import { ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
-import {
-    CalendarOutlined,
-    HistoryOutlined,
-    ProfileOutlined,
-} from '@ant-design/icons-vue';
 import { antdLocale, antTheme } from '@/theme';
 
 defineProps({
     title: { type: String, default: 'SIGAM' },
 });
 
-const caracteristicas = [
-    { icon: ProfileOutlined, t: 'Expediente digital', d: 'Historial técnico completo de cada equipo médico.' },
-    { icon: CalendarOutlined, t: 'Mantenimiento preventivo', d: 'Programación automática y alertas de vencimiento.' },
-    { icon: HistoryOutlined, t: 'Trazabilidad total', d: 'Cada acción queda registrada para auditoría.' },
-];
+const currentYear = new Date().getFullYear();
+
+// El logo transparente (logo-sigam.png, 480×108) se ve pixelado al mostrarse
+// grande sobre el panel oscuro; logo-web.jpg es la versión de mayor detalle
+// (640×190, trae su propia leyenda) pero con fondo claro no transparente —
+// por eso va en una tarjeta blanca sólida en vez del vidrio esmerilado que
+// usa RIC, para que ese fondo no se note como un recuadro encima del navy.
+const logoExists = ref(true);
 </script>
 
 <template>
     <a-config-provider :theme="antTheme" :locale="antdLocale">
-        <Head :title="title" />
+    <Head :title="title" />
 
-        <div class="au">
-            <!-- Panel de marca -->
-            <aside class="au-brand">
-                <span class="au-brand__dots" aria-hidden="true" />
-                <span class="au-brand__arc" aria-hidden="true" />
-                <span class="au-brand__ring" aria-hidden="true" />
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#eaf0f6] via-[#eaf0f6] to-[#dae5f0] p-4">
+        <div class="w-full max-w-5xl bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-white/20 relative">
+            <div class="absolute -inset-0.5 bg-gradient-to-r from-[#173a5f] via-[#1f9e86] to-[#173a5f] rounded-3xl blur-xl opacity-20 animate-pulse-slow" />
 
-                <div class="au-brand__inner">
-                    <div class="au-brand__logobox">
-                        <img src="/images/logo-sigam-blanco.png" alt="SIGAM" class="au-brand__logo" />
+            <!-- Columna izquierda: identidad de SIGAM -->
+            <div class="md:w-1/2 bg-gradient-to-br from-[#0f2c4a] via-[#173a5f] to-[#0f2c4a] p-10 md:p-14 flex flex-col justify-center items-center text-white relative overflow-hidden">
+                <div class="absolute -top-20 -right-20 w-72 h-72 bg-gradient-to-br from-[#1f9e86]/30 to-[#173a5f]/30 rounded-full blur-3xl animate-float" />
+                <div class="absolute -bottom-20 -left-20 w-72 h-72 bg-gradient-to-tr from-[#173a5f]/30 to-[#1f9e86]/30 rounded-full blur-3xl animate-float" style="animation-delay: 2s" />
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-r from-[#1f9e86]/10 to-[#0d84c9]/10 rounded-full blur-3xl animate-pulse-slow" />
+
+                <span
+                    v-for="i in 25" :key="i" class="particle"
+                    :style="{
+                        left: Math.random() * 100 + '%',
+                        top: Math.random() * 100 + '%',
+                        width: (Math.random() * 4 + 1) + 'px',
+                        height: (Math.random() * 4 + 1) + 'px',
+                        animationDelay: (Math.random() * 10) + 's',
+                        animationDuration: (Math.random() * 15 + 10) + 's',
+                        opacity: Math.random() * 0.3 + 0.1,
+                    }"
+                />
+
+                <div class="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                <div class="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                <div class="absolute left-0 top-0 w-0.5 h-full bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+                <div class="absolute right-0 top-0 w-0.5 h-full bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+
+                <div class="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-white/10 rounded-tl-xl" />
+                <div class="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-white/10 rounded-tr-xl" />
+                <div class="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-white/10 rounded-bl-xl" />
+                <div class="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-white/10 rounded-br-xl" />
+
+                <div class="relative z-10 text-center">
+                    <div class="mb-8 flex justify-center group">
+                        <div class="relative">
+                            <div class="absolute inset-0 bg-gradient-to-r from-[#1f9e86] via-[#0d84c9] to-[#1f9e86] rounded-3xl blur-2xl group-hover:blur-3xl transition-all duration-700 opacity-60 group-hover:opacity-100" />
+                            <div class="relative bg-white rounded-3xl p-5 border border-white/20 shadow-2xl transition-all duration-500 group-hover:scale-105">
+                                <img
+                                    v-if="logoExists"
+                                    src="/images/logo-web.jpg"
+                                    alt="SIGAM"
+                                    class="h-24 w-auto max-w-[260px] object-contain rounded-lg drop-shadow-2xl"
+                                    @error="logoExists = false"
+                                />
+                                <div v-else class="w-28 h-28 bg-[#173a5f]/10 rounded-2xl flex items-center justify-center">
+                                    <span class="text-4xl font-bold text-[#173a5f]">SIGAM</span>
+                                </div>
+                            </div>
+                            <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-16 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent rounded-full" />
+                        </div>
                     </div>
-                    <p class="au-brand__kicker">Sistema Integral de Gestión de Activos y Mantenimiento</p>
-                    <h2 class="au-brand__title">
-                        Gestión integral de <span>activos y mantenimiento</span> hospitalario
-                    </h2>
-                    <p class="au-brand__sub">
-                        Inventario centralizado, mantenimiento preventivo y correctivo, expediente
-                        digital y trazabilidad — en una sola plataforma.
+
+                    <h1 class="text-5xl md:text-6xl font-bold mb-3 tracking-tight">
+                        <span class="bg-gradient-to-r from-white via-[#bfe3d9] to-white bg-clip-text text-transparent">SIGAM</span>
+                    </h1>
+
+                    <div class="h-1 w-20 bg-gradient-to-r from-[#5eead4]/50 to-[#0d84c9]/50 mx-auto rounded-full mb-6" />
+
+                    <p class="text-[#cfe0ef]/90 text-lg font-light leading-relaxed">
+                        Sistema Integral<br />
+                        <span class="font-medium text-white">de Gestión de Activos y Mantenimiento</span>
                     </p>
 
-                    <ul class="au-feats">
-                        <li v-for="(f, i) in caracteristicas" :key="f.t" :style="{ '--d': i * 90 + 'ms' }">
-                            <span class="au-feats__ic"><component :is="f.icon" /></span>
-                            <b>{{ f.t }}</b>
-                            <small>{{ f.d }}</small>
-                        </li>
-                    </ul>
+                    <div class="flex items-center justify-center gap-4 mt-10 mb-6">
+                        <div class="w-12 h-px bg-gradient-to-r from-transparent via-[#5eead4]/20 to-transparent" />
+                        <div class="w-1.5 h-1.5 rounded-full bg-[#5eead4]/30" />
+                        <div class="w-12 h-px bg-gradient-to-r from-transparent via-[#5eead4]/20 to-transparent" />
+                    </div>
+
+                    <div class="mt-6 text-white/20 text-xs tracking-wider">
+                        <p>&copy; SIGAM {{ currentYear }}</p>
+                    </div>
                 </div>
-            </aside>
+            </div>
 
-            <!-- Panel del formulario -->
-            <main class="au-side">
-                <div class="au-card">
-                    <img src="/images/logo-sigam.png" alt="SIGAM" class="au-card__logo" />
+            <!-- Columna derecha: formulario -->
+            <div class="md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white/90 backdrop-blur-sm relative">
+                <div class="absolute -top-20 -right-20 w-48 h-48 bg-gradient-to-br from-[#eaf0f6] to-[#e6f5f1] rounded-full blur-2xl" />
+                <div class="absolute -bottom-20 -left-20 w-48 h-48 bg-gradient-to-tr from-[#e6f5f1] to-[#eaf0f6] rounded-full blur-2xl" />
 
-                    <h1 class="au-card__title"><slot name="title">Bienvenido</slot></h1>
-                    <p class="au-card__sub"><slot name="subtitle" /></p>
+                <div class="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-[#dae5f0] rounded-tl-lg" />
+                <div class="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-[#dae5f0] rounded-tr-lg" />
+                <div class="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-[#dae5f0] rounded-bl-lg" />
+                <div class="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-[#dae5f0] rounded-br-lg" />
+
+                <div class="max-w-sm mx-auto w-full relative z-10 au-form-wrap">
+                    <div class="mb-10">
+                        <div class="flex items-center gap-4 mb-2">
+                            <div class="w-1 h-14 bg-gradient-to-b from-[#173a5f] to-[#1f9e86] rounded-full" />
+                            <div>
+                                <h2 class="text-3xl font-bold text-gray-800 tracking-tight"><slot name="title">Bienvenido</slot></h2>
+                                <p class="text-sm text-gray-500 mt-0.5 font-light"><slot name="subtitle" /></p>
+                            </div>
+                        </div>
+                        <div class="w-16 h-0.5 bg-gradient-to-r from-[#173a5f] to-[#1f9e86] rounded-full ml-[22px]" />
+                    </div>
 
                     <slot />
 
-                    <p v-if="$slots.footer" class="au-card__foot"><slot name="footer" /></p>
+                    <p v-if="$slots.footer" class="text-center text-sm text-gray-500 mt-6"><slot name="footer" /></p>
                 </div>
-                <p class="au-legal">© {{ new Date().getFullYear() }} SIGAM — Sistema Integral de Gestión de Activos y Mantenimiento</p>
-            </main>
+            </div>
         </div>
+    </div>
     </a-config-provider>
 </template>
 
 <style scoped>
-.au {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1.05fr 1fr;
-    min-height: 100vh;
-    background: #ffffff;
-    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+@keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(5deg); }
 }
-
-/* ---------- Panel de marca ---------- */
-.au-brand {
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    padding: 56px 132px 56px 7%;
-    color: #fff;
-    background: linear-gradient(158deg, #0d3f77 0%, #1e5eb8 52%, #0b6b60 100%);
+@keyframes pulse-slow {
+    0%, 100% { opacity: 0.2; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.1); }
 }
-.au-brand::before {
-    content: '';
+@keyframes particleFloat {
+    0% { transform: translateY(0px) scale(0); opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { transform: translateY(-200px) scale(1); opacity: 0; }
+}
+.animate-float {
+    animation: float 8s ease-in-out infinite;
+}
+.animate-pulse-slow {
+    animation: pulse-slow 6s ease-in-out infinite;
+}
+.particle {
     position: absolute;
-    inset: 0;
-    background-image: linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
-    background-size: 42px 42px;
-    -webkit-mask-image: linear-gradient(180deg, transparent, #000 26%, #000 74%, transparent);
-    mask-image: linear-gradient(180deg, transparent, #000 26%, #000 74%, transparent);
-}
-.au-brand::after {
-    content: '';
-    position: absolute;
-    top: -14%;
-    right: -190px;
-    width: 300px;
-    height: 128%;
-    background: #ffffff;
     border-radius: 50%;
-}
-.au-brand__dots {
-    position: absolute;
-    top: 46px;
-    right: 130px;
-    width: 150px;
-    height: 118px;
-    background-image: radial-gradient(rgba(255, 255, 255, 0.38) 1.7px, transparent 1.8px);
-    background-size: 19px 19px;
-    opacity: 0.7;
-}
-.au-brand__arc {
-    position: absolute;
-    bottom: -140px;
-    right: -60px;
-    width: 320px;
-    height: 320px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 38% 38%, #5eead4, #2dd4bf 60%, transparent 68%);
-    opacity: 0.9;
-    animation: au-float 9s ease-in-out infinite;
-}
-.au-brand__ring {
-    position: absolute;
-    top: -120px;
-    left: -120px;
-    width: 320px;
-    height: 320px;
-    border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.12);
-    animation: au-float 12s ease-in-out infinite reverse;
-}
-@keyframes au-float {
-    0%, 100% { transform: translate(0, 0); }
-    50% { transform: translate(-14px, 16px); }
-}
-.au-brand__inner {
-    position: relative;
-    z-index: 2;
-    max-width: 520px;
-    width: 100%;
-    animation: au-slide-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@keyframes au-slide-in { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
-
-.au-brand__logobox {
-    display: inline-flex;
-    align-items: center;
-    padding: 18px 26px;
-    margin-bottom: 22px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    box-shadow: 0 20px 44px -20px rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(6px);
-}
-.au-brand__logo {
-    height: 76px;
-    width: auto;
-    display: block;
-    filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.3));
-}
-.au-brand__kicker {
-    margin: 0 0 18px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #8de4d3;
-}
-.au-brand__title {
-    font-size: clamp(1.7rem, 2.6vw, 2.3rem);
-    font-weight: 800;
-    line-height: 1.24;
-    margin: 0 0 14px;
-    letter-spacing: -0.01em;
-}
-.au-brand__title span {
-    color: #5eead4;
-    position: relative;
-    white-space: nowrap;
-}
-.au-brand__title span::after {
-    content: '';
-    position: absolute;
-    left: 0; right: 0; bottom: 2px;
-    height: 8px;
-    background: rgba(94, 234, 212, 0.26);
-    border-radius: 4px;
-    z-index: -1;
-}
-.au-brand__sub {
-    font-size: 1rem;
-    line-height: 1.6;
-    color: rgba(255, 255, 255, 0.8);
-    margin: 0 0 40px;
-    max-width: 460px;
-}
-.au-feats {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 22px;
-}
-.au-feats li {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    opacity: 0;
-    animation: au-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    animation-delay: calc(300ms + var(--d));
-}
-@keyframes au-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-.au-feats li:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    right: -11px;
-    top: 6px;
-    bottom: 6px;
-    width: 1px;
-    background: rgba(255, 255, 255, 0.2);
-}
-.au-feats__ic {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    border: 1.5px solid rgba(255, 255, 255, 0.35);
-    background: rgba(255, 255, 255, 0.06);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    color: #5eead4;
-    margin-bottom: 6px;
-}
-.au-feats b { font-size: 13.5px; font-weight: 700; }
-.au-feats small { font-size: 11.5px; color: rgba(255, 255, 255, 0.62); line-height: 1.4; }
-
-/* ---------- Panel del formulario ---------- */
-.au-side {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 40px 28px;
-    gap: 18px;
-}
-.au-card {
-    width: 100%;
-    max-width: 420px;
-    background: #fff;
-    border: 1px solid #eef1f6;
-    border-radius: 24px;
-    padding: 40px 40px 32px;
-    box-shadow: 0 44px 100px -38px rgba(15, 23, 42, 0.32);
-    text-align: center;
-    animation: au-card-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@keyframes au-card-in { from { opacity: 0; transform: translateY(16px) scale(0.99); } to { opacity: 1; transform: none; } }
-.au-card__logo { height: 34px; width: auto; margin: 0 auto 18px; }
-.au-card__title {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: #0d3f77;
-    margin: 0 0 5px;
-    letter-spacing: -0.01em;
-}
-.au-card__sub { font-size: 0.88rem; color: #64748b; margin: 0 0 24px; }
-.au-card > :deep(form),
-.au-card > :deep(.au-form) { text-align: left; }
-
-.au-card :deep(.au-form) > * {
-    opacity: 0;
-    animation: au-field-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-.au-card :deep(.au-form) > *:nth-child(1) { animation-delay: 0.12s; }
-.au-card :deep(.au-form) > *:nth-child(2) { animation-delay: 0.19s; }
-.au-card :deep(.au-form) > *:nth-child(3) { animation-delay: 0.26s; }
-.au-card :deep(.au-form) > *:nth-child(4) { animation-delay: 0.33s; }
-.au-card :deep(.au-form) > *:nth-child(5) { animation-delay: 0.40s; }
-.au-card :deep(.au-form) > *:nth-child(6) { animation-delay: 0.47s; }
-@keyframes au-field-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-
-.au-card__foot { margin: 18px 0 0; font-size: 13px; color: #64748b; }
-.au-legal { font-size: 11px; color: #94a3b8; margin: 0; text-align: center; }
-
-/* ---------- Responsive ---------- */
-@media (max-width: 1100px) {
-    .au-brand { padding-right: 96px; }
-    .au-brand::after { right: -220px; }
-    .au-feats { gap: 16px; }
-}
-@media (max-width: 1024px) {
-    .au { grid-template-columns: 1fr; }
-    .au-brand { display: none; }
-    .au-side {
-        padding: 36px 18px;
-        min-height: 100vh;
-        background: linear-gradient(158deg, #0d3f77 0%, #1e5eb8 60%, #0b6b60 100%);
-    }
-    .au-card { box-shadow: 0 30px 70px -20px rgba(15, 23, 42, 0.45); }
-    .au-legal { color: rgba(255, 255, 255, 0.75); }
+    background: rgba(255, 255, 255, 0.3);
+    animation: particleFloat linear infinite;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
 }
 @media (prefers-reduced-motion: reduce) {
-    .au *, .au *::before, .au *::after { animation: none !important; }
-    .au-card :deep(.au-form) > *,
-    .au-feats li,
-    .au-brand__inner { opacity: 1 !important; }
+    .animate-float,
+    .animate-pulse-slow,
+    .particle {
+        animation: none !important;
+    }
 }
 </style>
 
 <style>
-/* Campos */
-.au .ant-input-affix-wrapper {
-    border-radius: 12px;
+/* Campos del formulario dentro del shell */
+.au-form-wrap .ant-input-affix-wrapper,
+.au-form-wrap .ant-input {
+    border-radius: 1rem;
+    border: 2px solid #e5e7eb;
+    background: rgba(249, 250, 251, 0.5);
     padding-block: 9px;
-    border-color: #dbe3ec;
-    background: #f8fafc;
-    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
-.au .ant-input-affix-wrapper:hover {
-    border-color: #1e5eb8;
+.au-form-wrap .ant-input-affix-wrapper:hover {
+    border-color: var(--sigam-navy);
     background: #fff;
 }
-.au .ant-input-affix-wrapper-focused {
+.au-form-wrap .ant-input-affix-wrapper-focused {
+    border-color: var(--sigam-navy) !important;
     background: #fff;
-    border-color: #1e5eb8;
-    box-shadow: 0 0 0 3px rgba(30, 94, 184, 0.14);
+    box-shadow: 0 0 0 3px var(--sigam-navy-100) !important;
 }
-.au .ant-input-affix-wrapper > .ant-input-prefix {
-    color: #1e5eb8;
+.au-form-wrap .ant-input-affix-wrapper > .ant-input-prefix {
+    color: var(--sigam-navy);
     margin-inline-end: 10px;
     font-size: 15px;
 }
-.au .ant-input-affix-wrapper > input.ant-input { background: transparent; font-size: 14.5px; }
-.au .ant-form-item { margin-bottom: 16px; }
-
-/* Botón principal */
-.au .ant-btn {
-    border-radius: 12px;
+.au-form-wrap .ant-form-item {
+    margin-bottom: 16px;
+}
+.au-form-wrap .ant-btn {
+    border-radius: 1rem;
     font-weight: 700;
-    letter-spacing: 0.01em;
 }
-.au .ant-btn-primary {
+.au-form-wrap .ant-btn-primary {
     height: 46px;
-    box-shadow: 0 10px 22px -8px rgba(30, 94, 184, 0.55);
-    background: linear-gradient(180deg, #2a6cc9, #1e5eb8);
-    border: none;
+    border: 0;
+    background: linear-gradient(to right, var(--sigam-navy), var(--sigam-teal-700));
+    box-shadow: 0 10px 15px -3px rgba(23, 58, 95, 0.3);
 }
-.au .ant-btn-primary:not(:disabled):hover {
-    background: linear-gradient(180deg, #2f74d3, #1c559f);
-    box-shadow: 0 14px 26px -8px rgba(30, 94, 184, 0.6);
+.au-form-wrap .ant-btn-primary:not(:disabled):hover {
+    background: linear-gradient(to right, var(--sigam-navy-700), var(--sigam-teal-700));
+    box-shadow: 0 20px 25px -5px rgba(23, 58, 95, 0.4);
 }
 </style>

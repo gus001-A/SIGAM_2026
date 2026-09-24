@@ -9,17 +9,22 @@ use App\Models\Mantenimiento;
 use App\Models\Norma;
 use App\Models\PlanMantenimiento;
 use App\Models\Prioridad;
+use App\Models\Sucursal;
 use App\Models\TipoMantenimiento;
+use App\Models\Ubicacion;
 use App\Models\Usuario;
+use App\Support\Auditoria;
 use App\Support\CicloMantenimiento;
 use App\Support\Folios;
 use App\Support\Frecuencia;
+use App\Support\SeleccionSucursal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,41 +49,58 @@ class PlanMantenimientoController extends Controller
         $dir = $request->query('dir') === 'desc' ? 'desc' : 'asc';
 
         $texto = fn (string $clave): ?string => filled($request->query($clave)) ? trim((string) $request->query($clave)) : null;
+        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
 
         $planes = PlanMantenimiento::query()
-            ->with(['equipo:id,codigo_activo,descripcion', 'tipo:id,nombre', 'tecnico:id,nombre'])
+            ->with(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'tipo:id,nombre', 'tecnico:id,nombre'])
             ->withCount('ocurrencias')
             // Filtros por columna
-            ->when($texto('equipo'), fn (Builder $q, $v) => $q->whereHas('equipo', fn (Builder $e) => $e
-                ->where('codigo_activo', 'like', "%{$v}%")
-                ->orWhere('descripcion', 'like', "%{$v}%")))
+            ->when($texto('equipo'), fn (Builder $q, $v) => $q->where(fn (Builder $w) => $w
+                ->whereHas('equipo', fn (Builder $e) => $e->where('codigo_activo', 'like', "%{$v}%")->orWhere('descripcion', 'like', "%{$v}%"))
+                ->orWhereHas('ubicacion', fn (Builder $u) => $u->where('nombre', 'like', "%{$v}%"))))
             ->when($texto('nombre'), fn (Builder $q, $v) => $q->where('nombre', 'like', "%{$v}%"))
+            ->when($sucursalId, fn (Builder $q, $v) => $q->where('sucursal_id', $v))
             ->when($request->integer('tipo_mantenimiento_id'), fn (Builder $q, $v) => $q->where('tipo_mantenimiento_id', $v))
             ->when($request->integer('tecnico_id'), fn (Builder $q, $v) => $q->where('tecnico_id', $v))
             ->when($request->query('frecuencia'), fn (Builder $q, $v) => $q->where('tipo_frecuencia', $v))
             ->when($request->boolean('vencidos'), fn (Builder $q) => $q->whereDate('proxima_fecha', '<', today()))
+            ->when($request->filled('desde'), fn (Builder $q) => $q->whereDate('proxima_fecha', '>=', $request->query('desde')))
+            ->when($request->filled('hasta'), fn (Builder $q) => $q->whereDate('proxima_fecha', '<=', $request->query('hasta')))
+            ->when($request->filled('registrado_por'), fn (Builder $q) => $q->whereIn(
+                'id',
+                Auditoria::idsCreadosPor(PlanMantenimiento::class, trim((string) $request->query('registrado_por'))),
+            ))
             ->orderBy($orden, $dir)
             ->paginate(self::POR_PAGINA)
-            ->withQueryString()
-            ->through(fn (PlanMantenimiento $p) => [
-                'id' => $p->id,
-                'nombre' => $p->nombre,
-                'equipo' => $p->equipo ? $p->equipo->codigo_activo.' · '.$p->equipo->descripcion : null,
-                'tipo' => $p->tipo?->nombre,
-                'frecuencia' => $p->tipo_frecuencia,
-                'valor_frecuencia' => $p->valor_frecuencia,
-                'proxima_fecha' => $p->proxima_fecha?->toDateString(),
-                'vencido' => $p->proxima_fecha !== null && $p->proxima_fecha->isPast(),
-                'tecnico' => $p->tecnico?->nombre,
-                'ocurrencias_count' => $p->ocurrencias_count,
-                'estado' => $p->estado,
-            ]);
+            ->withQueryString();
+
+        $creadores = Auditoria::creadoPorMasivo(PlanMantenimiento::class, $planes->pluck('id'));
+        $planes->through(fn (PlanMantenimiento $p) => [
+            'id' => $p->id,
+            'nombre' => $p->nombre,
+            'objetivo' => $p->equipo
+                ? ['tipo' => 'equipo', 'texto' => "{$p->equipo->codigo_activo} · {$p->equipo->descripcion}"]
+                : ($p->ubicacion ? ['tipo' => 'ubicacion', 'texto' => $p->ubicacion->nombre] : null),
+            'sucursal' => $p->sucursal?->nombre,
+            'tipo' => $p->tipo?->nombre,
+            'frecuencia' => $p->tipo_frecuencia,
+            'valor_frecuencia' => $p->valor_frecuencia,
+            'proxima_fecha' => $p->proxima_fecha?->toDateString(),
+            'vencido' => $p->proxima_fecha !== null && $p->proxima_fecha->isPast(),
+            'tecnico' => $p->tecnico?->nombre,
+            'ocurrencias_count' => $p->ocurrencias_count,
+            'estado' => $p->estado,
+            'creado_por' => $creadores[$p->id]['usuario'] ?? null,
+            'creado_en' => $creadores[$p->id]['fecha'] ?? null,
+        ]);
 
         return Inertia::render('Mantenimiento/Planes/Index', [
             'planes' => $planes,
-            'filtros' => $request->only(['equipo', 'nombre', 'tipo_mantenimiento_id', 'tecnico_id', 'frecuencia', 'vencidos']),
+            'sucursalId' => $sucursalId,
+            'filtros' => $request->only(['equipo', 'nombre', 'tipo_mantenimiento_id', 'tecnico_id', 'frecuencia', 'vencidos', 'desde', 'hasta', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => [
+                'sucursales' => Sucursal::activos()->orderBy('nombre')->get(['id', 'nombre']),
                 'tipos' => TipoMantenimiento::activos()->where('categoria', 'preventivo')->orderBy('nombre')->get(['id', 'nombre']),
                 'tecnicos' => Usuario::role('tecnico')->where('estado', 'activo')->orderBy('nombre')->get(['id', 'nombre']),
                 'frecuencias' => self::FRECUENCIAS,
@@ -102,7 +124,7 @@ class PlanMantenimientoController extends Controller
     {
         $this->authorize('mantenimientos.crear');
 
-        $datos = $this->validar($request);
+        $datos = $this->validar($request, esNuevo: true);
         $datos['proxima_fecha'] = $this->calcularProxima($datos);
 
         $plan = PlanMantenimiento::create($datos);
@@ -114,10 +136,11 @@ class PlanMantenimientoController extends Controller
     {
         $this->authorize('mantenimientos.ver');
 
-        $plan->load(['equipo:id,codigo_activo,descripcion', 'tipo:id,nombre', 'norma:id,codigo', 'formato:id,nombre', 'tecnico:id,nombre']);
+        $plan->load(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'tipo:id,nombre', 'norma:id,codigo', 'formato:id,nombre', 'tecnico:id,nombre']);
 
         return Inertia::render('Mantenimiento/Planes/Show', [
             'plan' => $plan,
+            'sello' => $plan->selloAuditoria(),
             'ocurrencias' => $plan->ocurrencias()
                 ->with('mantenimiento:id,folio,estado_id')
                 ->orderBy('fecha_programada')
@@ -181,6 +204,20 @@ class PlanMantenimientoController extends Controller
         return back()->with('exito', count($fechas).' ocurrencias generadas.');
     }
 
+    /** Elimina una ocurrencia programada que todavía no generó una orden (p. ej. si ya no aplica). */
+    public function destroyOcurrencia(PlanMantenimiento $plan, int $ocurrencia): RedirectResponse
+    {
+        $this->authorize('mantenimientos.editar');
+
+        $registro = $plan->ocurrencias()->findOrFail($ocurrencia);
+
+        abort_if($registro->mantenimiento_id !== null, 422, 'Esta ocurrencia ya generó una orden y no se puede eliminar.');
+
+        $registro->delete();
+
+        return back()->with('exito', 'Ocurrencia eliminada.');
+    }
+
     /** Crea una orden de mantenimiento a partir de una ocurrencia pendiente. */
     public function generarOrden(Request $request, PlanMantenimiento $plan): RedirectResponse
     {
@@ -202,7 +239,8 @@ class PlanMantenimientoController extends Controller
                 'folio' => Folios::mantenimiento(),
                 'plan_id' => $plan->id,
                 'equipo_id' => $plan->equipo_id,
-                'sucursal_id' => $plan->equipo->sucursal_id,
+                'ubicacion_id' => $plan->ubicacion_id,
+                'sucursal_id' => $plan->sucursal_id ?? $plan->equipo?->sucursal_id ?? $plan->ubicacion?->sucursal_id,
                 'tipo_id' => $plan->tipo_mantenimiento_id,
                 'prioridad_id' => $plan->prioridad_id,
                 'estado_id' => $inicial->id,
@@ -254,23 +292,44 @@ class PlanMantenimientoController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validar(Request $request): array
+    private function validar(Request $request, bool $esNuevo = false): array
     {
-        return $request->validate([
-            'equipo_id' => ['required', 'integer', Rule::exists('equipos', 'id')],
+        $datos = $request->validate([
+            'equipo_id' => ['nullable', 'integer', Rule::exists('equipos', 'id')],
+            'ubicacion_id' => ['nullable', 'integer', Rule::exists('ubicaciones', 'id')],
             'tipo_mantenimiento_id' => ['required', 'integer', Rule::exists('tipos_mantenimiento', 'id')],
             'nombre' => ['nullable', 'string', 'max:255'],
             'tipo_frecuencia' => ['required', Rule::in(self::FRECUENCIAS)],
             'valor_frecuencia' => ['required', 'integer', 'min:1'],
             'regla_personalizada' => ['nullable', 'array'],
-            'fecha_inicio' => ['nullable', 'date'],
+            // Al crear, la fecha base para calendarizar no puede ser pasada; al
+            // editar un plan ya existente se conserva la que tenga (puede ser
+            // histórica sin que eso sea un error).
+            'fecha_inicio' => $esNuevo ? ['nullable', 'date', 'after_or_equal:today'] : ['nullable', 'date'],
             'dias_aviso_anticipado' => ['required', 'integer', 'min:0', 'max:365'],
             'norma_id' => ['nullable', 'integer', Rule::exists('normas', 'id')],
             'formato_id' => ['nullable', 'integer', Rule::exists('formatos', 'id')],
             'prioridad_id' => ['nullable', 'integer', Rule::exists('prioridades', 'id')],
             'tecnico_id' => ['nullable', 'integer', Rule::exists('usuarios', 'id')],
             'estado' => ['required', Rule::in(['activo', 'inactivo'])],
+        ], [
+            'fecha_inicio.after_or_equal' => 'La fecha de inicio no puede ser anterior a hoy.',
         ]);
+
+        $tieneEquipo = filled($datos['equipo_id'] ?? null);
+        $tieneUbicacion = filled($datos['ubicacion_id'] ?? null);
+
+        if ($tieneEquipo === $tieneUbicacion) {
+            throw ValidationException::withMessages([
+                'equipo_id' => 'Selecciona un equipo o una instalación, no ambos ni ninguno.',
+            ]);
+        }
+
+        $datos['sucursal_id'] = $tieneEquipo
+            ? Equipo::findOrFail($datos['equipo_id'])->sucursal_id
+            : Ubicacion::findOrFail($datos['ubicacion_id'])->sucursal_id;
+
+        return $datos;
     }
 
     /**
@@ -289,7 +348,8 @@ class PlanMantenimientoController extends Controller
     private function catalogos(): array
     {
         return [
-            'equipos' => Equipo::orderBy('codigo_activo')->get(['id', 'codigo_activo', 'descripcion']),
+            'equipos' => Equipo::orderBy('codigo_activo')->get(['id', 'codigo_activo', 'descripcion', 'sucursal_id']),
+            'ubicaciones' => Ubicacion::activos()->orderBy('ruta')->get(['id', 'nombre', 'profundidad', 'sucursal_id']),
             'tipos' => TipoMantenimiento::activos()->where('categoria', 'preventivo')->orderBy('nombre')->get(['id', 'nombre']),
             'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre']),
             'normas' => Norma::activos()->orderBy('codigo')->get(['id', 'codigo', 'nombre']),

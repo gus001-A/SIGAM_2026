@@ -1,5 +1,5 @@
 <script setup>
-import { computed, h, onMounted, ref, watch } from 'vue';
+import { computed, h, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import { message } from 'ant-design-vue';
 import {
@@ -7,6 +7,7 @@ import {
     BarChartOutlined,
     CalendarOutlined,
     CarOutlined,
+    CheckSquareOutlined,
     DashboardOutlined,
     DownOutlined,
     EnvironmentOutlined,
@@ -49,7 +50,7 @@ const grupos = [
         label: 'Inventario',
         icono: AppstoreOutlined,
         items: [
-            { label: 'Equipos', ruta: 'equipos.index', patron: 'equipos.*', permiso: 'equipos.ver', icon: ToolOutlined },
+            { label: 'Equipos', ruta: 'equipos.por_sucursal', patron: 'equipos.*', permiso: 'equipos.ver', icon: ToolOutlined },
             { label: 'Sucursales', ruta: 'sucursales.index', patron: 'sucursales.*', permiso: 'sucursales.ver', icon: ShopOutlined },
             { label: 'Ubicaciones', ruta: 'ubicaciones.index', patron: 'ubicaciones.*', permiso: 'ubicaciones.ver', icon: EnvironmentOutlined },
             { label: 'Proveedores', ruta: 'proveedores.index', patron: 'proveedores.*', permiso: 'proveedores.ver', icon: CarOutlined },
@@ -65,6 +66,13 @@ const grupos = [
             { label: 'Planes preventivos', ruta: 'planes.index', patron: 'planes.*', permiso: 'mantenimientos.ver', icon: CalendarOutlined },
             { label: 'Calendario', ruta: 'calendario.index', patron: 'calendario.*', permiso: 'mantenimientos.ver', icon: CalendarOutlined },
         ],
+    },
+    {
+        clave: 'g-tareas',
+        label: 'Tareas',
+        icono: CheckSquareOutlined,
+        items: [{ label: 'Tareas', ruta: 'tareas.index', patron: 'tareas.*', permiso: 'tareas.ver', icon: CheckSquareOutlined }],
+        directo: true,
     },
     {
         clave: 'g-normas',
@@ -112,6 +120,33 @@ const menuItems = computed(() =>
         })
         .filter(Boolean),
 );
+
+// El menú horizontal de AntD mide su ancho disponible una sola vez con un
+// ResizeObserver interno; si esa medición ocurre mientras el contenedor
+// está oculto (display:none, por debajo del punto de quiebre) o queda
+// obsoleta al cruzar el punto de quiebre varias veces, el menú puede
+// quedarse "en blanco" hasta recargar la página. En vez de confiar solo en
+// CSS para mostrar/ocultar el menú, se destruye y se vuelve a crear el
+// componente por completo (`v-if` + `:key`) cada vez que se cruza el punto
+// de quiebre, forzando una medición nueva y evitando el estado obsoleto.
+const PUNTO_QUIEBRE = 1180;
+const esEscritorio = ref(true);
+let temporizadorResize = null;
+const actualizarEsEscritorio = () => {
+    esEscritorio.value = window.innerWidth > PUNTO_QUIEBRE;
+};
+const onResize = () => {
+    clearTimeout(temporizadorResize);
+    temporizadorResize = setTimeout(actualizarEsEscritorio, 120);
+};
+onMounted(() => {
+    actualizarEsEscritorio();
+    window.addEventListener('resize', onResize);
+});
+onUnmounted(() => {
+    window.removeEventListener('resize', onResize);
+    clearTimeout(temporizadorResize);
+});
 
 const grupoActivo = computed(() =>
     grupos.find((g) =>
@@ -233,6 +268,8 @@ watch(
                     </div>
 
                     <a-menu
+                        v-if="esEscritorio"
+                        key="menu-escritorio"
                         mode="horizontal"
                         theme="light"
                         :items="menuItems"
@@ -240,6 +277,7 @@ watch(
                         class="app-nav__menu"
                         @click="onMenu"
                     />
+                    <div v-else class="app-nav__menu" />
 
                     <div class="app-nav__acciones">
                         <PanelNotificaciones :items="notis" :total="noLeidas" @recargar="cargarNoLeidas" />
@@ -319,7 +357,7 @@ watch(
     line-height: 64px;
     padding: 0 18px;
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 10px;
     z-index: 20;
@@ -376,11 +414,13 @@ watch(
     transform: scale(1.05);
 }
 .app-nav__menu {
-    justify-self: center;
+    justify-self: stretch;
+    min-width: 0;
+    max-width: 100%;
     border-bottom: none;
     background: transparent;
     line-height: 64px;
-    min-width: 0;
+    overflow: hidden;
 }
 .app-nav__acciones {
     justify-self: end;
@@ -499,13 +539,13 @@ watch(
 }
 
 /* Por debajo de este ancho el menú horizontal ya no cabe (se traslapa con
-   el logo y el usuario) — se oculta y se usa la hamburguesa + panel. */
+   el logo y el usuario) — se oculta y se usa la hamburguesa + panel. El
+   propio componente `<a-menu>` se destruye por completo bajo este ancho
+   (ver `esEscritorio` en el script), no solo se oculta con CSS, para que
+   AntD siempre vuelva a medirlo desde cero al cruzar este punto. */
 @media (max-width: 1180px) {
     .app-nav {
         grid-template-columns: auto 1fr auto;
-    }
-    .app-nav__menu.ant-menu-horizontal {
-        display: none !important;
     }
     .app-nav__burger {
         display: inline-flex !important;

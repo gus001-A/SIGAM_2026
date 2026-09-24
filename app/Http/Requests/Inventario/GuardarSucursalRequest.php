@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Inventario;
 
+use App\Models\Sucursal;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -14,6 +15,12 @@ class GuardarSucursalRequest extends FormRequest
         );
     }
 
+    /** La sucursal se guarda en MAYÚSCULAS; normaliza antes de validar `unique:codigo`. */
+    protected function prepareForValidation(): void
+    {
+        $this->merge(Sucursal::normalizarMayusculas($this->all()));
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -22,7 +29,8 @@ class GuardarSucursalRequest extends FormRequest
         $id = $this->route('sucursal')?->id;
 
         return [
-            'codigo' => ['required', 'string', 'max:40', Rule::unique('sucursales', 'codigo')->ignore($id)],
+            // Si se deja en blanco, el controlador genera "4 letras + consecutivo" del nombre.
+            'codigo' => ['nullable', 'string', 'max:40', Rule::unique('sucursales', 'codigo')->ignore($id)],
             'nombre' => ['required', 'string', 'max:255'],
             'direccion' => ['nullable', 'string', 'max:255'],
             'telefono' => ['nullable', 'digits:10'],

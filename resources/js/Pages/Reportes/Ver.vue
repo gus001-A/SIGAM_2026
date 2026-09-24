@@ -1,13 +1,11 @@
 <script setup>
-import { computed, h, reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     ArrowLeftOutlined,
     BarChartOutlined,
-    DownOutlined,
     FileExcelOutlined,
     FilePdfOutlined,
-    FileTextOutlined,
     ReloadOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -56,19 +54,13 @@ const generar = () => {
     router.get(route('reportes.generar', props.clave), params, { preserveScroll: true });
 };
 
-const exportar = ({ key }) => {
-    const params = new URLSearchParams({ formato: key });
+const exportar = (formato) => {
+    const params = new URLSearchParams({ formato });
     for (const [k, v] of Object.entries(form)) {
         if (v !== '' && v !== null && v !== undefined) params.set(k, v);
     }
     window.location.href = `${route('reportes.exportar', props.clave)}?${params.toString()}`;
 };
-
-const menuExportar = [
-    { key: 'xlsx', icon: () => h(FileExcelOutlined), label: 'Excel (.xlsx)' },
-    { key: 'pdf', icon: () => h(FilePdfOutlined), label: 'PDF' },
-    { key: 'csv', icon: () => h(FileTextOutlined), label: 'CSV' },
-];
 
 // --- Tabla --------------------------------------------------------
 const tablaColumns = computed(() =>
@@ -119,14 +111,16 @@ const fechaHora = (v) => (v ? new Date(v).toLocaleString('es-MX', { dateStyle: '
                 </div>
             </div>
 
-            <a-dropdown v-if="!pendiente && puedeExportar">
-                <a-button type="primary">
-                    Exportar <DownOutlined />
+            <a-space v-if="!pendiente && puedeExportar">
+                <a-button @click="exportar('xlsx')">
+                    <template #icon><FileExcelOutlined /></template>
+                    Excel
                 </a-button>
-                <template #overlay>
-                    <a-menu :items="menuExportar" @click="exportar" />
-                </template>
-            </a-dropdown>
+                <a-button @click="exportar('pdf')">
+                    <template #icon><FilePdfOutlined /></template>
+                    PDF
+                </a-button>
+            </a-space>
         </div>
 
         <a-card v-if="filtrosDisponibles.length" size="small" class="mb-4 rpt-filtros">

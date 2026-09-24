@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneEstadoActivo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,12 +16,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class PlanMantenimiento extends Model
 {
-    use EsAuditable, HasFactory, SoftDeletes, TieneEstadoActivo;
+    use ConvierteMayusculas, EsAuditable, HasFactory, SoftDeletes, TieneEstadoActivo;
 
     protected $table = 'planes_mantenimiento';
 
     protected $fillable = [
-        'equipo_id', 'tipo_mantenimiento_id', 'nombre',
+        'equipo_id', 'ubicacion_id', 'sucursal_id', 'tipo_mantenimiento_id', 'nombre',
         'tipo_frecuencia', 'valor_frecuencia', 'regla_personalizada',
         'fecha_inicio', 'proxima_fecha', 'dias_aviso_anticipado',
         'norma_id', 'formato_id', 'prioridad_id', 'tecnico_id', 'estado',
@@ -42,9 +43,24 @@ class PlanMantenimiento extends Model
         return 'planes';
     }
 
+    protected function camposMayusculas(): array
+    {
+        return ['nombre'];
+    }
+
     public function equipo(): BelongsTo
     {
         return $this->belongsTo(Equipo::class);
+    }
+
+    public function ubicacion(): BelongsTo
+    {
+        return $this->belongsTo(Ubicacion::class);
+    }
+
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class);
     }
 
     public function tipo(): BelongsTo

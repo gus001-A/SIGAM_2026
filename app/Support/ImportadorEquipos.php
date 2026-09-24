@@ -224,11 +224,21 @@ class ImportadorEquipos
 
         $mensajes = $v->errors()->all();
 
-        if ($datos['sucursal'] && ! Sucursal::where('nombre', $datos['sucursal'])->exists()) {
+        if ($datos['sucursal'] && ! Sucursal::where('nombre', $this->mayus($datos['sucursal']))->exists()) {
             $mensajes[] = "La sucursal «{$datos['sucursal']}» no existe.";
         }
 
         return $mensajes;
+    }
+
+    /**
+     * Los catálogos y sucursales se guardan en MAYÚSCULAS (observaciones generales
+     * del cliente); el archivo de Excel puede traer el texto en cualquier caja,
+     * así que las búsquedas por nombre normalizan antes de comparar.
+     */
+    private function mayus(string $valor): string
+    {
+        return mb_strtoupper($valor, 'UTF-8');
     }
 
     /**
@@ -237,25 +247,25 @@ class ImportadorEquipos
      */
     private function resolverReferencias(array $datos): array
     {
-        $sucursal = Sucursal::where('nombre', $datos['sucursal'])->firstOrFail();
+        $sucursal = Sucursal::where('nombre', $this->mayus($datos['sucursal']))->firstOrFail();
 
         $tipoId = $datos['tipo']
-            ? TipoEquipo::firstOrCreate(['nombre' => $datos['tipo']], ['clave' => Str::slug($datos['tipo'], '_'), 'estado' => 'activo'])->id
+            ? TipoEquipo::firstOrCreate(['nombre' => $this->mayus($datos['tipo'])], ['clave' => Str::slug($datos['tipo'], '_'), 'estado' => 'activo'])->id
             : null;
         $marcaId = $datos['marca']
-            ? Marca::firstOrCreate(['nombre' => $datos['marca']], ['estado' => 'activo'])->id
+            ? Marca::firstOrCreate(['nombre' => $this->mayus($datos['marca'])], ['estado' => 'activo'])->id
             : null;
         $estadoId = $datos['estado']
-            ? EstadoEquipo::where('nombre', $datos['estado'])->value('id')
+            ? EstadoEquipo::where('nombre', $this->mayus($datos['estado']))->value('id')
             : null;
         $proveedorId = $datos['proveedor']
-            ? Proveedor::where('razon_social', $datos['proveedor'])->value('id')
+            ? Proveedor::where('razon_social', $this->mayus($datos['proveedor']))->value('id')
             : null;
         $responsableId = $datos['responsable']
             ? Usuario::where('email', $datos['responsable'])->value('id')
             : null;
         $ubicacionId = $datos['ubicacion']
-            ? Ubicacion::where('sucursal_id', $sucursal->id)->where('nombre', $datos['ubicacion'])->value('id')
+            ? Ubicacion::where('sucursal_id', $sucursal->id)->where('nombre', $this->mayus($datos['ubicacion']))->value('id')
             : null;
 
         return [

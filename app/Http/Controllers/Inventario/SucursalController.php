@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventario\GuardarSucursalRequest;
 use App\Models\Sucursal;
 use App\Models\Usuario;
+use App\Support\Auditoria;
+use App\Support\Folios;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,27 +49,35 @@ class SucursalController extends Controller
                 $request->query('estado') === 'inactivo',
                 fn (Builder $q) => $q->onlyTrashed(),
             )
+            ->when($request->filled('registrado_por'), fn (Builder $q) => $q->whereIn(
+                'id',
+                Auditoria::idsCreadosPor(Sucursal::class, trim((string) $request->query('registrado_por'))),
+            ))
             ->orderBy($orden, $dir)
             ->paginate(self::POR_PAGINA)
-            ->withQueryString()
-            ->through(fn (Sucursal $s) => [
-                'id' => $s->id,
-                'codigo' => $s->codigo,
-                'nombre' => $s->nombre,
-                'direccion' => $s->direccion,
-                'telefono' => $s->telefono,
-                'correo' => $s->correo,
-                'responsable' => $s->responsable?->nombre_completo,
-                'equipos_count' => $s->equipos_count,
-                'ubicaciones_count' => $s->ubicaciones_count,
-                'usuarios_count' => $s->usuarios_count,
-                'valor_activos' => (float) $s->valor_activos,
-                'estado' => $s->estado,
-            ]);
+            ->withQueryString();
+
+        $creadores = Auditoria::creadoPorMasivo(Sucursal::class, $sucursales->pluck('id'));
+        $sucursales->through(fn (Sucursal $s) => [
+            'id' => $s->id,
+            'codigo' => $s->codigo,
+            'nombre' => $s->nombre,
+            'direccion' => $s->direccion,
+            'telefono' => $s->telefono,
+            'correo' => $s->correo,
+            'responsable' => $s->responsable?->nombre_completo,
+            'equipos_count' => $s->equipos_count,
+            'ubicaciones_count' => $s->ubicaciones_count,
+            'usuarios_count' => $s->usuarios_count,
+            'valor_activos' => (float) $s->valor_activos,
+            'estado' => $s->estado,
+            'creado_por' => $creadores[$s->id]['usuario'] ?? null,
+            'creado_en' => $creadores[$s->id]['fecha'] ?? null,
+        ]);
 
         return Inertia::render('Inventario/Sucursales/Index', [
             'sucursales' => $sucursales,
-            'filtros' => $request->only(['codigo', 'nombre', 'direccion', 'responsable_id', 'estado']),
+            'filtros' => $request->only(['codigo', 'nombre', 'direccion', 'responsable_id', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => ['responsables' => $this->responsables()],
         ]);
@@ -85,7 +95,10 @@ class SucursalController extends Controller
 
     public function store(GuardarSucursalRequest $request): RedirectResponse
     {
-        $sucursal = Sucursal::create($request->validated());
+        $datos = $request->validated();
+        $datos['codigo'] = ($datos['codigo'] ?? null) ?: Folios::codigoSucursal($datos['nombre']);
+
+        $sucursal = Sucursal::create($datos);
 
         return redirect()
             ->route('sucursales.show', $sucursal)
@@ -130,6 +143,7 @@ class SucursalController extends Controller
                 'documentos' => $sucursal->documentos,
             ],
             'valorActivos' => (float) $sucursal->equipos()->sum('valor_adquisicion'),
+            'sello' => $sucursal->selloAuditoria(),
         ]);
     }
 
@@ -145,7 +159,10 @@ class SucursalController extends Controller
 
     public function update(GuardarSucursalRequest $request, Sucursal $sucursal): RedirectResponse
     {
-        $sucursal->update($request->validated());
+        $datos = $request->validated();
+        $datos['codigo'] = ($datos['codigo'] ?? null) ?: Folios::codigoSucursal($datos['nombre'], $sucursal->id);
+
+        $sucursal->update($datos);
 
         return redirect()
             ->route('sucursales.show', $sucursal)

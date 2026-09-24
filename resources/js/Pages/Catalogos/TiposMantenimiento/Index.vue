@@ -9,28 +9,24 @@ defineProps({
     orden: Object,
 });
 
+const OPCIONES_CATEGORIA = [
+    { label: 'Preventivo', value: 'preventivo' },
+    { label: 'Correctivo', value: 'correctivo' },
+    { label: 'Urgente', value: 'urgente' },
+    { label: 'Inspección', value: 'inspeccion' },
+];
+
 const columnas = [
     { key: 'nombre', title: 'Tipo de mantenimiento', filtro: 'texto', sorter: true, width: 240 },
-    { key: 'categoria', title: 'Categoría', tipo: 'tag', width: 150 },
-    { key: 'descripcion', title: 'Descripción', width: 280 },
+    { key: 'categoria', title: 'Categoría', tipo: 'tag', filtro: 'select', opciones: OPCIONES_CATEGORIA, width: 150 },
+    { key: 'descripcion', title: 'Descripción', filtro: 'texto', width: 280 },
     { key: 'planes_count', title: 'Planes', tipo: 'count', align: 'right', width: 100 },
     { key: 'mantenimientos_count', title: 'Órdenes', tipo: 'count', align: 'right', width: 100 },
 ];
 
 const campos = [
     { name: 'nombre', label: 'Nombre', tipo: 'text', required: true },
-    {
-        name: 'categoria',
-        label: 'Categoría',
-        tipo: 'select',
-        required: true,
-        opciones: [
-            { label: 'Preventivo', value: 'preventivo' },
-            { label: 'Correctivo', value: 'correctivo' },
-            { label: 'Urgente', value: 'urgente' },
-            { label: 'Inspección', value: 'inspeccion' },
-        ],
-    },
+    { name: 'categoria', label: 'Categoría', tipo: 'select', required: true, opciones: OPCIONES_CATEGORIA },
     { name: 'descripcion', label: 'Descripción', tipo: 'textarea' },
 ];
 </script>

@@ -6,11 +6,13 @@ import {
     DeleteOutlined,
     EditOutlined,
     EnvironmentOutlined,
+    FileAddOutlined,
     PlusOutlined,
     ToolOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
+import SelectCatalogo from '@/Components/SelectCatalogo.vue';
 import { usePermisos } from '@/composables/usePermisos';
 
 const props = defineProps({
@@ -18,18 +20,34 @@ const props = defineProps({
     sucursalSeleccionada: { type: [Number, String], default: null },
     arbol: { type: Array, default: () => [] },
     tipos: { type: Array, default: () => [] },
+    tiposArea: { type: Array, default: () => [] },
+    tiposLimpieza: { type: Array, default: () => [] },
 });
 
 const { puede } = usePermisos();
 const confirmar = ref(null);
 
+const solicitarMantenimiento = (nodo) =>
+    router.visit(route('solicitudes.create', { ubicacion_id: nodo.id }));
+const verSolicitudes = (nodo) =>
+    router.visit(route('solicitudes.index', { ubicacion_id: nodo.id }));
+const verOrdenes = (nodo) =>
+    router.visit(route('mantenimientos.index', { ubicacion_id: nodo.id }));
+
+const modoTodas = computed(() => props.sucursalSeleccionada === 'todas');
+
+const opcionesSucursal = computed(() => [
+    { id: 'todas', nombre: 'Todas las sucursales' },
+    ...props.sucursales,
+]);
+
 const sucursalActual = computed({
-    get: () => (props.sucursalSeleccionada ? Number(props.sucursalSeleccionada) : null),
+    get: () => (modoTodas.value ? 'todas' : props.sucursalSeleccionada ? Number(props.sucursalSeleccionada) : null),
     set: (v) => router.get(route('ubicaciones.index'), { sucursal_id: v }, { preserveState: false }),
 });
 
-const sucursalNombre = computed(
-    () => props.sucursales.find((s) => s.id === Number(props.sucursalSeleccionada))?.nombre ?? '',
+const sucursalNombre = computed(() =>
+    modoTodas.value ? 'Todas las sucursales' : props.sucursales.find((s) => s.id === Number(props.sucursalSeleccionada))?.nombre ?? '',
 );
 
 // --- Árbol -> treeData de a-tree -------------------------------------
@@ -54,6 +72,8 @@ const form = useForm({
     sucursal_id: null,
     padre_id: null,
     tipo_id: undefined,
+    tipo_area_id: undefined,
+    tipo_limpieza_id: undefined,
     codigo: '',
     nombre: '',
     descripcion: '',
@@ -63,9 +83,11 @@ const form = useForm({
 const cargarForm = (datos) => {
     form.clearErrors();
     form.id = datos.id ?? null;
-    form.sucursal_id = Number(props.sucursalSeleccionada);
+    form.sucursal_id = datos.sucursal_id ?? Number(props.sucursalSeleccionada);
     form.padre_id = datos.padre_id ?? null;
     form.tipo_id = datos.tipo_id ?? undefined;
+    form.tipo_area_id = datos.tipo_area_id ?? undefined;
+    form.tipo_limpieza_id = datos.tipo_limpieza_id ?? undefined;
     form.codigo = datos.codigo ?? '';
     form.nombre = datos.nombre ?? '';
     form.descripcion = datos.descripcion ?? '';
@@ -118,13 +140,13 @@ const est = (campo) => (form.errors[campo] ? 'error' : undefined);
         <template #acciones>
             <a-select
                 v-model:value="sucursalActual"
-                :options="sucursales"
+                :options="opcionesSucursal"
                 :field-names="{ label: 'nombre', value: 'id' }"
                 style="min-width: 220px"
                 placeholder="Selecciona una sucursal"
             />
             <a-button
-                v-if="puede('ubicaciones.crear') && sucursalSeleccionada"
+                v-if="puede('ubicaciones.crear') && sucursalSeleccionada && !modoTodas"
                 type="primary"
                 @click="abrirAlta()"
             >
@@ -157,19 +179,49 @@ const est = (campo) => (form.errors[campo] ? 'error' : undefined);
                 >
                     <template #title="{ nodo }">
                         <div class="nodo" :class="{ 'nodo--inactiva': nodo.estado !== 'activo' }">
-                            <span class="nodo__pin"><EnvironmentOutlined /></span>
+                            <a-tooltip :title="nodo.creado_por ? `Registrado por ${nodo.creado_por}` : 'Sin registro'">
+                                <span class="nodo__pin"><EnvironmentOutlined /></span>
+                            </a-tooltip>
                             <div class="nodo__info">
                                 <span class="nodo__nombre">{{ nodo.nombre }}</span>
-                                <a-tag v-if="nodo.codigo" class="nodo__cod">{{ nodo.codigo }}</a-tag>
+                                <a-tooltip v-if="nodo.codigo" :title="nodo.ruta ? `Trazabilidad: ${nodo.ruta}` : ''">
+                                    <a-tag class="nodo__cod">{{ nodo.codigo }}</a-tag>
+                                </a-tooltip>
                                 <span v-if="nodo.tipo" class="nodo__tipo">{{ nodo.tipo }}</span>
+                                <a-tooltip v-if="nodo.tipo_area" title="Tipo de área (periodicidad de limpieza)">
+                                    <a-tag color="cyan">{{ nodo.tipo_area }}</a-tag>
+                                </a-tooltip>
+                                <a-tag v-if="nodo.tipo_limpieza" color="geekblue">{{ nodo.tipo_limpieza }}</a-tag>
+                                <a-tag v-if="modoTodas && !nodo.padre_id" color="purple">{{ nodo.sucursal }}</a-tag>
                                 <a-tag v-if="nodo.equipos_count" color="blue">
                                     <ToolOutlined /> {{ nodo.equipos_count }}
+                                </a-tag>
+                                <a-tag
+                                    v-if="nodo.solicitudes_count"
+                                    color="orange"
+                                    class="nodo__mant"
+                                    @click.stop="verSolicitudes(nodo)"
+                                >
+                                    <FileAddOutlined /> {{ nodo.solicitudes_count }} solicitud(es)
+                                </a-tag>
+                                <a-tag
+                                    v-if="nodo.mantenimientos_count"
+                                    color="orange"
+                                    class="nodo__mant"
+                                    @click.stop="verOrdenes(nodo)"
+                                >
+                                    <ToolOutlined /> {{ nodo.mantenimientos_count }} orden(es)
                                 </a-tag>
                                 <a-tag v-if="nodo.estado !== 'activo'">Inactiva</a-tag>
                             </div>
                             <div class="nodo__acciones">
+                                <a-tooltip v-if="puede('solicitudes.crear')" title="Solicitar mantenimiento para esta área">
+                                    <a-button class="nodo__btn nodo__btn--mant" @click.stop="solicitarMantenimiento(nodo)">
+                                        <template #icon><FileAddOutlined /></template>
+                                    </a-button>
+                                </a-tooltip>
                                 <a-tooltip title="Añadir sububicación">
-                                    <a-button v-if="puede('ubicaciones.crear')" class="nodo__btn nodo__btn--add" @click.stop="abrirAlta(nodo)">
+                                    <a-button v-if="puede('ubicaciones.crear') && !modoTodas" class="nodo__btn nodo__btn--add" @click.stop="abrirAlta(nodo)">
                                         <template #icon><PlusOutlined /></template>
                                     </a-button>
                                 </a-tooltip>
@@ -207,8 +259,13 @@ const est = (campo) => (form.errors[campo] ? 'error' : undefined);
             <a-form layout="vertical" class="mt-2" @submit.prevent="guardar">
                 <a-row :gutter="12">
                     <a-col :span="10">
-                        <a-form-item label="Código" :validate-status="est('codigo')" :help="form.errors.codigo">
-                            <a-input v-model:value="form.codigo" />
+                        <a-form-item
+                            label="Código"
+                            extra="Vacío = automático (4 letras + consecutivo)."
+                            :validate-status="est('codigo')"
+                            :help="form.errors.codigo"
+                        >
+                            <a-input v-model:value="form.codigo" placeholder="Automático" />
                         </a-form-item>
                     </a-col>
                     <a-col :span="14">
@@ -218,10 +275,41 @@ const est = (campo) => (form.errors[campo] ? 'error' : undefined);
                     </a-col>
                     <a-col :span="24">
                         <a-form-item label="Tipo de ubicación" :validate-status="est('tipo_id')" :help="form.errors.tipo_id">
-                            <a-select
+                            <SelectCatalogo
                                 v-model:value="form.tipo_id"
                                 :options="tipos"
-                                :field-names="{ label: 'nombre', value: 'id' }"
+                                ruta="catalogos.tipos_ubicacion"
+                                etiqueta="tipo de ubicación"
+                                etiqueta-plural="tipos de ubicación"
+                                placeholder="Sin especificar"
+                            />
+                        </a-form-item>
+                    </a-col>
+                    <a-col :span="12">
+                        <a-form-item
+                            label="Tipo de área"
+                            extra="Criticidad de limpieza — opcional."
+                            :validate-status="est('tipo_area_id')"
+                            :help="form.errors.tipo_area_id"
+                        >
+                            <a-select
+                                v-model:value="form.tipo_area_id"
+                                :options="tiposArea.map((t) => ({ value: t.id, label: `${t.nombre} (${t.dias_limpieza} días)` }))"
+                                allow-clear
+                                placeholder="Sin especificar"
+                            />
+                        </a-form-item>
+                    </a-col>
+                    <a-col :span="12">
+                        <a-form-item
+                            label="Tipo de limpieza"
+                            extra="Opcional."
+                            :validate-status="est('tipo_limpieza_id')"
+                            :help="form.errors.tipo_limpieza_id"
+                        >
+                            <a-select
+                                v-model:value="form.tipo_limpieza_id"
+                                :options="tiposLimpieza.map((t) => ({ value: t.id, label: t.nombre }))"
                                 allow-clear
                                 placeholder="Sin especificar"
                             />
@@ -356,6 +444,16 @@ const est = (campo) => (form.errors[campo] ? 'error' : undefined);
 .nodo__btn.ant-btn:hover {
     transform: translateY(-1px);
     color: #fff;
+}
+.nodo__btn--mant {
+    background: #fdf3e6;
+    color: #a86717;
+}
+.nodo__btn--mant:hover {
+    background: #e08a1e;
+}
+.nodo__mant {
+    cursor: pointer;
 }
 .nodo__btn--add {
     background: #e4f4ee;

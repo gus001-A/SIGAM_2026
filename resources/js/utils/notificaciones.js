@@ -1,23 +1,34 @@
 import {
-    AlertOutlined,
     BellOutlined,
     CalendarOutlined,
-    CheckOutlined,
+    CheckSquareOutlined,
     ClockCircleOutlined,
-    SafetyCertificateOutlined,
+    EditOutlined,
+    SwapOutlined,
     ToolOutlined,
     UserAddOutlined,
 } from '@ant-design/icons-vue';
 
-/** Ícono, etiqueta y color por tipo de notificación. */
+/**
+ * Ícono, etiqueta y color por tipo de notificación. Alcance deliberadamente
+ * acotado a lo que le fue asignado a la persona (tarea, orden o plan): quién
+ * se lo asignó, si se modificó, si se reprogramó o si está por vencer.
+ */
 export const META_NOTIFICACION = {
+    // Tareas
+    tarea_asignada: { label: 'Tarea asignada', icon: UserAddOutlined, color: '#16806c' },
+    tarea_modificada: { label: 'Tarea modificada', icon: EditOutlined, color: '#0d84c9' },
+    tarea_proxima: { label: 'Tarea próxima a vencer', icon: ClockCircleOutlined, color: '#e08a1e' },
+    tarea_vencida: { label: 'Tarea vencida', icon: CheckSquareOutlined, color: '#d64545' },
+    // Órdenes de mantenimiento
+    mantenimiento_asignado: { label: 'Orden asignada', icon: UserAddOutlined, color: '#16806c' },
+    mantenimiento_modificado: { label: 'Orden modificada', icon: EditOutlined, color: '#0d84c9' },
+    mantenimiento_reprogramado: { label: 'Orden reprogramada', icon: SwapOutlined, color: '#e08a1e' },
     mantenimiento_proximo: { label: 'Preventivo próximo', icon: CalendarOutlined, color: '#0d84c9' },
     mantenimiento_vencido: { label: 'Preventivo vencido', icon: ClockCircleOutlined, color: '#d64545' },
-    urgencia: { label: 'Urgencia', icon: AlertOutlined, color: '#d64545' },
-    asignacion: { label: 'Asignación', icon: UserAddOutlined, color: '#16806c' },
-    trabajo_terminado: { label: 'Trabajo terminado', icon: CheckOutlined, color: '#1f9e86' },
-    pendiente_supervision: { label: 'Pendiente de supervisión', icon: ToolOutlined, color: '#e08a1e' },
-    garantia_por_vencer: { label: 'Garantía por vencer', icon: SafetyCertificateOutlined, color: '#e08a1e' },
+    // Planes de mantenimiento
+    plan_asignado: { label: 'Plan asignado', icon: UserAddOutlined, color: '#173a5f' },
+    plan_modificado: { label: 'Plan modificado', icon: EditOutlined, color: '#0d84c9' },
 };
 
 export const metaNotificacion = (tipo) =>

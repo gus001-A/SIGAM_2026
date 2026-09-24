@@ -74,6 +74,23 @@ class CicloMantenimiento
         return $faltantes;
     }
 
+    /**
+     * Mismos requisitos que `validarCierre()` pero como checklist visible en
+     * todo momento (no solo al intentar cerrar), más un ítem informativo de
+     * evidencia que NO bloquea el cierre — solo se sugiere.
+     *
+     * @return list<array{clave: string, label: string, cumplido: bool}>
+     */
+    public static function checklistCierre(Mantenimiento $mantenimiento): array
+    {
+        return [
+            ['clave' => 'diagnostico', 'label' => 'Diagnóstico registrado', 'cumplido' => filled($mantenimiento->diagnostico)],
+            ['clave' => 'trabajo', 'label' => 'Actividades realizadas registradas', 'cumplido' => filled($mantenimiento->descripcion_trabajo)],
+            ['clave' => 'realizado', 'label' => 'Orden marcada como realizada', 'cumplido' => filled($mantenimiento->completado_at)],
+            ['clave' => 'evidencia', 'label' => 'Evidencia adjunta (recomendado)', 'cumplido' => $mantenimiento->documentos()->exists()],
+        ];
+    }
+
     public static function aplicarSello(Mantenimiento $mantenimiento, string $claveDestino): void
     {
         $columna = self::SELLOS[$claveDestino] ?? null;

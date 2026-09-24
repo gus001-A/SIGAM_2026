@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneEstadoActivo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,12 +16,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Ubicacion extends Model
 {
-    use EsAuditable, HasFactory, SoftDeletes, TieneEstadoActivo;
+    use ConvierteMayusculas, EsAuditable, HasFactory, SoftDeletes, TieneEstadoActivo;
 
     protected $table = 'ubicaciones';
 
     protected $fillable = [
-        'sucursal_id', 'padre_id', 'tipo_id', 'codigo', 'nombre', 'descripcion', 'profundidad', 'ruta', 'estado',
+        'sucursal_id', 'padre_id', 'tipo_id', 'tipo_area_id', 'tipo_limpieza_id',
+        'codigo', 'nombre', 'descripcion', 'profundidad', 'ruta', 'estado',
     ];
 
     protected function casts(): array
@@ -33,6 +35,11 @@ class Ubicacion extends Model
         return 'ubicaciones';
     }
 
+    protected function camposMayusculas(): array
+    {
+        return ['codigo', 'nombre', 'descripcion', 'ruta'];
+    }
+
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(Sucursal::class);
@@ -41,6 +48,16 @@ class Ubicacion extends Model
     public function tipo(): BelongsTo
     {
         return $this->belongsTo(TipoUbicacion::class, 'tipo_id');
+    }
+
+    public function tipoArea(): BelongsTo
+    {
+        return $this->belongsTo(TipoArea::class, 'tipo_area_id');
+    }
+
+    public function tipoLimpieza(): BelongsTo
+    {
+        return $this->belongsTo(TipoLimpieza::class, 'tipo_limpieza_id');
     }
 
     public function padre(): BelongsTo
@@ -56,6 +73,21 @@ class Ubicacion extends Model
     public function equipos(): HasMany
     {
         return $this->hasMany(Equipo::class);
+    }
+
+    public function solicitudes(): HasMany
+    {
+        return $this->hasMany(SolicitudMantenimiento::class);
+    }
+
+    public function mantenimientos(): HasMany
+    {
+        return $this->hasMany(Mantenimiento::class);
+    }
+
+    public function planes(): HasMany
+    {
+        return $this->hasMany(PlanMantenimiento::class);
     }
 
     /** IDs de todos los ancestros, para prevenir ciclos en el árbol (RF-024). */

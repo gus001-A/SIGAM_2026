@@ -60,9 +60,14 @@ const paginacion = computed(() => ({
 
 const onChange = (pag, filtros, sorter) => emit('cambio', pag, filtros, sorter);
 
-// --- Alto dinámico: el cuerpo de la tabla se ajusta al espacio disponible ---
+// --- Alto dinámico: el cuerpo de la tabla se ajusta al espacio disponible,
+// pero SIEMPRE se ven al menos 8 filas aunque el contenedor sea angosto
+// (antes el mínimo era 140px = ~2 filas, y páginas con mucho contenido
+// arriba de la tabla —KPIs, tarjetas— dejaban la tabla ilegible).
+const ALTO_FILA = 52;
+const FILAS_MINIMAS = 8;
 const contenedor = ref(null);
-const scrollY = ref(360);
+const scrollY = ref(ALTO_FILA * FILAS_MINIMAS);
 let ro = null;
 
 const recalcular = () => {
@@ -73,7 +78,7 @@ const recalcular = () => {
     const paginador = el.querySelector('.ant-pagination')?.offsetHeight ?? 0;
     const paginadorMargen = paginador ? 24 : 0;
     const alto = el.clientHeight - header - resumen - paginador - paginadorMargen - 2;
-    scrollY.value = Math.max(140, Math.round(alto));
+    scrollY.value = Math.max(ALTO_FILA * FILAS_MINIMAS, Math.round(alto));
 };
 
 onMounted(() => {

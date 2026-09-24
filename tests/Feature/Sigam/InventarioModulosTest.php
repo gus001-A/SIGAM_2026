@@ -10,6 +10,7 @@ use App\Models\Usuario;
 use Database\Seeders\CatalogosSeeder;
 use Database\Seeders\RolesPermisosSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class InventarioModulosTest extends TestCase
@@ -51,7 +52,24 @@ class InventarioModulosTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('proveedores.total', 1)
                 ->where('proveedores.per_page', 15)
-                ->where('proveedores.data.0.razon_social', 'Refacciones Industriales SA'));
+                ->where('proveedores.data.0.razon_social', 'REFACCIONES INDUSTRIALES SA'));
+    }
+
+    public function test_crea_proveedor_con_documentos_adjuntos(): void
+    {
+        $archivo = UploadedFile::fake()->create('contrato.pdf', 200, 'application/pdf');
+
+        $this->actingAs($this->admin)
+            ->post(route('proveedores.store'), [
+                'razon_social' => 'Servicios Técnicos SA',
+                'estado' => 'activo',
+                'documentos' => [$archivo],
+            ])
+            ->assertRedirect();
+
+        $proveedor = Proveedor::where('razon_social', 'SERVICIOS TÉCNICOS SA')->firstOrFail();
+        $documento = $proveedor->documentos()->wherePivot('rol', 'contrato')->firstOrFail();
+        $this->assertSame('CONTRATO.PDF', $documento->nombre_original);
     }
 
     public function test_proveedor_baja_logica_y_reactivacion(): void
@@ -67,7 +85,56 @@ class InventarioModulosTest extends TestCase
         $this->assertSame('activo', $proveedor->estado);
     }
 
+    // ---- Sucursales: código automático -----------------------------
+
+    public function test_sucursal_genera_codigo_automatico_si_se_deja_en_blanco(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('sucursales.store'), ['nombre' => 'Hospital Central', 'estado' => 'activo'])
+            ->assertRedirect();
+
+        $sucursal = Sucursal::firstOrFail();
+        $this->assertSame('HOSP-01', $sucursal->codigo);
+
+        // Una segunda sucursal con el mismo prefijo de 4 letras avanza el consecutivo.
+        $this->actingAs($this->admin)
+            ->post(route('sucursales.store'), ['nombre' => 'Hospital Norte', 'estado' => 'activo'])
+            ->assertRedirect();
+
+        $this->assertSame('HOSP-02', Sucursal::where('nombre', 'HOSPITAL NORTE')->value('codigo'));
+    }
+
     // ---- Ubicaciones ----------------------------------------------
+
+    public function test_ubicacion_genera_codigo_automatico_y_ruta_de_trazabilidad(): void
+    {
+        $sucursal = Sucursal::create(['codigo' => 'CSAN-01', 'nombre' => 'Clínica San Ángel', 'estado' => 'activo']);
+
+        $this->actingAs($this->admin)
+            ->post(route('ubicaciones.store'), [
+                'sucursal_id' => $sucursal->id,
+                'nombre' => 'Urgencias',
+                'estado' => 'activo',
+            ])
+            ->assertRedirect();
+
+        $padre = Ubicacion::where('nombre', 'URGENCIAS')->firstOrFail();
+        $this->assertSame('URGE-01', $padre->codigo);
+        $this->assertSame('CSAN-01/URGE-01', $padre->ruta);
+
+        $this->actingAs($this->admin)
+            ->post(route('ubicaciones.store'), [
+                'sucursal_id' => $sucursal->id,
+                'padre_id' => $padre->id,
+                'nombre' => 'Sala de choque',
+                'estado' => 'activo',
+            ])
+            ->assertRedirect();
+
+        $hija = Ubicacion::where('nombre', 'SALA DE CHOQUE')->firstOrFail();
+        $this->assertSame('SALA-01', $hija->codigo);
+        $this->assertSame('CSAN-01/URGE-01/SALA-01', $hija->ruta);
+    }
 
     public function test_crea_arbol_de_ubicaciones_con_profundidad(): void
     {

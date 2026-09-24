@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AsignacionMantenimiento extends Model
 {
-    use HasFactory;
+    use ConvierteMayusculas, HasFactory;
 
     protected $table = 'asignaciones_mantenimiento';
 
@@ -17,6 +18,11 @@ class AsignacionMantenimiento extends Model
     protected $fillable = [
         'mantenimiento_id', 'tecnico_id', 'asignado_por', 'es_principal', 'asignado_at', 'desasignado_at', 'notas',
     ];
+
+    protected function camposMayusculas(): array
+    {
+        return ['notas'];
+    }
 
     protected function casts(): array
     {

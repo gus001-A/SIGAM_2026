@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { ArrowLeftOutlined } from '@ant-design/icons-vue';
+import { ArrowLeftOutlined, HistoryOutlined } from '@ant-design/icons-vue';
 
 /**
  * Encabezado reutilizable para las páginas de ficha (Show).
@@ -11,20 +11,37 @@ const props = defineProps({
     titulo: { type: String, required: true },
     subtitulo: { type: String, default: '' },
     volver: { type: String, default: '' },
+    // Parámetros opcionales para la ruta de "volver" (p. ej. { sucursal_id }).
+    volverParams: { type: Object, default: () => ({}) },
     // Componente de ícono de @ant-design/icons-vue.
     icono: { type: [Object, Function], default: null },
     // Alternativa al ícono: iniciales para el avatar.
     iniciales: { type: String, default: '' },
     // Color de acento del avatar/ícono.
     color: { type: String, default: '#1e5eb8' },
+    // Trazabilidad: { creado_por, creado_en, modificado_por, modificado_en } — de EsAuditable::selloAuditoria().
+    sello: { type: Object, default: null },
 });
 
 const atenuar = computed(() => `${props.color}1a`);
+
+const fechaHora = (v) =>
+    v
+        ? new Date(v).toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : '';
+
+const textoSello = computed(() => {
+    if (!props.sello) return '';
+    const partes = [];
+    if (props.sello.creado_por) partes.push(`Creado por ${props.sello.creado_por} · ${fechaHora(props.sello.creado_en)}`);
+    if (props.sello.modificado_por) partes.push(`Última edición: ${props.sello.modificado_por} · ${fechaHora(props.sello.modificado_en)}`);
+    return partes.join('  ·  ');
+});
 </script>
 
 <template>
     <div class="fe">
-        <button v-if="volver" type="button" class="fe__volver" @click="router.visit(route(volver))">
+        <button v-if="volver" type="button" class="fe__volver" @click="router.visit(route(volver, volverParams))">
             <ArrowLeftOutlined />
         </button>
 
@@ -44,6 +61,10 @@ const atenuar = computed(() => `${props.color}1a`);
             </div>
             <div v-if="subtitulo || $slots.subtitulo" class="fe__sub">
                 <slot name="subtitulo">{{ subtitulo }}</slot>
+            </div>
+            <div v-if="textoSello" class="fe__sello">
+                <HistoryOutlined />
+                <span>{{ textoSello }}</span>
             </div>
         </div>
 
@@ -125,6 +146,23 @@ const atenuar = computed(() => `${props.color}1a`);
     margin-top: 3px;
     font-size: 13px;
     color: var(--sigam-tenue);
+}
+.fe__sello {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: #94a3b8;
+}
+.fe__sello .anticon {
+    font-size: 11px;
+    flex: none;
+}
+.fe__sello span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .fe__acciones {
     flex: none;

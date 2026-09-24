@@ -13,6 +13,7 @@ import {
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTableInertia from '@/Components/DataTableInertia.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
+import CeldaRegistro from '@/Components/CeldaRegistro.vue';
 import { usePermisos } from '@/composables/usePermisos';
 import { useTablaInertia } from '@/composables/useTablaInertia';
 
@@ -29,6 +30,7 @@ const { filtros, orden, cargando, filtrar, aplicar, limpiar, hayFiltros, onCambi
         nombre: props.filtros.nombre ?? '',
         version: props.filtros.version ?? '',
         estado: props.filtros.estado ?? undefined,
+        registrado_por: props.filtros.registrado_por ?? '',
     },
     orden: { campo: props.orden.campo ?? 'nombre', dir: props.orden.dir ?? 'asc' },
 });
@@ -44,6 +46,7 @@ const columns = [
     { title: 'Campos', key: 'campos_count', dataIndex: 'campos_count', sorter: true, align: 'right', width: 100 },
     { title: 'Respuestas', key: 'respuestas_count', dataIndex: 'respuestas_count', sorter: true, align: 'right', width: 120 },
     { title: 'Estado', key: 'estado', filtro: 'select', filtroClave: 'estado', width: 120 },
+    { title: 'Registrado por', key: 'registrado', filtro: 'texto', filtroClave: 'registrado_por', width: 150 },
     { title: '', key: 'acciones', align: 'right', width: 130, fixed: 'right' },
 ];
 
@@ -123,6 +126,10 @@ const reactivar = (formato) => router.put(route('formatos.restore', formato.id),
                     <a-tag :color="record.estado === 'activo' ? 'green' : 'default'">
                         {{ record.estado === 'activo' ? 'Activo' : 'Inactivo' }}
                     </a-tag>
+                </template>
+
+                <template v-else-if="column.key === 'registrado'">
+                    <CeldaRegistro :usuario="record.creado_por" :fecha="record.creado_en" />
                 </template>
 
                 <template v-else-if="column.key === 'acciones'">

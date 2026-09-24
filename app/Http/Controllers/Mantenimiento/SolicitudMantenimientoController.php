@@ -11,8 +11,11 @@ use App\Models\Prioridad;
 use App\Models\SolicitudMantenimiento;
 use App\Models\Sucursal;
 use App\Models\TipoMantenimiento;
+use App\Models\Ubicacion;
+use App\Support\Auditoria;
 use App\Support\CicloMantenimiento;
 use App\Support\Folios;
+use App\Support\SeleccionSucursal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,10 +41,12 @@ class SolicitudMantenimientoController extends Controller
         $orden = in_array($request->query('orden'), self::ORDENABLES, true) ? $request->query('orden') : 'id';
         $dir = $request->query('dir') === 'asc' ? 'asc' : 'desc';
         $texto = fn (string $c): ?string => filled($request->query($c)) ? trim((string) $request->query($c)) : null;
+        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
 
         $solicitudes = SolicitudMantenimiento::query()
             ->with([
                 'equipo:id,codigo_activo,descripcion',
+                'ubicacion:id,nombre',
                 'sucursal:id,nombre',
                 'solicitante:id,nombre',
                 'prioridad:id,nombre,color',
@@ -53,37 +58,55 @@ class SolicitudMantenimientoController extends Controller
                 fn (Builder $q) => $q->where('solicitado_por', $usuario->id),
             )
             ->when($texto('folio'), fn (Builder $q, $v) => $q->where('folio', 'like', "%{$v}%"))
-            ->when($texto('equipo'), fn (Builder $q, $v) => $q->whereHas('equipo', fn (Builder $e) => $e
-                ->where('codigo_activo', 'like', "%{$v}%")->orWhere('descripcion', 'like', "%{$v}%")))
+            ->when($texto('equipo'), fn (Builder $q, $v) => $q->where(fn (Builder $w) => $w
+                ->whereHas('equipo', fn (Builder $e) => $e->where('codigo_activo', 'like', "%{$v}%")->orWhere('descripcion', 'like', "%{$v}%"))
+                ->orWhereHas('ubicacion', fn (Builder $u) => $u->where('nombre', 'like', "%{$v}%"))))
             ->when($texto('solicitante'), fn (Builder $q, $v) => $q->whereHas('solicitante', fn (Builder $u) => $u->where('nombre', 'like', "%{$v}%")))
-            ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
+            ->when($sucursalId, fn (Builder $q, $v) => $q->where('sucursal_id', $v))
+            ->when($request->integer('ubicacion_id'), fn (Builder $q, $v) => $q->where('ubicacion_id', $v))
             ->when($request->integer('prioridad_id'), fn (Builder $q, $v) => $q->where('prioridad_id', $v))
             ->when($request->integer('estado_id'), fn (Builder $q, $v) => $q->where('estado_id', $v))
+            ->when($request->filled('desde'), fn (Builder $q) => $q->whereDate('solicitado_at', '>=', $request->query('desde')))
+            ->when($request->filled('hasta'), fn (Builder $q) => $q->whereDate('solicitado_at', '<=', $request->query('hasta')))
+            ->when($request->filled('registrado_por'), fn (Builder $q) => $q->whereIn(
+                'id',
+                Auditoria::idsCreadosPor(SolicitudMantenimiento::class, trim((string) $request->query('registrado_por'))),
+            ))
             ->orderBy($orden, $dir)
             ->paginate(self::POR_PAGINA)
-            ->withQueryString()
-            ->through(fn (SolicitudMantenimiento $s) => [
-                'id' => $s->id,
-                'folio' => $s->folio,
-                'equipo' => $s->equipo ? "{$s->equipo->codigo_activo} · {$s->equipo->descripcion}" : null,
-                'sucursal' => $s->sucursal?->nombre,
-                'prioridad' => $s->prioridad,
-                'estado' => $s->estado,
-                'solicitante' => $s->solicitante?->nombre,
-                'solicitado_at' => $s->solicitado_at,
-                'fecha_requerida' => $s->fecha_requerida,
-            ]);
+            ->withQueryString();
+
+        $creadores = Auditoria::creadoPorMasivo(SolicitudMantenimiento::class, $solicitudes->pluck('id'));
+        $solicitudes->through(fn (SolicitudMantenimiento $s) => [
+            'id' => $s->id,
+            'folio' => $s->folio,
+            'objetivo' => $s->equipo
+                ? ['tipo' => 'equipo', 'texto' => "{$s->equipo->codigo_activo} · {$s->equipo->descripcion}"]
+                : ($s->ubicacion ? ['tipo' => 'ubicacion', 'texto' => $s->ubicacion->nombre] : null),
+            'sucursal' => $s->sucursal?->nombre,
+            'prioridad' => $s->prioridad,
+            'estado' => $s->estado,
+            'solicitante' => $s->solicitante?->nombre,
+            'solicitado_at' => $s->solicitado_at,
+            'fecha_requerida' => $s->fecha_requerida,
+            'creado_por' => $creadores[$s->id]['usuario'] ?? null,
+            'creado_en' => $creadores[$s->id]['fecha'] ?? null,
+        ]);
 
         return Inertia::render('Mantenimiento/Solicitudes/Index', [
             'solicitudes' => $solicitudes,
-            'filtros' => $request->only(['folio', 'equipo', 'solicitante', 'sucursal_id', 'prioridad_id', 'estado_id']),
+            'sucursalId' => $sucursalId,
+            'filtros' => $request->only(['folio', 'equipo', 'solicitante', 'prioridad_id', 'estado_id', 'desde', 'hasta', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => [
-                'sucursales' => Sucursal::orderBy('nombre')->get(['id', 'nombre']),
+                'sucursales' => Sucursal::activos()->orderBy('nombre')->get(['id', 'nombre']),
                 'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre', 'color']),
                 'estados' => EstadoMantenimiento::activos()->orderBy('orden')->get(['id', 'nombre', 'clave']),
                 'equipos' => $request->user()->can('solicitudes.crear')
-                    ? Equipo::orderBy('codigo_activo')->get(['id', 'codigo_activo', 'descripcion'])
+                    ? Equipo::when($sucursalId, fn ($q, $v) => $q->where('sucursal_id', $v))->orderBy('codigo_activo')->get(['id', 'codigo_activo', 'descripcion'])
+                    : [],
+                'ubicaciones' => $request->user()->can('solicitudes.crear')
+                    ? Ubicacion::activos()->when($sucursalId, fn ($q, $v) => $q->where('sucursal_id', $v))->orderBy('ruta')->get(['id', 'nombre', 'profundidad', 'sucursal_id'])
                     : [],
             ],
         ]);
@@ -95,19 +118,25 @@ class SolicitudMantenimientoController extends Controller
 
         return Inertia::render('Mantenimiento/Solicitudes/Form', [
             'equipos' => Equipo::orderBy('codigo_activo')->get(['id', 'codigo_activo', 'descripcion', 'sucursal_id']),
+            'ubicaciones' => Ubicacion::activos()->orderBy('ruta')->get(['id', 'nombre', 'profundidad', 'sucursal_id']),
             'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre']),
-            'preseleccion' => ['equipo_id' => $request->integer('equipo_id') ?: null],
+            'preseleccion' => [
+                'equipo_id' => $request->integer('equipo_id') ?: null,
+                'ubicacion_id' => $request->integer('ubicacion_id') ?: null,
+            ],
         ]);
     }
 
     public function store(GuardarSolicitudRequest $request): RedirectResponse
     {
-        $equipo = Equipo::findOrFail($request->integer('equipo_id'));
+        $sucursalId = $request->filled('ubicacion_id')
+            ? Ubicacion::findOrFail($request->integer('ubicacion_id'))->sucursal_id
+            : Equipo::findOrFail($request->integer('equipo_id'))->sucursal_id;
 
         $solicitud = SolicitudMantenimiento::create([
             ...$request->validated(),
             'folio' => Folios::solicitud(),
-            'sucursal_id' => $equipo->sucursal_id,
+            'sucursal_id' => $sucursalId,
             'solicitado_por' => $request->user()->id,
             'estado_id' => CicloMantenimiento::estado('solicitado')->id,
             'solicitado_at' => now(),
@@ -123,6 +152,7 @@ class SolicitudMantenimientoController extends Controller
 
         $solicitud->load([
             'equipo:id,codigo_activo,descripcion,sucursal_id',
+            'ubicacion:id,nombre,sucursal_id',
             'sucursal:id,nombre',
             'solicitante:id,nombre',
             'revisadoPor:id,nombre',
@@ -135,6 +165,7 @@ class SolicitudMantenimientoController extends Controller
 
         return Inertia::render('Mantenimiento/Solicitudes/Show', [
             'solicitud' => $solicitud,
+            'sello' => $solicitud->selloAuditoria(),
             'puedeConvertir' => $solicitud->mantenimientos->isEmpty()
                 && $solicitud->estado->clave !== 'cancelado'
                 && request()->user()->can('mantenimientos.crear'),
@@ -181,6 +212,7 @@ class SolicitudMantenimientoController extends Controller
                 'folio' => Folios::mantenimiento(),
                 'solicitud_id' => $solicitud->id,
                 'equipo_id' => $solicitud->equipo_id,
+                'ubicacion_id' => $solicitud->ubicacion_id,
                 'sucursal_id' => $solicitud->sucursal_id,
                 'tipo_id' => $datos['tipo_id'],
                 'prioridad_id' => $datos['prioridad_id'],

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneEstadoActivo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Formato extends Model
 {
-    use EsAuditable, HasFactory, SoftDeletes, TieneEstadoActivo;
+    use ConvierteMayusculas, EsAuditable, HasFactory, SoftDeletes, TieneEstadoActivo;
 
     protected $table = 'formatos';
 
@@ -23,6 +24,11 @@ class Formato extends Model
     public function auditoriaModulo(): string
     {
         return 'formatos';
+    }
+
+    protected function camposMayusculas(): array
+    {
+        return ['nombre', 'descripcion'];
     }
 
     public function campos(): HasMany

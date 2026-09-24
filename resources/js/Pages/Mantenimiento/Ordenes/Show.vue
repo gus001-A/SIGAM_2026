@@ -4,6 +4,7 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import {
     ApartmentOutlined,
     CalendarOutlined,
+    CheckCircleOutlined,
     ClockCircleOutlined,
     DeleteOutlined,
     DownOutlined,
@@ -13,6 +14,7 @@ import {
     FlagOutlined,
     PlusOutlined,
     SaveOutlined,
+    StarFilled,
     SwapOutlined,
     TagOutlined,
     ToolOutlined,
@@ -25,13 +27,17 @@ import ListaDatos from '@/Components/ListaDatos.vue';
 import ListaDocumentos from '@/Components/ListaDocumentos.vue';
 import SeccionFicha from '@/Components/SeccionFicha.vue';
 import CampoFechaHora from '@/Components/CampoFechaHora.vue';
+import SelectCatalogo from '@/Components/SelectCatalogo.vue';
 import { usePermisos } from '@/composables/usePermisos';
+import { hoyISO, reglaDespuesDe, reglaNoPasada } from '@/utils/restricciones';
 
 const props = defineProps({
     mantenimiento: { type: Object, required: true },
     transicionesPosibles: { type: Array, default: () => [] },
     faltantesCierre: { type: Array, default: () => [] },
+    checklistCierre: { type: Array, default: () => [] },
     catalogos: { type: Object, default: () => ({}) },
+    sello: { type: Object, default: null },
 });
 
 const { puede } = usePermisos();
@@ -61,7 +67,9 @@ const cronologia = computed(() => [
 ]);
 
 const datos = computed(() => [
-    { icono: ToolOutlined, label: 'Equipo', valor: m.value.equipo ? `${m.value.equipo.codigo_activo} — ${m.value.equipo.descripcion}` : null, color: '#0d84c9' },
+    m.value.equipo
+        ? { icono: ToolOutlined, label: 'Equipo', valor: `${m.value.equipo.codigo_activo} — ${m.value.equipo.descripcion}`, color: '#0d84c9' }
+        : { icono: EnvironmentOutlined, label: 'Instalación', valor: m.value.ubicacion?.nombre, color: '#0d84c9' },
     { icono: EnvironmentOutlined, label: 'Sucursal', valor: m.value.sucursal?.nombre, color: '#1f9e86' },
     { icono: TagOutlined, label: 'Tipo', valor: m.value.tipo?.nombre, color: '#6b4bc9' },
     { icono: FileDoneOutlined, label: 'Solicitud origen', valor: m.value.solicitud?.folio, color: '#e08a1e' },
@@ -99,7 +107,8 @@ const confirmarEstado = () => {
 const modalReprogramar = ref(false);
 const formReprogramar = useForm({ programado_inicio: '', programado_fin: '', motivo: '' });
 const reglasReprogramar = reactive({
-    programado_inicio: [{ required: true, message: 'Indica la nueva fecha.' }],
+    programado_inicio: [{ required: true, message: 'Indica la nueva fecha.' }, reglaNoPasada('La nueva fecha no puede ser anterior a hoy.')],
+    programado_fin: [reglaDespuesDe(() => formReprogramar.programado_inicio, 'El fin debe ser posterior al inicio.', true)],
     motivo: [{ required: true, message: 'Indica el motivo.' }],
 });
 const reprogramar = () => {
@@ -124,6 +133,9 @@ const guardarTrabajo = () =>
 // --- Asignar técnico --------------------------------------
 const modalTecnico = ref(false);
 const formTecnico = useForm({ tecnico_id: undefined, es_principal: false, notas: '' });
+const tecnicoSeleccionado = computed(() =>
+    (props.catalogos.tecnicos ?? []).find((t) => t.id === formTecnico.tecnico_id),
+);
 const asignarTecnico = () => {
     formTecnico.post(route('mantenimientos.asignaciones.store', m.value.id), {
         preserveScroll: true,
@@ -193,9 +205,10 @@ const menuTransiciones = computed(() =>
     <AppLayout>
         <FichaEncabezado
             :titulo="m.folio"
-            :subtitulo="`${m.equipo?.codigo_activo ?? ''} · ${m.equipo?.descripcion ?? ''}`"
+            :subtitulo="m.equipo ? `${m.equipo.codigo_activo} · ${m.equipo.descripcion}` : (m.ubicacion?.nombre ?? '')"
             :icono="ToolOutlined"
             volver="mantenimientos.index"
+            :sello="sello"
         >
             <template #tags>
                 <a-tag color="processing">{{ m.estado?.nombre }}</a-tag>
@@ -229,8 +242,11 @@ const menuTransiciones = computed(() =>
 
         <a-card size="small" class="mb-4 orden-info">
             <div class="orden-info__desc">
-                <ToolOutlined class="orden-info__ic" />
-                <span>{{ m.problema_reportado || 'Orden de mantenimiento sin descripción de problema.' }}</span>
+                <div class="destacado__objetivo">
+                    <component :is="m.equipo ? ToolOutlined : EnvironmentOutlined" />
+                    {{ m.equipo ? `${m.equipo.codigo_activo} — ${m.equipo.descripcion}` : (m.ubicacion?.nombre ?? '') }}
+                </div>
+                <div class="destacado__desc">{{ m.problema_reportado || 'ORDEN DE MANTENIMIENTO SIN DESCRIPCIÓN DE PROBLEMA.' }}</div>
             </div>
             <a-collapse ghost class="orden-info__col">
                 <a-collapse-panel key="i" header="Información relevante">
@@ -239,13 +255,14 @@ const menuTransiciones = computed(() =>
             </a-collapse>
         </a-card>
 
-        <a-alert
-            v-if="faltantesCierre.length"
-            type="warning"
-            show-icon
-            class="mb-4"
-            :message="'Para poder cerrar la orden: ' + faltantesCierre.join(' ')"
-        />
+        <div v-if="checklistCierre.length && !['cerrado', 'cancelado'].includes(m.estado?.clave)" class="checklist-cierre">
+            <span class="checklist-cierre__l">Para cerrar esta orden:</span>
+            <span v-for="item in checklistCierre" :key="item.clave" class="checklist-cierre__item" :class="{ 'is-ok': item.cumplido }">
+                <CheckCircleOutlined v-if="item.cumplido" />
+                <ClockCircleOutlined v-else />
+                {{ item.label }}
+            </span>
+        </div>
 
         <a-card :body-style="{ padding: 0 }">
             <a-tabs v-model:activeKey="tab" class="px-4 pt-2">
@@ -255,9 +272,6 @@ const menuTransiciones = computed(() =>
                         <a-col :xs="24" :md="13">
                             <SeccionFicha titulo="Información de la orden" :icono="ToolOutlined">
                                 <ListaDatos :datos="datos" />
-                            </SeccionFicha>
-                            <SeccionFicha v-if="m.problema_reportado" titulo="Problema reportado" :icono="FileDoneOutlined" color="#e08a1e">
-                                <p class="orden-desc">{{ m.problema_reportado }}</p>
                             </SeccionFicha>
                         </a-col>
                         <a-col :xs="24" :md="11">
@@ -308,10 +322,16 @@ const menuTransiciones = computed(() =>
                                     </a-form-item>
                                 </a-col>
                             </a-row>
-                            <a-button v-if="puede('mantenimientos.editar')" type="primary" :loading="formTrabajo.processing" @click="guardarTrabajo">
-                                <template #icon><SaveOutlined /></template>
-                                Guardar
-                            </a-button>
+                            <a-space>
+                                <a-button v-if="puede('mantenimientos.editar')" type="primary" :loading="formTrabajo.processing" @click="guardarTrabajo">
+                                    <template #icon><SaveOutlined /></template>
+                                    Guardar
+                                </a-button>
+                                <a-button type="link" @click="tab = 'evidencias'">
+                                    <template #icon><PlusOutlined /></template>
+                                    Adjuntar evidencia
+                                </a-button>
+                            </a-space>
                         </a-form>
                     </div>
                 </a-tab-pane>
@@ -461,10 +481,10 @@ const menuTransiciones = computed(() =>
         <a-modal v-model:open="modalReprogramar" title="Reprogramar orden" ok-text="Reprogramar" cancel-text="Cancelar" :confirm-loading="formReprogramar.processing" @ok="reprogramar">
             <a-form :model="formReprogramar" :rules="reglasReprogramar" layout="vertical" class="pt-2">
                 <a-form-item label="Nueva fecha y hora de inicio" name="programado_inicio" :validate-status="formReprogramar.errors.programado_inicio ? 'error' : undefined" :help="formReprogramar.errors.programado_inicio">
-                    <CampoFechaHora v-model="formReprogramar.programado_inicio" />
+                    <CampoFechaHora v-model="formReprogramar.programado_inicio" :min-fecha="hoyISO()" />
                 </a-form-item>
-                <a-form-item label="Nueva fecha y hora de fin" :help="formReprogramar.errors.programado_fin" :validate-status="formReprogramar.errors.programado_fin ? 'error' : undefined">
-                    <CampoFechaHora v-model="formReprogramar.programado_fin" />
+                <a-form-item label="Nueva fecha y hora de fin" name="programado_fin" :help="formReprogramar.errors.programado_fin" :validate-status="formReprogramar.errors.programado_fin ? 'error' : undefined">
+                    <CampoFechaHora v-model="formReprogramar.programado_fin" :min-fecha="formReprogramar.programado_inicio ? formReprogramar.programado_inicio.slice(0, 10) : hoyISO()" />
                 </a-form-item>
                 <a-form-item label="Motivo" name="motivo" :validate-status="formReprogramar.errors.motivo ? 'error' : undefined" :help="formReprogramar.errors.motivo">
                     <a-textarea v-model:value="formReprogramar.motivo" :rows="2" />
@@ -474,9 +494,28 @@ const menuTransiciones = computed(() =>
 
         <a-modal v-model:open="modalTecnico" title="Asignar técnico" ok-text="Asignar" cancel-text="Cancelar" :confirm-loading="formTecnico.processing" @ok="asignarTecnico">
             <a-form layout="vertical" class="pt-2">
-                <a-form-item label="Técnico" :validate-status="formTecnico.errors.tecnico_id ? 'error' : undefined" :help="formTecnico.errors.tecnico_id">
-                    <a-select v-model:value="formTecnico.tecnico_id" :options="catalogos.tecnicos?.map((t) => ({ value: t.id, label: t.nombre }))" />
+                <a-form-item
+                    label="Técnico"
+                    extra="Los marcados con ⭐ tienen una especialidad registrada que coincide con esta orden."
+                    :validate-status="formTecnico.errors.tecnico_id ? 'error' : undefined"
+                    :help="formTecnico.errors.tecnico_id"
+                >
+                    <a-select v-model:value="formTecnico.tecnico_id">
+                        <a-select-option v-for="t in catalogos.tecnicos" :key="t.id" :value="t.id">
+                            <StarFilled v-if="t.recomendado" class="tecnico-op__star" />
+                            {{ t.nombre }}
+                            <span v-if="t.recomendado" class="tecnico-op__tag">Recomendado</span>
+                        </a-select-option>
+                    </a-select>
                 </a-form-item>
+
+                <div v-if="tecnicoSeleccionado" class="tecnico-cualidades">
+                    <span class="tecnico-cualidades__t">Cualidades de {{ tecnicoSeleccionado.nombre }}</span>
+                    <a-space v-if="tecnicoSeleccionado.cualidades?.length" wrap>
+                        <a-tag v-for="c in tecnicoSeleccionado.cualidades" :key="c" color="blue">{{ c }}</a-tag>
+                    </a-space>
+                    <span v-else class="tecnico-cualidades__vacio">Sin especialidades registradas todavía.</span>
+                </div>
                 <a-form-item>
                     <a-checkbox v-model:checked="formTecnico.es_principal">Responsable principal</a-checkbox>
                 </a-form-item>
@@ -489,12 +528,18 @@ const menuTransiciones = computed(() =>
         <a-modal v-model:open="modalMaterial" title="Agregar material" ok-text="Agregar" cancel-text="Cancelar" :confirm-loading="formMaterial.processing" @ok="agregarMaterial">
             <a-form :model="formMaterial" :rules="reglasMaterial" layout="vertical" class="pt-2">
                 <a-form-item label="Del catálogo">
-                    <a-select
+                    <SelectCatalogo
                         v-model:value="formMaterial.material_id"
-                        :options="catalogos.materiales?.map((x) => ({ value: x.id, label: x.nombre }))"
-                        allow-clear
+                        :options="catalogos.materiales"
+                        ruta="catalogos.materiales"
+                        etiqueta="material"
+                        etiqueta-plural="materiales"
                         placeholder="Opcional — o captura la descripción abajo"
-                        @change="onMaterialSel"
+                        :campos="[
+                            { name: 'unidad', label: 'Unidad (pza, m, lt…)', ancho: 12 },
+                            { name: 'costo_referencia', label: 'Costo referencia', tipo: 'number', min: 0 },
+                        ]"
+                        @update:value="onMaterialSel"
                     />
                 </a-form-item>
                 <a-form-item v-if="!formMaterial.material_id" label="Descripción" :validate-status="formMaterial.errors.descripcion ? 'error' : undefined" :help="formMaterial.errors.descripcion">
@@ -517,14 +562,18 @@ const menuTransiciones = computed(() =>
         </a-modal>
 
         <a-modal v-model:open="modalObs" title="Agregar observación" ok-text="Agregar" cancel-text="Cancelar" :confirm-loading="formObs.processing" @ok="agregarObs">
+            <a-alert
+                type="info"
+                show-icon
+                class="mb-3"
+                message="La bitácora es para notas rápidas o seguimiento. El diagnóstico y las actividades formales se registran en la pestaña «Diagnóstico y trabajo»."
+            />
             <a-form :model="formObs" :rules="reglasObs" layout="vertical" class="pt-2">
                 <a-form-item label="Tipo">
                     <a-select
                         v-model:value="formObs.tipo"
                         :options="[
                             { value: 'comentario', label: 'Comentario' },
-                            { value: 'diagnostico', label: 'Diagnóstico' },
-                            { value: 'actividad', label: 'Actividad' },
                             { value: 'supervision', label: 'Supervisión' },
                         ]"
                     />
@@ -540,23 +589,72 @@ const menuTransiciones = computed(() =>
 </template>
 
 <style scoped>
+.tecnico-op__star {
+    color: #e08a1e;
+    margin-right: 4px;
+}
+.tecnico-op__tag {
+    float: right;
+    font-size: 11px;
+    font-weight: 700;
+    color: #e08a1e;
+}
+.tecnico-cualidades {
+    margin: -8px 0 16px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--sigam-navy-050);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.tecnico-cualidades__t {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--sigam-tenue);
+}
+.tecnico-cualidades__vacio {
+    font-size: 12.5px;
+    color: var(--sigam-tenue);
+    font-style: italic;
+}
+.checklist-cierre {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: #fbfcfe;
+    border: 1px solid var(--sigam-borde);
+    border-radius: 12px;
+    font-size: 12.5px;
+}
+.checklist-cierre__l {
+    font-weight: 700;
+    color: var(--sigam-tenue);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+}
+.checklist-cierre__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #a86717;
+}
+.checklist-cierre__item.is-ok {
+    color: var(--sigam-teal-700);
+}
 .orden-info :deep(.ant-card-body) {
     padding: 0;
 }
 .orden-info__desc {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
     padding: 14px 16px;
-    font-size: 13.5px;
-    color: var(--sigam-texto);
     border-bottom: 1px solid var(--sigam-borde-suave);
-}
-.orden-info__ic {
-    color: var(--sigam-teal);
-    font-size: 15px;
-    margin-top: 2px;
-    flex: none;
+    background: #fef4f4;
 }
 .orden-info__col :deep(.ant-collapse-header) {
     padding: 10px 16px !important;
@@ -567,13 +665,23 @@ const menuTransiciones = computed(() =>
 .orden-info__col :deep(.ant-collapse-content-box) {
     padding: 0 16px 12px !important;
 }
-.orden-desc {
+.destacado__objetivo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-weight: 800;
+    font-size: 17px;
+    color: #b52222;
+    margin-bottom: 6px;
+}
+.destacado__desc {
     white-space: pre-line;
-    font-size: 13.5px;
-    color: var(--sigam-texto);
-    background: var(--sigam-navy-050);
-    border-radius: 10px;
-    padding: 12px 14px;
-    margin: 0;
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #d64545;
 }
 </style>

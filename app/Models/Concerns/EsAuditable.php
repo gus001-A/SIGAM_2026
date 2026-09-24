@@ -2,6 +2,7 @@
 
 namespace App\Models\Concerns;
 
+use App\Models\RegistroAuditoria;
 use App\Support\Auditoria;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -54,5 +55,29 @@ trait EsAuditable
         }
 
         Auditoria::registrar($accion, $this->auditoriaModulo(), $this, $anteriores, $nuevos);
+    }
+
+    /**
+     * "Sello" de trazabilidad para mostrar en pantalla: quién dio de alta el
+     * registro y cuándo, y quién hizo el último cambio y cuándo (§13 — buenas
+     * prácticas: alta/baja/modificación siempre a la vista, con usuario+fecha+hora).
+     *
+     * @return array{creado_por: ?string, creado_en: ?string, modificado_por: ?string, modificado_en: ?string}
+     */
+    public function selloAuditoria(): array
+    {
+        $base = RegistroAuditoria::where('auditable_type', $this->getMorphClass())
+            ->where('auditable_id', $this->getKey())
+            ->with('usuario:id,nombre,apellidos');
+
+        $creado = (clone $base)->where('accion', 'crear')->oldest('created_at')->first();
+        $modificado = (clone $base)->where('accion', 'actualizar')->latest('created_at')->first();
+
+        return [
+            'creado_por' => $creado?->usuario?->nombre_completo,
+            'creado_en' => $creado?->created_at?->toISOString(),
+            'modificado_por' => $modificado?->usuario?->nombre_completo,
+            'modificado_en' => $modificado?->created_at?->toISOString(),
+        ];
     }
 }

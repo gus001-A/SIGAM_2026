@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,11 +13,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Notificacion extends Model
 {
-    use HasFactory;
+    use ConvierteMayusculas, HasFactory;
 
     protected $table = 'notificaciones';
 
     protected $fillable = ['usuario_id', 'tipo', 'titulo', 'cuerpo', 'datos', 'leida_at'];
+
+    protected function camposMayusculas(): array
+    {
+        return ['titulo', 'cuerpo'];
+    }
 
     protected function casts(): array
     {

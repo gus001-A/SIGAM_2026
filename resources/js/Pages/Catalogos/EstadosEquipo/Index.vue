@@ -13,7 +13,14 @@ const columnas = [
     { key: 'nombre', title: 'Estado de equipo', filtro: 'texto', sorter: true, width: 220 },
     { key: 'clave', title: 'Clave', tipo: 'tag', width: 160 },
     { key: 'color', title: 'Color', tipo: 'color', width: 140 },
-    { key: 'es_operativo', title: 'Cuenta como operativo', tipo: 'bool', width: 170 },
+    {
+        key: 'es_operativo',
+        title: 'Cuenta como operativo',
+        tipo: 'bool',
+        filtro: 'select',
+        opciones: [{ label: 'Sí', value: 1 }, { label: 'No', value: 0 }],
+        width: 170,
+    },
     { key: 'equipos_count', title: 'Equipos', tipo: 'count', align: 'right', width: 110 },
 ];
 

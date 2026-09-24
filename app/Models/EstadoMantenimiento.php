@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
+use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneEstadoActivo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class EstadoMantenimiento extends Model
 {
-    use HasFactory, TieneEstadoActivo;
+    use ConvierteMayusculas, EsAuditable, HasFactory, TieneEstadoActivo;
 
     protected $table = 'estados_mantenimiento';
 
@@ -33,5 +35,10 @@ class EstadoMantenimiento extends Model
     public function mantenimientos(): HasMany
     {
         return $this->hasMany(Mantenimiento::class, 'estado_id');
+    }
+
+    protected function camposMayusculas(): array
+    {
+        return ['nombre', 'descripcion'];
     }
 }

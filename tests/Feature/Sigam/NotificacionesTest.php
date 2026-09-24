@@ -70,37 +70,37 @@ class NotificacionesTest extends TestCase
 
         $this->assertDatabaseHas('notificaciones', [
             'usuario_id' => $this->tecnico->id,
-            'tipo' => 'asignacion',
+            'tipo' => 'mantenimiento_asignado',
         ]);
     }
 
-    public function test_orden_urgente_notifica_a_supervisores(): void
+    public function test_cambio_de_estado_notifica_al_tecnico_asignado(): void
     {
-        $supervisor = Usuario::factory()->create();
-        $supervisor->assignRole('supervisor');
+        $this->actingAs($this->admin);
 
-        $this->nuevaOrden('urgente');
-
-        $this->assertDatabaseHas('notificaciones', ['usuario_id' => $supervisor->id, 'tipo' => 'urgencia']);
-        // El creador (admin) no se auto-notifica.
-        $this->assertDatabaseMissing('notificaciones', ['usuario_id' => $this->admin->id, 'tipo' => 'urgencia']);
-    }
-
-    public function test_estado_realizado_notifica_supervision(): void
-    {
         $orden = $this->nuevaOrden();
+        $orden->asignaciones()->create([
+            'tecnico_id' => $this->tecnico->id,
+            'asignado_por' => $this->admin->id,
+            'asignado_at' => now(),
+        ]);
         $realizado = CicloMantenimiento::estado('realizado');
 
         $orden->historialEstados()->create([
             'estado_origen_id' => $orden->estado_id,
             'estado_destino_id' => $realizado->id,
-            'cambiado_por' => $this->tecnico->id,
+            'cambiado_por' => $this->admin->id,
             'cambiado_at' => now(),
         ]);
 
         $this->assertDatabaseHas('notificaciones', [
+            'usuario_id' => $this->tecnico->id,
+            'tipo' => 'mantenimiento_modificado',
+        ]);
+        // Quien hizo el cambio no se auto-notifica.
+        $this->assertDatabaseMissing('notificaciones', [
             'usuario_id' => $this->admin->id,
-            'tipo' => 'pendiente_supervision',
+            'tipo' => 'mantenimiento_modificado',
         ]);
     }
 

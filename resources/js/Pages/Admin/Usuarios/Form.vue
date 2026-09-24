@@ -1,9 +1,10 @@
 <script setup>
 import { computed, reactive } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { CheckCircleFilled, IdcardOutlined, LockOutlined, SafetyCertificateOutlined, SaveOutlined } from '@ant-design/icons-vue';
+import { CheckCircleFilled, IdcardOutlined, LockOutlined, SafetyCertificateOutlined, SaveOutlined, StarOutlined } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { colorHexRol, etiquetaRol } from '@/utils/roles';
+import { useFormularioPestanas } from '@/composables/useFormularioPestanas';
+import { colorHexRol, descripcionRol, etiquetaRol } from '@/utils/roles';
 import { reglaCorreo, reglaRequerido, reglaTelefono, soloDigitos } from '@/utils/restricciones';
 
 const props = defineProps({
@@ -23,6 +24,8 @@ const form = useForm({
     password: '',
     password_confirmation: '',
     rol: props.usuario?.roles?.[0] ?? null,
+    especialidades_equipo: props.usuario?.especialidades_equipo ?? [],
+    especialidades_mantenimiento: props.usuario?.especialidades_mantenimiento ?? [],
 });
 
 const reglas = reactive({
@@ -38,11 +41,20 @@ const opcionesRoles = computed(() =>
         return { valor: nombre, etiqueta: etiquetaRol(nombre), color: colorHexRol(nombre) };
     }),
 );
+const esTecnico = computed(() => form.rol === 'tecnico');
+const opcionesTiposEquipo = computed(() => (props.catalogos.tipos_equipo ?? []).map((t) => ({ label: t.nombre, value: t.id })));
+const opcionesTiposMantenimiento = computed(() => (props.catalogos.tipos_mantenimiento ?? []).map((t) => ({ label: t.nombre, value: t.id })));
 
 const est = (campo) => (form.errors[campo] ? 'error' : undefined);
 
+const { pestanaActiva, onFinishFailed, onErrorServidor } = useFormularioPestanas({
+    per: ['nombre', 'apellidos', 'email', 'telefono', 'sucursal_id'],
+    clave: ['password', 'password_confirmation'],
+    rol: ['roles', 'rol', 'estado', 'especialidades_equipo', 'especialidades_mantenimiento'],
+}, 'per');
+
 const enviar = () => {
-    const opciones = { preserveScroll: true };
+    const opciones = { preserveScroll: true, onError: onErrorServidor };
     form.transform((datos) => ({ ...datos, roles: datos.rol ? [datos.rol] : [] }));
     if (editando.value) form.put(route('usuarios.update', props.usuario.id), opciones);
     else form.post(route('usuarios.store'), opciones);
@@ -57,13 +69,14 @@ const cancelar = () =>
 
     <AppLayout
         :titulo="editando ? 'Editar usuario' : 'Nuevo usuario'"
-        descripcion="Datos personales, credenciales de acceso y roles del usuario."
+        descripcion="Datos personales, credenciales de acceso, rol y especialidades del usuario."
     >
-        <a-form :model="form" :rules="reglas" layout="vertical" @finish="enviar">
-            <a-row :gutter="16">
-                <a-col :xs="24" :lg="16">
-                    <a-card size="small" class="mb-4 sec">
-                        <template #title><IdcardOutlined /> Datos personales</template>
+        <a-form :model="form" :rules="reglas" layout="vertical" @finish="enviar" @finish-failed="onFinishFailed">
+            <a-card size="small" class="form-card">
+                <a-tabs v-model:activeKey="pestanaActiva">
+                    <a-tab-pane key="per">
+                        <template #tab><span><IdcardOutlined /> Datos personales</span></template>
+                        <p class="tab-ayuda">Identificación y forma de contacto del usuario.</p>
                         <a-row :gutter="12">
                             <a-col :xs="24" :sm="12">
                                 <a-form-item label="Nombre(s)" name="nombre" :validate-status="est('nombre')" :help="form.errors.nombre">
@@ -76,7 +89,7 @@ const cancelar = () =>
                                 </a-form-item>
                             </a-col>
                             <a-col :xs="24" :sm="14">
-                                <a-form-item label="Correo electrónico" name="email" :validate-status="est('email')" :help="form.errors.email">
+                                <a-form-item label="Correo electrónico" name="email" extra="Se usa para iniciar sesión y recuperar la contraseña." :validate-status="est('email')" :help="form.errors.email">
                                     <a-input v-model:value="form.email" type="email" />
                                 </a-form-item>
                             </a-col>
@@ -92,7 +105,7 @@ const cancelar = () =>
                                 </a-form-item>
                             </a-col>
                             <a-col :xs="24" :sm="14">
-                                <a-form-item label="Sucursal" :validate-status="est('sucursal_id')" :help="form.errors.sucursal_id">
+                                <a-form-item label="Sucursal" extra="A qué sede pertenece este usuario — opcional." :validate-status="est('sucursal_id')" :help="form.errors.sucursal_id">
                                     <a-select
                                         v-model:value="form.sucursal_id"
                                         :options="catalogos.sucursales"
@@ -103,10 +116,11 @@ const cancelar = () =>
                                 </a-form-item>
                             </a-col>
                         </a-row>
-                    </a-card>
+                    </a-tab-pane>
 
-                    <a-card size="small" class="sec">
-                        <template #title><LockOutlined /> Contraseña</template>
+                    <a-tab-pane key="clave">
+                        <template #tab><span><LockOutlined /> Contraseña</span></template>
+                        <p class="tab-ayuda">Credencial de acceso al sistema.</p>
                         <a-alert
                             v-if="editando"
                             type="info"
@@ -126,46 +140,90 @@ const cancelar = () =>
                                 </a-form-item>
                             </a-col>
                         </a-row>
-                    </a-card>
-                </a-col>
+                    </a-tab-pane>
 
-                <a-col :xs="24" :lg="8">
-                    <a-card size="small" class="mb-4 sec">
-                        <template #title><SafetyCertificateOutlined /> Rol y acceso</template>
-                        <a-form-item label="Rol del usuario" :validate-status="est('roles') || est('rol')" :help="form.errors.roles || form.errors.rol">
-                            <div class="roles-grid">
-                                <button
-                                    v-for="op in opcionesRoles"
-                                    :key="op.valor"
-                                    type="button"
-                                    class="rol-op"
-                                    :class="{ 'is-sel': form.rol === op.valor }"
-                                    :style="{ '--c': op.color }"
-                                    @click="form.rol = op.valor"
-                                >
-                                    <span class="rol-op__punto" />
-                                    <span class="rol-op__txt">{{ op.etiqueta }}</span>
-                                    <CheckCircleFilled v-if="form.rol === op.valor" class="rol-op__check" />
-                                </button>
-                            </div>
-                        </a-form-item>
-                        <a-form-item label="Estado de la cuenta" name="estado">
-                            <a-radio-group v-model:value="form.estado" button-style="solid">
-                                <a-radio-button value="activo">Activo</a-radio-button>
-                                <a-radio-button value="inactivo">Inactivo</a-radio-button>
-                            </a-radio-group>
-                        </a-form-item>
-                    </a-card>
+                    <a-tab-pane key="rol">
+                        <template #tab><span><SafetyCertificateOutlined /> Rol y acceso</span></template>
+                        <p class="tab-ayuda">Qué puede hacer este usuario dentro del sistema — cada usuario tiene exactamente un rol.</p>
+                        <a-row :gutter="24">
+                            <a-col :xs="24" :md="12">
+                                <a-form-item label="Rol del usuario" :validate-status="est('roles') || est('rol')" :help="form.errors.roles || form.errors.rol">
+                                    <div class="roles-grid">
+                                        <button
+                                            v-for="op in opcionesRoles"
+                                            :key="op.valor"
+                                            type="button"
+                                            class="rol-op"
+                                            :class="{ 'is-sel': form.rol === op.valor }"
+                                            :style="{ '--c': op.color }"
+                                            @click="form.rol = op.valor"
+                                        >
+                                            <span class="rol-op__punto" />
+                                            <span class="rol-op__txt">{{ op.etiqueta }}</span>
+                                            <CheckCircleFilled v-if="form.rol === op.valor" class="rol-op__check" />
+                                        </button>
+                                    </div>
+                                    <p v-if="form.rol" class="rol-desc">{{ descripcionRol(form.rol) }}</p>
+                                </a-form-item>
+                                <a-form-item label="Estado de la cuenta" name="estado">
+                                    <a-radio-group v-model:value="form.estado" button-style="solid">
+                                        <a-radio-button value="activo">Activo</a-radio-button>
+                                        <a-radio-button value="inactivo">Inactivo</a-radio-button>
+                                    </a-radio-group>
+                                </a-form-item>
+                            </a-col>
 
-                    <a-card size="small">
-                        <a-button type="primary" size="large" block html-type="submit" :loading="form.processing">
-                            <template #icon><SaveOutlined /></template>
-                            {{ editando ? 'Guardar cambios' : 'Crear usuario' }}
-                        </a-button>
-                        <a-button type="text" block class="mt-2" @click="cancelar">Cancelar</a-button>
-                    </a-card>
-                </a-col>
-            </a-row>
+                            <a-col :xs="24" :md="12" class="especialidades-col">
+                                <div class="especialidades-tit">
+                                    <StarOutlined /> Especialidades del técnico
+                                    <span class="especialidades-tit__sub">— se usa para sugerirlo al delegar una orden</span>
+                                </div>
+                                <template v-if="esTecnico">
+                                    <a-form-item label="Tipos de equipo en los que es especialista">
+                                        <a-select
+                                            v-model:value="form.especialidades_equipo"
+                                            :options="opcionesTiposEquipo"
+                                            mode="multiple"
+                                            size="small"
+                                            :show-search="false"
+                                            allow-clear
+                                            placeholder="Sin especialidades de equipo registradas"
+                                        />
+                                    </a-form-item>
+                                    <a-form-item label="Tipos de mantenimiento en los que es especialista">
+                                        <a-select
+                                            v-model:value="form.especialidades_mantenimiento"
+                                            :options="opcionesTiposMantenimiento"
+                                            mode="multiple"
+                                            size="small"
+                                            :show-search="false"
+                                            allow-clear
+                                            placeholder="Sin especialidades de mantenimiento registradas"
+                                        />
+                                    </a-form-item>
+                                </template>
+                                <a-alert
+                                    v-else
+                                    type="info"
+                                    show-icon
+                                    message="Solo aplica al rol Técnico"
+                                    description="Elige el rol Técnico para registrar sus especialidades."
+                                />
+                            </a-col>
+                        </a-row>
+                    </a-tab-pane>
+                </a-tabs>
+            </a-card>
+
+            <a-card size="small" class="form-acciones">
+                <a-space>
+                    <a-button type="primary" size="large" html-type="submit" :loading="form.processing">
+                        <template #icon><SaveOutlined /></template>
+                        {{ editando ? 'Guardar cambios' : 'Crear usuario' }}
+                    </a-button>
+                    <a-button size="large" @click="cancelar">Cancelar</a-button>
+                </a-space>
+            </a-card>
         </a-form>
     </AppLayout>
 </template>
@@ -174,7 +232,8 @@ const cancelar = () =>
 .roles-grid {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    max-width: 420px;
 }
 .rol-op {
     display: flex;
@@ -182,7 +241,7 @@ const cancelar = () =>
     gap: 10px;
     width: 100%;
     text-align: left;
-    padding: 10px 12px;
+    padding: 7px 12px;
     border: 1px solid var(--sigam-borde);
     border-radius: 11px;
     background: #fff;
@@ -214,16 +273,64 @@ const cancelar = () =>
     color: var(--c);
     font-size: 16px;
 }
-.sec :deep(.ant-card-head-title) {
+.rol-desc {
+    margin: 8px 0 0;
+    max-width: 420px;
+    font-size: 12.5px;
+    color: var(--sigam-tenue);
+    background: var(--sigam-navy-050);
+    border-radius: 9px;
+    padding: 8px 10px;
+}
+.especialidades-col {
+    border-left: 1px solid var(--sigam-borde-suave);
+    padding-left: 24px;
+}
+@media (max-width: 767px) {
+    .especialidades-col {
+        border-left: none;
+        border-top: 1px solid var(--sigam-borde-suave);
+        padding-left: 0;
+        padding-top: 16px;
+        margin-top: 8px;
+    }
+}
+.especialidades-tit {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--sigam-navy);
+    margin-bottom: 8px;
 }
-.sec :deep(.ant-card-head-title)::before {
-    display: none !important;
-}
-.sec :deep(.ant-card-head-title .anticon) {
+.especialidades-tit .anticon {
     color: var(--sigam-teal);
-    font-size: 15px;
+    align-self: center;
+}
+.especialidades-tit__sub {
+    font-weight: 500;
+    font-size: 11.5px;
+    color: var(--sigam-tenue);
+}
+.especialidades-col :deep(.ant-form-item) {
+    margin-bottom: 8px;
+}
+.form-card {
+    margin-bottom: 10px;
+}
+.form-card :deep(.ant-tabs-nav) {
+    margin-bottom: 10px;
+}
+.tab-ayuda {
+    margin: -4px 0 10px;
+    font-size: 12.5px;
+    color: var(--sigam-tenue);
+}
+.form-acciones {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
 }
 </style>

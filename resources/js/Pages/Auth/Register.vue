@@ -107,8 +107,8 @@ const enviar = () => {
 </template>
 
 <style scoped>
-.au-link { color: #1e5eb8; font-weight: 600; }
-.au-link:hover { color: #0d3f77; }
+.au-link { color: var(--sigam-navy); font-weight: 600; }
+.au-link:hover { color: var(--sigam-teal-700); }
 .au-link--strong { display: inline-flex; align-items: center; gap: 5px; }
 .au-terms {
     display: flex;

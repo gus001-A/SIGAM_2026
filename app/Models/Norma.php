@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneDocumentos;
 use App\Models\Concerns\TieneEstadoActivo;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Norma extends Model
 {
-    use EsAuditable, HasFactory, SoftDeletes, TieneDocumentos, TieneEstadoActivo;
+    use ConvierteMayusculas, EsAuditable, HasFactory, SoftDeletes, TieneDocumentos, TieneEstadoActivo;
 
     protected $table = 'normas';
 
@@ -36,6 +37,11 @@ class Norma extends Model
     public function auditoriaModulo(): string
     {
         return 'normas';
+    }
+
+    protected function camposMayusculas(): array
+    {
+        return ['codigo', 'nombre', 'descripcion'];
     }
 
     public function documento(): BelongsTo

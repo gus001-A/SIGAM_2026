@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneDocumentos;
 use App\Models\Concerns\TieneEstadoActivo;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Proveedor extends Model
 {
-    use EsAuditable, HasFactory, SoftDeletes, TieneDocumentos, TieneEstadoActivo;
+    use ConvierteMayusculas, EsAuditable, HasFactory, SoftDeletes, TieneDocumentos, TieneEstadoActivo;
 
     protected $table = 'proveedores';
 
@@ -23,6 +24,11 @@ class Proveedor extends Model
     public function auditoriaModulo(): string
     {
         return 'proveedores';
+    }
+
+    protected function camposMayusculas(): array
+    {
+        return ['razon_social', 'nombre_comercial', 'rfc', 'contacto', 'direccion', 'especialidad', 'notas'];
     }
 
     public function equipos(): HasMany

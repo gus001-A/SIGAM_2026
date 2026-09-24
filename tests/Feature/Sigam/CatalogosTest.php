@@ -58,7 +58,7 @@ class CatalogosTest extends TestCase
             ->post(route('catalogos.marcas.store'), ['nombre' => 'Carrier'])
             ->assertRedirect();
 
-        $this->assertDatabaseHas('marcas', ['nombre' => 'Carrier', 'estado' => 'activo']);
+        $this->assertDatabaseHas('marcas', ['nombre' => 'CARRIER', 'estado' => 'activo']);
 
         $this->actingAs($this->admin)
             ->from(route('catalogos.marcas.index'))
@@ -72,7 +72,7 @@ class CatalogosTest extends TestCase
             ->post(route('catalogos.tipos_equipo.store'), ['nombre' => 'Bomba de vacío'])
             ->assertRedirect();
 
-        $this->assertDatabaseHas('tipos_equipo', ['nombre' => 'Bomba de vacío', 'clave' => 'bomba_de_vacio']);
+        $this->assertDatabaseHas('tipos_equipo', ['nombre' => 'BOMBA DE VACÍO', 'clave' => 'bomba_de_vacio']);
     }
 
     public function test_desactivar_y_reactivar_catalogo(): void
@@ -96,7 +96,7 @@ class CatalogosTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('registros.total', 1)
-                ->where('registros.data.0.nombre', 'Alfa')
+                ->where('registros.data.0.nombre', 'ALFA')
                 ->where('orden.dir', 'desc'));
     }
 
@@ -111,7 +111,7 @@ class CatalogosTest extends TestCase
             ->post(route('catalogos.prioridades.store'), ['nombre' => 'Crítica inmediata', 'nivel' => 1, 'minutos_respuesta' => 15])
             ->assertRedirect();
 
-        $this->assertDatabaseHas('prioridades', ['nombre' => 'Crítica inmediata', 'nivel' => 1]);
+        $this->assertDatabaseHas('prioridades', ['nombre' => 'CRÍTICA INMEDIATA', 'nivel' => 1]);
     }
 
     public function test_tecnico_no_puede_editar_catalogos(): void
@@ -123,5 +123,70 @@ class CatalogosTest extends TestCase
         $this->actingAs($tecnico)
             ->put(route('catalogos.marcas.update', $marca->id), ['nombre' => 'Z'])
             ->assertForbidden();
+    }
+
+    /**
+     * El botón «+» junto a los selects de catálogo (<SelectCatalogo>) da de
+     * alta / edita / desactiva sin salir del formulario: manda el header
+     * `X-Alta-Rapida` y espera JSON en vez de una redirección.
+     */
+    public function test_alta_rapida_de_catalogo_responde_json(): void
+    {
+        $respuesta = $this->actingAs($this->admin)
+            ->withHeaders(['X-Alta-Rapida' => '1'])
+            ->postJson(route('catalogos.marcas.store'), ['nombre' => 'Trane']);
+
+        $respuesta->assertOk()->assertJsonFragment(['nombre' => 'TRANE']);
+        $id = $respuesta->json('id');
+
+        $this->actingAs($this->admin)
+            ->withHeaders(['X-Alta-Rapida' => '1'])
+            ->putJson(route('catalogos.marcas.update', $id), ['nombre' => 'Trane Technologies'])
+            ->assertOk()
+            ->assertJsonFragment(['nombre' => 'TRANE TECHNOLOGIES']);
+
+        $this->actingAs($this->admin)
+            ->withHeaders(['X-Alta-Rapida' => '1'])
+            ->deleteJson(route('catalogos.marcas.destroy', $id))
+            ->assertOk()
+            ->assertJson(['ok' => true]);
+
+        $this->assertSame('inactivo', Marca::find($id)->estado);
+    }
+
+    /** Sin el header de alta rápida, el comportamiento normal (redirect) no cambia. */
+    public function test_alta_de_catalogo_sin_header_sigue_redirigiendo(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('catalogos.marcas.store'), ['nombre' => 'Daikin'])
+            ->assertRedirect();
+    }
+
+    /** Catálogos de limpieza hospitalaria (observaciones generales del cliente §18-19). */
+    public function test_catalogos_de_limpieza_traen_los_valores_sembrados(): void
+    {
+        $this->assertDatabaseHas('tipos_area', ['nombre' => 'ÁREA CRÍTICA', 'dias_limpieza' => 7]);
+        $this->assertDatabaseHas('tipos_area', ['nombre' => 'ÁREA SEMI-CRÍTICA', 'dias_limpieza' => 15]);
+        $this->assertDatabaseHas('tipos_area', ['nombre' => 'ÁREA NO CRÍTICA', 'dias_limpieza' => 30]);
+        $this->assertDatabaseHas('tipos_limpieza', ['nombre' => 'RUTINARIA', 'frecuencia' => 'DIARIA']);
+        $this->assertDatabaseHas('tipos_limpieza', ['nombre' => 'TERMINAL', 'frecuencia' => 'DESPUÉS DE CADA EVENTO']);
+        $this->assertDatabaseHas('tipos_limpieza', ['nombre' => 'EXHAUSTIVA', 'frecuencia' => 'SEGÚN TIPO DE ÁREA']);
+    }
+
+    public function test_crea_tipo_de_area_con_dias_de_limpieza(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('catalogos.tipos_area.store'), ['nombre' => 'Área intermedia', 'dias_limpieza' => 20])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('tipos_area', ['nombre' => 'ÁREA INTERMEDIA', 'dias_limpieza' => 20]);
+    }
+
+    public function test_tipo_de_area_requiere_dias_de_limpieza(): void
+    {
+        $this->actingAs($this->admin)
+            ->from(route('catalogos.tipos_area.index'))
+            ->post(route('catalogos.tipos_area.store'), ['nombre' => 'Sin días'])
+            ->assertSessionHasErrors('dias_limpieza');
     }
 }

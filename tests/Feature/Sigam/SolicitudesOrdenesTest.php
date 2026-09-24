@@ -95,7 +95,7 @@ class SolicitudesOrdenesTest extends TestCase
 
         $orden = Mantenimiento::firstOrFail();
         $this->assertSame($solicitud->id, $orden->solicitud_id);
-        $this->assertSame('No enciende', $orden->problema_reportado);
+        $this->assertSame('NO ENCIENDE', $orden->problema_reportado);
         $this->assertSame('autorizado', $orden->estado->clave);
         $this->assertNotNull($solicitud->fresh()->revisado_at);
     }

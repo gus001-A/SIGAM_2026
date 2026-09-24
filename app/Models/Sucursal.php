@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneDocumentos;
 use App\Models\Concerns\TieneEstadoActivo;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Sucursal extends Model
 {
-    use EsAuditable, HasFactory, SoftDeletes, TieneDocumentos, TieneEstadoActivo;
+    use ConvierteMayusculas, EsAuditable, HasFactory, SoftDeletes, TieneDocumentos, TieneEstadoActivo;
 
     protected $table = 'sucursales';
 
@@ -24,6 +25,11 @@ class Sucursal extends Model
     public function auditoriaModulo(): string
     {
         return 'sucursales';
+    }
+
+    protected function camposMayusculas(): array
+    {
+        return ['codigo', 'nombre', 'direccion', 'notas'];
     }
 
     public function responsable(): BelongsTo

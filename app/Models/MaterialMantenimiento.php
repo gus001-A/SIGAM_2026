@@ -2,19 +2,25 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MaterialMantenimiento extends Model
 {
-    use HasFactory;
+    use ConvierteMayusculas, HasFactory;
 
     protected $table = 'materiales_mantenimiento';
 
     protected $fillable = [
         'mantenimiento_id', 'material_id', 'descripcion', 'cantidad', 'unidad', 'costo_unitario', 'notas',
     ];
+
+    protected function camposMayusculas(): array
+    {
+        return ['descripcion', 'unidad', 'notas'];
+    }
 
     protected function casts(): array
     {

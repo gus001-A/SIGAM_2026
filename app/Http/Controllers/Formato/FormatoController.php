@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Formato;
 
 use App\Http\Controllers\Controller;
 use App\Models\Formato;
+use App\Support\Auditoria;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -44,22 +45,30 @@ class FormatoController extends Controller
                 $request->query('estado') === 'inactivo',
                 fn (Builder $q) => $q->onlyTrashed(),
             )
+            ->when($request->filled('registrado_por'), fn (Builder $q) => $q->whereIn(
+                'id',
+                Auditoria::idsCreadosPor(Formato::class, trim((string) $request->query('registrado_por'))),
+            ))
             ->orderBy($orden, $dir)
             ->paginate(self::POR_PAGINA)
-            ->withQueryString()
-            ->through(fn (Formato $f) => [
-                'id' => $f->id,
-                'nombre' => $f->nombre,
-                'descripcion' => $f->descripcion,
-                'version' => $f->version,
-                'campos_count' => $f->campos_count,
-                'respuestas_count' => $f->respuestas_count,
-                'estado' => $f->estado,
-            ]);
+            ->withQueryString();
+
+        $creadores = Auditoria::creadoPorMasivo(Formato::class, $formatos->pluck('id'));
+        $formatos->through(fn (Formato $f) => [
+            'id' => $f->id,
+            'nombre' => $f->nombre,
+            'descripcion' => $f->descripcion,
+            'version' => $f->version,
+            'campos_count' => $f->campos_count,
+            'respuestas_count' => $f->respuestas_count,
+            'estado' => $f->estado,
+            'creado_por' => $creadores[$f->id]['usuario'] ?? null,
+            'creado_en' => $creadores[$f->id]['fecha'] ?? null,
+        ]);
 
         return Inertia::render('Formatos/Index', [
             'formatos' => $formatos,
-            'filtros' => $request->only(['nombre', 'version', 'estado']),
+            'filtros' => $request->only(['nombre', 'version', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
         ]);
     }
@@ -101,6 +110,7 @@ class FormatoController extends Controller
 
         return Inertia::render('Formatos/Show', [
             'formato' => $formato->load('campos')->loadCount('respuestas'),
+            'sello' => $formato->selloAuditoria(),
         ]);
     }
 

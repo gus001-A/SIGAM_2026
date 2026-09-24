@@ -17,6 +17,7 @@ import { usePermisos } from '@/composables/usePermisos';
 const props = defineProps({
     plan: { type: Object, required: true },
     ocurrencias: { type: Array, default: () => [] },
+    sello: { type: Object, default: null },
 });
 
 const { puede } = usePermisos();
@@ -32,7 +33,9 @@ const etiquetaFrecuencia = (f) =>
     })[f] ?? f;
 
 const datos = computed(() => [
-    ['Equipo', props.plan.equipo ? `${props.plan.equipo.codigo_activo} · ${props.plan.equipo.descripcion}` : 'No especificado'],
+    props.plan.equipo
+        ? ['Equipo', `${props.plan.equipo.codigo_activo} · ${props.plan.equipo.descripcion}`]
+        : ['Instalación', props.plan.ubicacion?.nombre ?? 'No especificado'],
     ['Tipo de mantenimiento', props.plan.tipo?.nombre],
     ['Frecuencia', `${etiquetaFrecuencia(props.plan.tipo_frecuencia)} (${props.plan.valor_frecuencia})`],
     ['Fecha de inicio', fecha(props.plan.fecha_inicio)],
@@ -62,6 +65,16 @@ const generarOrden = (ocurrencia) => {
     router.post(route('planes.orden.generar', props.plan.id), { ocurrencia_id: ocurrencia.id }, { preserveScroll: true });
 };
 
+const eliminarOcurrencia = async (ocurrencia) => {
+    const ok = await confirmar.value.abrir({
+        titulo: `Eliminar ocurrencia del ${fecha(ocurrencia.fecha_programada)}`,
+        mensaje: 'Se quita del calendario de este plan. Si ya generó una orden, no se puede eliminar.',
+        confirmar: 'Eliminar',
+        peligro: true,
+    });
+    if (ok) router.delete(route('planes.ocurrencias.destroy', [props.plan.id, ocurrencia.id]), { preserveScroll: true });
+};
+
 const desactivar = async () => {
     const ok = await confirmar.value.abrir({
         titulo: 'Desactivar plan preventivo',
@@ -82,9 +95,10 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
     <AppLayout>
         <FichaEncabezado
             :titulo="plan.nombre || 'Plan preventivo'"
-            :subtitulo="`${plan.equipo?.codigo_activo ?? ''} · ${plan.equipo?.descripcion ?? ''}`"
+            :subtitulo="plan.equipo ? `${plan.equipo.codigo_activo} · ${plan.equipo.descripcion}` : (plan.ubicacion?.nombre ?? '')"
             :icono="CalendarOutlined"
             volver="planes.index"
+            :sello="sello"
         >
             <template #tags>
                 <a-tag :color="inactivo ? 'default' : 'green'">{{ inactivo ? 'Inactivo' : 'Activo' }}</a-tag>
@@ -136,16 +150,23 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
                                         <a @click="irA('mantenimientos.show', o.mantenimiento.id)">{{ o.mantenimiento.folio }}</a>
                                     </div>
                                 </div>
-                                <a-button
-                                    v-if="o.estado === 'pendiente' && !o.mantenimiento_id && puede('mantenimientos.crear')"
-                                    size="small"
-                                    type="primary"
-                                    ghost
-                                    @click="generarOrden(o)"
-                                >
-                                    <template #icon><ThunderboltOutlined /></template>
-                                    Generar orden
-                                </a-button>
+                                <a-space :size="4">
+                                    <a-button
+                                        v-if="o.estado === 'pendiente' && !o.mantenimiento_id && puede('mantenimientos.crear')"
+                                        size="small"
+                                        type="primary"
+                                        ghost
+                                        @click="generarOrden(o)"
+                                    >
+                                        <template #icon><ThunderboltOutlined /></template>
+                                        Generar orden
+                                    </a-button>
+                                    <a-tooltip v-if="!o.mantenimiento_id && puede('mantenimientos.editar')" title="Eliminar esta ocurrencia">
+                                        <a-button size="small" danger @click="eliminarOcurrencia(o)">
+                                            <template #icon><DeleteOutlined /></template>
+                                        </a-button>
+                                    </a-tooltip>
+                                </a-space>
                             </div>
                         </a-timeline-item>
                     </a-timeline>

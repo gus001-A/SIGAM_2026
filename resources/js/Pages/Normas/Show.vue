@@ -24,6 +24,7 @@ import { usePermisos } from '@/composables/usePermisos';
 
 const props = defineProps({
     norma: { type: Object, required: true },
+    sello: { type: Object, default: null },
 });
 
 const { puede } = usePermisos();
@@ -74,7 +75,7 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
     <Head :title="norma.codigo" />
 
     <AppLayout>
-        <FichaEncabezado :titulo="norma.codigo" :subtitulo="norma.nombre" :icono="FileProtectOutlined" volver="normas.index">
+        <FichaEncabezado :titulo="norma.codigo" :subtitulo="norma.nombre" :icono="FileProtectOutlined" volver="normas.index" :sello="sello">
             <template #tags>
                 <a-tag :color="inactiva ? 'default' : 'green'">{{ inactiva ? 'Inactiva' : 'Vigente' }}</a-tag>
                 <a-tag v-if="revisionVencida" color="error">Revisión vencida</a-tag>

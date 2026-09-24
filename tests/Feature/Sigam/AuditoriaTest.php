@@ -49,8 +49,8 @@ class AuditoriaTest extends TestCase
         $sucursal->update(['nombre' => 'Central Renombrada']);
 
         $registro = RegistroAuditoria::where('accion', 'actualizar')->firstOrFail();
-        $this->assertSame('Central', $registro->valores_anteriores['nombre']);
-        $this->assertSame('Central Renombrada', $registro->valores_nuevos['nombre']);
+        $this->assertSame('CENTRAL', $registro->valores_anteriores['nombre']);
+        $this->assertSame('CENTRAL RENOMBRADA', $registro->valores_nuevos['nombre']);
     }
 
     public function test_no_audita_sin_usuario_autenticado(): void

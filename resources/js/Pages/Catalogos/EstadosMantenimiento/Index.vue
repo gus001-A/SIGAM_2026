@@ -9,13 +9,15 @@ defineProps({
     orden: Object,
 });
 
+const OPCIONES_SI_NO = [{ label: 'Sí', value: 1 }, { label: 'No', value: 0 }];
+
 const columnas = [
     { key: 'orden', title: '#', sorter: true, align: 'right', width: 70 },
     { key: 'nombre', title: 'Estado de la orden', filtro: 'texto', sorter: true, width: 240 },
     { key: 'clave', title: 'Clave', tipo: 'tag', width: 180 },
-    { key: 'es_abierto', title: 'Orden abierta', tipo: 'bool', width: 130 },
-    { key: 'es_terminal', title: 'Estado final', tipo: 'bool', width: 130 },
-    { key: 'descripcion', title: 'Descripción', width: 280 },
+    { key: 'es_abierto', title: 'Orden abierta', tipo: 'bool', filtro: 'select', opciones: OPCIONES_SI_NO, width: 130 },
+    { key: 'es_terminal', title: 'Estado final', tipo: 'bool', filtro: 'select', opciones: OPCIONES_SI_NO, width: 130 },
+    { key: 'descripcion', title: 'Descripción', filtro: 'texto', width: 280 },
 ];
 
 const campos = [

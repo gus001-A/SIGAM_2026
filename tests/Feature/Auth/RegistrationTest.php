@@ -35,7 +35,7 @@ class RegistrationTest extends TestCase
         $response->assertRedirect(route('dashboard', absolute: false));
 
         $usuario = Usuario::firstOrFail();
-        $this->assertSame('Test User', $usuario->nombre);
+        $this->assertSame('TEST USER', $usuario->nombre);
         $this->assertTrue($usuario->hasRole('usuario_basico'));
     }
 }

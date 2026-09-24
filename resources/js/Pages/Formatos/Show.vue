@@ -9,6 +9,7 @@ import { usePermisos } from '@/composables/usePermisos';
 
 const props = defineProps({
     formato: { type: Object, required: true },
+    sello: { type: Object, default: null },
 });
 
 const { puede } = usePermisos();
@@ -45,7 +46,7 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
     <Head :title="formato.nombre" />
 
     <AppLayout>
-        <FichaEncabezado :titulo="formato.nombre" :subtitulo="formato.descripcion" :icono="SnippetsOutlined" volver="formatos.index">
+        <FichaEncabezado :titulo="formato.nombre" :subtitulo="formato.descripcion" :icono="SnippetsOutlined" volver="formatos.index" :sello="sello">
             <template #tags>
                 <a-tag :color="inactivo ? 'default' : 'green'">{{ inactivo ? 'Inactivo' : 'Activo' }}</a-tag>
                 <a-tag>v{{ formato.version }}</a-tag>

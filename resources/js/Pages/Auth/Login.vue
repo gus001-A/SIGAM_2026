@@ -1,21 +1,35 @@
 <script setup>
+import { onMounted, ref } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import { message } from 'ant-design-vue';
 import { LockOutlined, LoginOutlined, MailOutlined } from '@ant-design/icons-vue';
 import AuthShell from '@/Components/AuthShell.vue';
 
-defineProps({
+const props = defineProps({
     canResetPassword: Boolean,
     status: String,
 });
 
+onMounted(() => {
+    if (props.status) message.success(props.status);
+});
+
 const form = useForm({ email: '', password: '', remember: false });
+const huboError = ref(false);
+
+const limpiarError = () => (huboError.value = false);
 
 const enviar = () => {
+    const credencialesCompletas = form.email && form.password;
+    huboError.value = false;
     form.post(route('login'), {
-        onError: (e) => {
+        onError: () => {
             form.reset('password');
-            message.error(e.email || e.password || 'No pudimos iniciar sesión. Revisa tus datos.');
+            if (credencialesCompletas) {
+                form.clearErrors();
+                huboError.value = true;
+                message.error('Correo y/o contraseña incorrectas.');
+            }
         },
     });
 };
@@ -26,34 +40,28 @@ const enviar = () => {
         <template #title>Bienvenido</template>
         <template #subtitle>Ingresa a tu cuenta para acceder al sistema</template>
 
-        <a-alert
-            v-if="status"
-            :message="status"
-            type="success"
-            show-icon
-            class="au-status"
-        />
-
         <a-form layout="vertical" class="au-form" @submitcapture.prevent>
-            <a-form-item :validate-status="form.errors.email ? 'error' : ''" :help="form.errors.email">
+            <a-form-item :validate-status="(form.errors.email || huboError) ? 'error' : ''" :help="form.errors.email">
                 <a-input
                     v-model:value="form.email"
                     type="email"
                     size="large"
                     placeholder="Correo electrónico"
                     autocomplete="username"
+                    @update:value="limpiarError"
                     @press-enter="enviar"
                 >
                     <template #prefix><MailOutlined /></template>
                 </a-input>
             </a-form-item>
 
-            <a-form-item :validate-status="form.errors.password ? 'error' : ''" :help="form.errors.password">
+            <a-form-item :validate-status="(form.errors.password || huboError) ? 'error' : ''" :help="form.errors.password">
                 <a-input-password
                     v-model:value="form.password"
                     size="large"
                     placeholder="Contraseña"
                     autocomplete="current-password"
+                    @update:value="limpiarError"
                     @press-enter="enviar"
                 >
                     <template #prefix><LockOutlined /></template>
@@ -76,7 +84,6 @@ const enviar = () => {
 </template>
 
 <style scoped>
-.au-status { margin-bottom: 16px; }
 .au-row {
     display: flex;
     align-items: center;
@@ -86,6 +93,6 @@ const enviar = () => {
     font-size: 13px;
     flex-wrap: wrap;
 }
-.au-link { color: #1e5eb8; font-weight: 600; white-space: nowrap; }
-.au-link:hover { color: #0d3f77; }
+.au-link { color: var(--sigam-navy); font-weight: 600; white-space: nowrap; }
+.au-link:hover { color: var(--sigam-teal-700); }
 </style>

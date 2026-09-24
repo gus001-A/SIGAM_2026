@@ -30,7 +30,7 @@ const abrir = (clave) => router.visit(route('reportes.generar', clave));
 
     <AppLayout
         titulo="Reportes"
-        descripcion="Indicadores y listados de inventario y mantenimiento, con exportación a Excel, PDF y CSV."
+        descripcion="Indicadores y listados de inventario y mantenimiento, con exportación a Excel y PDF."
     >
         <div v-for="g in grupos" :key="g.grupo" class="grupo">
             <div class="grupo__titulo" :style="{ '--acc': estilo(g.grupo).color }">

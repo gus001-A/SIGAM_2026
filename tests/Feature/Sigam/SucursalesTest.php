@@ -38,7 +38,7 @@ class SucursalesTest extends TestCase
             ->assertRedirect();
 
         $sucursal = Sucursal::firstOrFail();
-        $this->assertSame('Hospital Central', $sucursal->nombre);
+        $this->assertSame('HOSPITAL CENTRAL', $sucursal->nombre);
         $this->assertSame('activo', $sucursal->estado);
     }
 
@@ -98,7 +98,7 @@ class SucursalesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('sucursales.total', 1)
-                ->where('sucursales.data.0.nombre', 'Norte'));
+                ->where('sucursales.data.0.nombre', 'NORTE'));
     }
 
     public function test_tecnico_no_puede_crear_sucursales(): void

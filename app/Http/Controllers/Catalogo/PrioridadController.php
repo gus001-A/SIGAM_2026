@@ -17,6 +17,8 @@ class PrioridadController extends CatalogoController
 
     protected bool $generaClave = true;
 
+    protected array $buscables = ['nombre', 'nivel', 'minutos_respuesta'];
+
     protected array $ordenablesExtra = ['nivel', 'minutos_respuesta'];
 
     protected function reglas(Request $request, ?Model $registro = null): array

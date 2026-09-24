@@ -34,6 +34,10 @@ class GuardarUsuarioRequest extends FormRequest
             // Un usuario tiene exactamente un rol.
             'roles' => ['required', 'array', 'size:1'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
+            'especialidades_equipo' => ['nullable', 'array'],
+            'especialidades_equipo.*' => ['integer', Rule::exists('tipos_equipo', 'id')],
+            'especialidades_mantenimiento' => ['nullable', 'array'],
+            'especialidades_mantenimiento.*' => ['integer', Rule::exists('tipos_mantenimiento', 'id')],
         ];
     }
 

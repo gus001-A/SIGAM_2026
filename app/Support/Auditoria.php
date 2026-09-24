@@ -62,4 +62,58 @@ class Auditoria
             ->reject(fn ($v) => in_array($v, [null, ''], true))
             ->all();
     }
+
+    /**
+     * Quién dio de alta cada uno de los registros dados, en UNA sola consulta
+     * (evita hacer N+1 llamando `selloAuditoria()` fila por fila en un
+     * listado paginado). Pensado para pintar "Registrado por / fecha" en las
+     * columnas de las tablas — solo el alta, no la última modificación.
+     *
+     * @param  class-string<Model>  $modelo
+     * @param  iterable<int|string>  $ids
+     * @return array<int|string, array{usuario: ?string, fecha: ?string}>
+     */
+    public static function creadoPorMasivo(string $modelo, iterable $ids): array
+    {
+        $ids = collect($ids)->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return RegistroAuditoria::query()
+            ->where('auditable_type', (new $modelo)->getMorphClass())
+            ->whereIn('auditable_id', $ids)
+            ->where('accion', 'crear')
+            ->with('usuario:id,nombre,apellidos')
+            ->oldest('created_at')
+            ->get()
+            ->unique('auditable_id')
+            ->keyBy('auditable_id')
+            ->map(fn (RegistroAuditoria $r) => [
+                'usuario' => $r->usuario?->nombre_completo,
+                'fecha' => $r->created_at?->toISOString(),
+            ])
+            ->all();
+    }
+
+    /**
+     * IDs de los registros de `$modelo` cuya alta fue hecha por un usuario
+     * cuyo nombre coincide con `$termino` — para el filtro "Registrado por"
+     * de los listados (el nombre no vive en la propia tabla, solo en la
+     * bitácora, así que no se puede filtrar con un `where` normal).
+     *
+     * @param  class-string<Model>  $modelo
+     * @return array<int|string>
+     */
+    public static function idsCreadosPor(string $modelo, string $termino): array
+    {
+        return RegistroAuditoria::query()
+            ->where('auditable_type', (new $modelo)->getMorphClass())
+            ->where('accion', 'crear')
+            ->whereHas('usuario', fn ($q) => $q
+                ->where('nombre', 'like', "%{$termino}%")
+                ->orWhere('apellidos', 'like', "%{$termino}%"))
+            ->pluck('auditable_id')
+            ->all();
+    }
 }

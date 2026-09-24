@@ -10,10 +10,10 @@ defineProps({
 });
 
 const columnas = [
-    { key: 'nivel', title: 'Nivel', sorter: true, align: 'right', width: 80 },
+    { key: 'nivel', title: 'Nivel', filtro: 'texto', sorter: true, align: 'right', width: 80 },
     { key: 'nombre', title: 'Prioridad', filtro: 'texto', enlace: true, sorter: true, width: 220 },
     { key: 'clave', title: 'Clave', tipo: 'tag', width: 160 },
-    { key: 'minutos_respuesta', title: 'Respuesta (min)', sorter: true, align: 'right', width: 150 },
+    { key: 'minutos_respuesta', title: 'Respuesta (min)', filtro: 'texto', sorter: true, align: 'right', width: 150 },
     { key: 'color', title: 'Color', tipo: 'color', width: 140 },
 ];
 

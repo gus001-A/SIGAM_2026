@@ -24,6 +24,7 @@ const props = defineProps({
     solicitud: { type: Object, required: true },
     puedeConvertir: { type: Boolean, default: false },
     catalogos: { type: Object, default: () => ({}) },
+    sello: { type: Object, default: null },
 });
 
 const { puede } = usePermisos();
@@ -34,7 +35,9 @@ const terminada = computed(() => s.value.estado?.clave === 'cancelado');
 const convertida = computed(() => (s.value.mantenimientos ?? []).length > 0);
 
 const datos = computed(() => [
-    { icono: ToolOutlined, label: 'Equipo', valor: s.value.equipo ? `${s.value.equipo.codigo_activo} — ${s.value.equipo.descripcion}` : null, color: '#0d84c9' },
+    s.value.equipo
+        ? { icono: ToolOutlined, label: 'Equipo', valor: `${s.value.equipo.codigo_activo} — ${s.value.equipo.descripcion}`, color: '#0d84c9' }
+        : { icono: EnvironmentOutlined, label: 'Instalación', valor: s.value.ubicacion?.nombre, color: '#0d84c9' },
     { icono: EnvironmentOutlined, label: 'Sucursal', valor: s.value.sucursal?.nombre, color: '#1f9e86' },
     { icono: UserOutlined, label: 'Solicitante', valor: s.value.solicitante?.nombre, color: '#6b4bc9' },
     { icono: CalendarOutlined, label: 'Fecha de solicitud', valor: fecha(s.value.solicitado_at), color: '#173a5f' },
@@ -78,9 +81,10 @@ const rechazar = () => {
     <AppLayout>
         <FichaEncabezado
             :titulo="solicitud.folio"
-            :subtitulo="solicitud.equipo?.codigo_activo"
+            :subtitulo="solicitud.equipo?.codigo_activo ?? solicitud.ubicacion?.nombre"
             :icono="FormOutlined"
             volver="solicitudes.index"
+            :sello="sello"
         >
             <template #tags>
                 <a-tag>{{ solicitud.estado?.nombre }}</a-tag>
@@ -104,17 +108,19 @@ const rechazar = () => {
             </template>
         </FichaEncabezado>
 
+        <a-card size="small" class="mb-4 destacado">
+            <div class="destacado__objetivo">
+                <component :is="solicitud.equipo ? ToolOutlined : EnvironmentOutlined" />
+                {{ solicitud.equipo ? `${solicitud.equipo.codigo_activo} — ${solicitud.equipo.descripcion}` : solicitud.ubicacion?.nombre }}
+            </div>
+            <div class="destacado__desc">{{ solicitud.descripcion }}</div>
+        </a-card>
+
         <a-row :gutter="16">
             <a-col :xs="24" :lg="15">
                 <a-card size="small" class="mb-4">
                     <SeccionFicha titulo="Información de la solicitud" :icono="FormOutlined">
                         <ListaDatos :datos="datos" />
-                    </SeccionFicha>
-
-                    <a-divider />
-
-                    <SeccionFicha titulo="Descripción del problema" :icono="FileTextOutlined" color="#e08a1e">
-                        <p class="descripcion">{{ solicitud.descripcion }}</p>
                     </SeccionFicha>
 
                     <a-alert
@@ -219,14 +225,28 @@ const rechazar = () => {
 </template>
 
 <style scoped>
-.descripcion {
+.destacado {
+    border-color: #f3c6c6;
+    background: #fef4f4;
+}
+.destacado__objetivo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-weight: 800;
+    font-size: 17px;
+    color: #b52222;
+    margin-bottom: 6px;
+}
+.destacado__desc {
     white-space: pre-line;
-    font-size: 13.5px;
-    color: var(--sigam-texto);
-    background: var(--sigam-navy-050);
-    border-radius: 10px;
-    padding: 12px 14px;
-    margin: 0;
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #d64545;
 }
 .ordenes {
     display: flex;

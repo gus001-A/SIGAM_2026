@@ -5,7 +5,9 @@ namespace Database\Seeders;
 use App\Models\EstadoEquipo;
 use App\Models\EstadoMantenimiento;
 use App\Models\Prioridad;
+use App\Models\TipoArea;
 use App\Models\TipoEquipo;
+use App\Models\TipoLimpieza;
 use App\Models\TipoMantenimiento;
 use App\Models\TipoUbicacion;
 use Illuminate\Database\Seeder;
@@ -25,6 +27,8 @@ class CatalogosSeeder extends Seeder
         $this->tiposMantenimiento();
         $this->prioridades();
         $this->estadosMantenimiento();
+        $this->tiposArea();
+        $this->tiposLimpieza();
     }
 
     private function tiposUbicacion(): void
@@ -116,6 +120,38 @@ class CatalogosSeeder extends Seeder
             EstadoMantenimiento::firstOrCreate(
                 ['clave' => $clave],
                 ['nombre' => $nombre, 'orden' => $orden, 'es_terminal' => $terminal, 'es_abierto' => $abierto, 'estado' => 'activo'],
+            );
+        }
+    }
+
+    /** Criticidad de áreas y su periodicidad de limpieza (observaciones generales §18). */
+    private function tiposArea(): void
+    {
+        $tipos = [
+            ['critica', 'Área crítica', 7],
+            ['semi_critica', 'Área semi-crítica', 15],
+            ['no_critica', 'Área no crítica', 30],
+        ];
+        foreach ($tipos as [$clave, $nombre, $dias]) {
+            TipoArea::firstOrCreate(
+                ['clave' => $clave],
+                ['nombre' => $nombre, 'dias_limpieza' => $dias, 'estado' => 'activo'],
+            );
+        }
+    }
+
+    /** Tipos de limpieza y cuándo se realizan (observaciones generales §19). */
+    private function tiposLimpieza(): void
+    {
+        $tipos = [
+            ['rutinaria', 'Rutinaria', 'Diaria'],
+            ['terminal', 'Terminal', 'Después de cada evento'],
+            ['exhaustiva', 'Exhaustiva', 'Según tipo de área'],
+        ];
+        foreach ($tipos as [$clave, $nombre, $frecuencia]) {
+            TipoLimpieza::firstOrCreate(
+                ['clave' => $clave],
+                ['nombre' => $nombre, 'frecuencia' => $frecuencia, 'estado' => 'activo'],
             );
         }
     }

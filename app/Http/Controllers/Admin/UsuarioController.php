@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\GuardarUsuarioRequest;
 use App\Models\Sucursal;
+use App\Models\TipoEquipo;
+use App\Models\TipoMantenimiento;
 use App\Models\Usuario;
+use App\Support\Auditoria;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,23 +51,31 @@ class UsuarioController extends Controller
                 $request->query('estado') === 'inactivo',
                 fn (Builder $q) => $q->onlyTrashed(),
             )
+            ->when($request->filled('registrado_por'), fn (Builder $q) => $q->whereIn(
+                'id',
+                Auditoria::idsCreadosPor(Usuario::class, trim((string) $request->query('registrado_por'))),
+            ))
             ->orderBy($orden, $dir)
             ->paginate(self::POR_PAGINA)
-            ->withQueryString()
-            ->through(fn (Usuario $u) => [
-                'id' => $u->id,
-                'nombre_completo' => $u->nombre_completo,
-                'email' => $u->email,
-                'telefono' => $u->telefono,
-                'sucursal' => $u->sucursal?->nombre,
-                'roles' => $u->roles->pluck('name'),
-                'ultimo_acceso_at' => $u->ultimo_acceso_at,
-                'estado' => $u->estado,
-            ]);
+            ->withQueryString();
+
+        $creadores = Auditoria::creadoPorMasivo(Usuario::class, $usuarios->pluck('id'));
+        $usuarios->through(fn (Usuario $u) => [
+            'id' => $u->id,
+            'nombre_completo' => $u->nombre_completo,
+            'email' => $u->email,
+            'telefono' => $u->telefono,
+            'sucursal' => $u->sucursal?->nombre,
+            'roles' => $u->roles->pluck('name'),
+            'ultimo_acceso_at' => $u->ultimo_acceso_at,
+            'estado' => $u->estado,
+            'creado_por' => $creadores[$u->id]['usuario'] ?? null,
+            'creado_en' => $creadores[$u->id]['fecha'] ?? null,
+        ]);
 
         return Inertia::render('Admin/Usuarios/Index', [
             'usuarios' => $usuarios,
-            'filtros' => $request->only(['nombre', 'email', 'sucursal_id', 'rol', 'estado']),
+            'filtros' => $request->only(['nombre', 'email', 'sucursal_id', 'rol', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => [
                 'sucursales' => Sucursal::orderBy('nombre')->get(['id', 'nombre']),
@@ -85,11 +96,13 @@ class UsuarioController extends Controller
 
     public function store(GuardarUsuarioRequest $request): RedirectResponse
     {
-        $datos = $request->safe()->except(['roles', 'password', 'password_confirmation']);
+        $datos = $request->safe()->except(['roles', 'password', 'password_confirmation', 'especialidades_equipo', 'especialidades_mantenimiento']);
         $datos['password'] = Hash::make($request->input('password'));
 
         $usuario = Usuario::create($datos);
         $usuario->syncRoles($request->input('roles', []));
+        $usuario->especialidadesEquipo()->sync($request->input('especialidades_equipo', []));
+        $usuario->especialidadesMantenimiento()->sync($request->input('especialidades_mantenimiento', []));
 
         return redirect()->route('usuarios.show', $usuario)->with('exito', 'Usuario creado.');
     }
@@ -98,7 +111,7 @@ class UsuarioController extends Controller
     {
         $this->authorize('usuarios.ver');
 
-        $usuario->load(['sucursal:id,nombre', 'roles:id,name']);
+        $usuario->load(['sucursal:id,nombre', 'roles:id,name', 'especialidadesEquipo:id,nombre', 'especialidadesMantenimiento:id,nombre']);
 
         return Inertia::render('Admin/Usuarios/Show', [
             'usuario' => [
@@ -111,11 +124,13 @@ class UsuarioController extends Controller
                 'sucursal' => $usuario->sucursal?->only(['id', 'nombre']),
                 'estado' => $usuario->estado,
                 'roles' => $usuario->roles->pluck('name'),
+                'especialidades_equipo' => $usuario->especialidadesEquipo->pluck('nombre'),
+                'especialidades_mantenimiento' => $usuario->especialidadesMantenimiento->pluck('nombre'),
                 'ultimo_acceso_at' => $usuario->ultimo_acceso_at,
                 'email_verified_at' => $usuario->email_verified_at,
                 'created_at' => $usuario->created_at,
             ],
-            'permisosEfectivos' => $usuario->getAllPermissions()->pluck('name')->sort()->values(),
+            'sello' => $usuario->selloAuditoria(),
             'actividad' => $usuario->registrosAuditoria()
                 ->latest('created_at')
                 ->limit(30)
@@ -127,7 +142,7 @@ class UsuarioController extends Controller
     {
         $this->authorize('usuarios.editar');
 
-        $usuario->load('roles:id,name');
+        $usuario->load(['roles:id,name', 'especialidadesEquipo:id', 'especialidadesMantenimiento:id']);
 
         return Inertia::render('Admin/Usuarios/Form', [
             'usuario' => [
@@ -139,6 +154,8 @@ class UsuarioController extends Controller
                 'sucursal_id' => $usuario->sucursal_id,
                 'estado' => $usuario->estado,
                 'roles' => $usuario->roles->pluck('name'),
+                'especialidades_equipo' => $usuario->especialidadesEquipo->pluck('id'),
+                'especialidades_mantenimiento' => $usuario->especialidadesMantenimiento->pluck('id'),
             ],
             'catalogos' => $this->catalogos(),
         ]);
@@ -146,7 +163,7 @@ class UsuarioController extends Controller
 
     public function update(GuardarUsuarioRequest $request, Usuario $usuario): RedirectResponse
     {
-        $datos = $request->safe()->except(['roles', 'password', 'password_confirmation']);
+        $datos = $request->safe()->except(['roles', 'password', 'password_confirmation', 'especialidades_equipo', 'especialidades_mantenimiento']);
 
         if ($request->filled('password')) {
             $datos['password'] = Hash::make($request->input('password'));
@@ -154,6 +171,8 @@ class UsuarioController extends Controller
 
         $usuario->update($datos);
         $usuario->syncRoles($request->input('roles', []));
+        $usuario->especialidadesEquipo()->sync($request->input('especialidades_equipo', []));
+        $usuario->especialidadesMantenimiento()->sync($request->input('especialidades_mantenimiento', []));
 
         return redirect()->route('usuarios.show', $usuario)->with('exito', 'Usuario actualizado.');
     }
@@ -206,6 +225,8 @@ class UsuarioController extends Controller
         return [
             'sucursales' => Sucursal::orderBy('nombre')->get(['id', 'nombre']),
             'roles' => Role::orderBy('name')->get(['id', 'name']),
+            'tipos_equipo' => TipoEquipo::activos()->orderBy('nombre')->get(['id', 'nombre']),
+            'tipos_mantenimiento' => TipoMantenimiento::activos()->orderBy('nombre')->get(['id', 'nombre']),
         ];
     }
 }

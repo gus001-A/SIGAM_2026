@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inventario;
 
 use App\Http\Controllers\Controller;
 use App\Models\Norma;
+use App\Support\Auditoria;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,27 +43,35 @@ class NormaController extends Controller
                 $request->query('estado') === 'inactivo',
                 fn (Builder $q) => $q->onlyTrashed(),
             )
+            ->when($request->filled('registrado_por'), fn (Builder $q) => $q->whereIn(
+                'id',
+                Auditoria::idsCreadosPor(Norma::class, trim((string) $request->query('registrado_por'))),
+            ))
             ->orderBy($orden, $dir)
             ->paginate(self::POR_PAGINA)
-            ->withQueryString()
-            ->through(fn (Norma $n) => [
-                'id' => $n->id,
-                'codigo' => $n->codigo,
-                'nombre' => $n->nombre,
-                'version' => $n->version,
-                'fecha_vigencia' => $n->fecha_vigencia?->toDateString(),
-                'fecha_revision' => $n->fecha_revision?->toDateString(),
-                'revision_vencida' => $n->fecha_revision !== null && $n->fecha_revision->isPast(),
-                'tiene_documento' => $n->documento_id !== null,
-                'equipos_count' => $n->equipos_count,
-                'planes_count' => $n->planes_count,
-                'mantenimientos_count' => $n->mantenimientos_count,
-                'estado' => $n->estado,
-            ]);
+            ->withQueryString();
+
+        $creadores = Auditoria::creadoPorMasivo(Norma::class, $normas->pluck('id'));
+        $normas->through(fn (Norma $n) => [
+            'id' => $n->id,
+            'codigo' => $n->codigo,
+            'nombre' => $n->nombre,
+            'version' => $n->version,
+            'fecha_vigencia' => $n->fecha_vigencia?->toDateString(),
+            'fecha_revision' => $n->fecha_revision?->toDateString(),
+            'revision_vencida' => $n->fecha_revision !== null && $n->fecha_revision->isPast(),
+            'tiene_documento' => $n->documento_id !== null,
+            'equipos_count' => $n->equipos_count,
+            'planes_count' => $n->planes_count,
+            'mantenimientos_count' => $n->mantenimientos_count,
+            'estado' => $n->estado,
+            'creado_por' => $creadores[$n->id]['usuario'] ?? null,
+            'creado_en' => $creadores[$n->id]['fecha'] ?? null,
+        ]);
 
         return Inertia::render('Normas/Index', [
             'normas' => $normas,
-            'filtros' => $request->only(['codigo', 'nombre', 'version', 'estado']),
+            'filtros' => $request->only(['codigo', 'nombre', 'version', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
         ]);
     }
@@ -90,7 +99,7 @@ class NormaController extends Controller
         $norma->load(['documento', 'documentos', 'equipos:id,codigo_activo,descripcion']);
         $norma->loadCount(['equipos', 'planes', 'mantenimientos']);
 
-        return Inertia::render('Normas/Show', ['norma' => $norma]);
+        return Inertia::render('Normas/Show', ['norma' => $norma, 'sello' => $norma->selloAuditoria()]);
     }
 
     public function edit(Norma $norma): Response
@@ -135,6 +144,8 @@ class NormaController extends Controller
      */
     private function validar(Request $request, ?Norma $norma = null): array
     {
+        $request->merge(Norma::normalizarMayusculas($request->all()));
+
         return $request->validate([
             'codigo' => ['required', 'string', 'max:80', Rule::unique('normas', 'codigo')->ignore($norma?->id)],
             'nombre' => ['required', 'string', 'max:255'],

@@ -16,6 +16,8 @@ class MarcaController extends CatalogoController
 
     protected string $titulo = 'Marcas';
 
+    protected array $buscables = ['nombre', 'descripcion'];
+
     protected function consulta(): Builder
     {
         return Marca::query()->withCount('equipos');

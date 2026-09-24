@@ -9,6 +9,7 @@ import {
     FileUnknownOutlined,
     InboxOutlined,
 } from '@ant-design/icons-vue';
+import CampoFechaHora from '@/Components/CampoFechaHora.vue';
 
 /**
  * Diálogo para adjuntar un documento a cualquier entidad (relación polimórfica).
@@ -168,7 +169,7 @@ defineExpose({ abrir });
                 </a-col>
                 <a-col :span="12">
                     <a-form-item label="Vence (opcional)">
-                        <a-input v-model:value="form.vence_at" type="date" />
+                        <CampoFechaHora v-model="form.vence_at" solo-fecha />
                     </a-form-item>
                 </a-col>
             </a-row>

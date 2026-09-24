@@ -11,6 +11,7 @@ import {
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTableInertia from '@/Components/DataTableInertia.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
+import CeldaRegistro from '@/Components/CeldaRegistro.vue';
 import { usePermisos } from '@/composables/usePermisos';
 import { useTablaInertia } from '@/composables/useTablaInertia';
 
@@ -43,6 +44,8 @@ const CATALOGOS = [
     { ruta: 'catalogos.estados_mantenimiento', label: 'Estados de mantenimiento' },
     { ruta: 'catalogos.prioridades', label: 'Prioridades' },
     { ruta: 'catalogos.materiales', label: 'Materiales' },
+    { ruta: 'catalogos.tipos_area', label: 'Tipos de área' },
+    { ruta: 'catalogos.tipos_limpieza', label: 'Tipos de limpieza' },
 ];
 const irCatalogo = (ruta) => {
     if (ruta !== props.rutaBase) router.visit(route(`${ruta}.index`));
@@ -54,6 +57,7 @@ const claveEnlace = (props.columnas.find((c) => c.enlace) ?? props.columnas.find
 const estadoInicial = {};
 clavesFiltro.forEach((k) => (estadoInicial[k] = props.filtros[k] ?? ''));
 estadoInicial.estado = props.filtros.estado ?? undefined;
+estadoInicial.registrado_por = props.filtros.registrado_por ?? '';
 
 const { filtros, orden, cargando, filtrar, aplicar, limpiar, hayFiltros, onCambioTabla } = useTablaInertia(
     `${props.rutaBase}.index`,
@@ -68,6 +72,7 @@ const opcionesEstado = [
 const columns = computed(() => [
     ...props.columnas.map((c) => ({ align: c.align, width: c.width ?? 160, sorter: c.sorter, ...c })),
     { title: 'Estado', key: '__estado', filtro: 'select', filtroClave: 'estado', width: 120 },
+    { title: 'Registrado por', key: '__registrado', filtro: 'texto', filtroClave: 'registrado_por', width: 160 },
     { title: '', key: '__acciones', align: 'right', width: 110, fixed: 'right' },
 ]);
 
@@ -175,7 +180,7 @@ const moneda = (v) =>
                 <a-select
                     v-else-if="column.filtro === 'select'"
                     v-model:value="filtros[column.filtroClave ?? column.key]"
-                    :options="opcionesEstado"
+                    :options="column.opciones ?? opcionesEstado"
                     size="small"
                     allow-clear
                     placeholder="Todos"
@@ -189,6 +194,10 @@ const moneda = (v) =>
                     <a-tag :color="record.estado === 'activo' ? 'green' : 'default'">
                         {{ record.estado === 'activo' ? 'Activo' : 'Inactivo' }}
                     </a-tag>
+                </template>
+
+                <template v-else-if="column.key === '__registrado'">
+                    <CeldaRegistro :usuario="record.creado_por" :fecha="record.creado_en" />
                 </template>
 
                 <template v-else-if="column.key === '__acciones'">

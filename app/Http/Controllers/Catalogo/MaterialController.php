@@ -15,7 +15,7 @@ class MaterialController extends CatalogoController
 
     protected string $titulo = 'Materiales y refacciones';
 
-    protected array $buscables = ['nombre', 'codigo'];
+    protected array $buscables = ['nombre', 'codigo', 'unidad', 'costo_referencia'];
 
     protected function reglas(Request $request, ?Model $registro = null): array
     {

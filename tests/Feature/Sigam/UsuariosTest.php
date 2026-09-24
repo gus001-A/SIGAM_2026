@@ -102,7 +102,7 @@ class UsuariosTest extends TestCase
             ->assertRedirect();
 
         $usuario->refresh();
-        $this->assertSame('Nuevo Nombre', $usuario->nombre);
+        $this->assertSame('NUEVO NOMBRE', $usuario->nombre);
         $this->assertTrue(Hash::check('vieja-clave-123', $usuario->password));
         $this->assertTrue($usuario->hasRole('supervisor'));
         $this->assertFalse($usuario->hasRole('usuario_basico'));
@@ -141,7 +141,7 @@ class UsuariosTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('usuarios.total', 1)
                 ->where('usuarios.per_page', 15)
-                ->where('usuarios.data.0.nombre_completo', 'Pedro Ruiz'));
+                ->where('usuarios.data.0.nombre_completo', 'PEDRO RUIZ'));
     }
 
     public function test_usuarios_inactivos_se_listan_al_filtrar_por_estado(): void

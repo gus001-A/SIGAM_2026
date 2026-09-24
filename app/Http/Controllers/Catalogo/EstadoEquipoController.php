@@ -18,6 +18,8 @@ class EstadoEquipoController extends CatalogoController
 
     protected bool $generaClave = true;
 
+    protected array $filtrosExactos = ['es_operativo'];
+
     protected function consulta(): Builder
     {
         return EstadoEquipo::query()->withCount('equipos');

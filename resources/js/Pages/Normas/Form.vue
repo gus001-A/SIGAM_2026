@@ -4,6 +4,7 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import { CalendarOutlined, FileProtectOutlined, SaveOutlined, TagOutlined } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import CampoFechaHora from '@/Components/CampoFechaHora.vue';
+import { useFormularioPestanas } from '@/composables/useFormularioPestanas';
 
 const props = defineProps({
     norma: { type: Object, default: null },
@@ -29,8 +30,14 @@ const reglas = reactive({
 
 const est = (campo) => (form.errors[campo] ? 'error' : undefined);
 
+const { pestanaActiva, onFinishFailed, onErrorServidor } = useFormularioPestanas({
+    id: ['codigo', 'nombre', 'version', 'descripcion'],
+    vig: ['fecha_vigencia', 'fecha_revision'],
+    estado: ['estado'],
+}, 'id');
+
 const enviar = () => {
-    const opciones = { preserveScroll: true };
+    const opciones = { preserveScroll: true, onError: onErrorServidor };
     if (editando.value) form.put(route('normas.update', props.norma.id), opciones);
     else form.post(route('normas.store'), opciones);
 };
@@ -46,11 +53,12 @@ const cancelar = () =>
         :titulo="editando ? `Editar norma ${norma.codigo}` : 'Nueva norma'"
         descripcion="Código, versión y fechas de vigencia y revisión de la normativa."
     >
-        <a-form :model="form" :rules="reglas" layout="vertical" @finish="enviar">
-            <a-row :gutter="16">
-                <a-col :xs="24" :lg="16">
-                    <a-card size="small" class="mb-4 sec">
-                        <template #title><FileProtectOutlined /> Identificación</template>
+        <a-form :model="form" :rules="reglas" layout="vertical" @finish="enviar" @finish-failed="onFinishFailed">
+            <a-card size="small" class="form-card">
+                <a-tabs v-model:activeKey="pestanaActiva">
+                    <a-tab-pane key="id">
+                        <template #tab><span><FileProtectOutlined /> Identificación</span></template>
+                        <p class="tab-ayuda">Qué norma es y a qué se refiere.</p>
                         <a-row :gutter="12">
                             <a-col :xs="24" :sm="8">
                                 <a-form-item label="Código" name="codigo" :validate-status="est('codigo')" :help="form.errors.codigo">
@@ -73,10 +81,11 @@ const cancelar = () =>
                                 </a-form-item>
                             </a-col>
                         </a-row>
-                    </a-card>
+                    </a-tab-pane>
 
-                    <a-card size="small" class="sec">
-                        <template #title><CalendarOutlined /> Vigencia</template>
+                    <a-tab-pane key="vig">
+                        <template #tab><span><CalendarOutlined /> Vigencia</span></template>
+                        <p class="tab-ayuda">Cuándo entró en vigor y cuándo toca revisarla otra vez.</p>
                         <a-row :gutter="12">
                             <a-col :xs="24" :sm="12">
                                 <a-form-item label="Fecha de entrada en vigor" :validate-status="est('fecha_vigencia')" :help="form.errors.fecha_vigencia">
@@ -86,7 +95,7 @@ const cancelar = () =>
                             <a-col :xs="24" :sm="12">
                                 <a-form-item
                                     label="Próxima revisión"
-                                    extra="Se marcará en rojo cuando la fecha haya pasado"
+                                    extra="Se marcará en rojo cuando la fecha haya pasado."
                                     :validate-status="est('fecha_revision')"
                                     :help="form.errors.fecha_revision"
                                 >
@@ -94,47 +103,49 @@ const cancelar = () =>
                                 </a-form-item>
                             </a-col>
                         </a-row>
-                    </a-card>
-                </a-col>
+                    </a-tab-pane>
 
-                <a-col :xs="24" :lg="8">
-                    <a-card size="small" class="mb-4 sec">
-                        <template #title><TagOutlined /> Estado</template>
+                    <a-tab-pane key="estado">
+                        <template #tab><span><TagOutlined /> Estado</span></template>
+                        <p class="tab-ayuda">Una norma inactiva no aparece al asociar equipos ni planes preventivos.</p>
                         <a-form-item name="estado" :validate-status="est('estado')" :help="form.errors.estado">
                             <a-radio-group v-model:value="form.estado" button-style="solid">
                                 <a-radio-button value="activo">Vigente</a-radio-button>
                                 <a-radio-button value="inactivo">Inactiva</a-radio-button>
                             </a-radio-group>
                         </a-form-item>
-                        <p class="text-xs opacity-60 m-0">
-                            Una norma inactiva no aparece al asociar equipos ni planes preventivos.
-                        </p>
-                    </a-card>
+                    </a-tab-pane>
+                </a-tabs>
+            </a-card>
 
-                    <a-card size="small">
-                        <a-button type="primary" size="large" block html-type="submit" :loading="form.processing">
-                            <template #icon><SaveOutlined /></template>
-                            {{ editando ? 'Guardar cambios' : 'Registrar norma' }}
-                        </a-button>
-                        <a-button type="text" block class="mt-2" @click="cancelar">Cancelar</a-button>
-                    </a-card>
-                </a-col>
-            </a-row>
+            <a-card size="small" class="form-acciones">
+                <a-space>
+                    <a-button type="primary" size="large" html-type="submit" :loading="form.processing">
+                        <template #icon><SaveOutlined /></template>
+                        {{ editando ? 'Guardar cambios' : 'Registrar norma' }}
+                    </a-button>
+                    <a-button size="large" @click="cancelar">Cancelar</a-button>
+                </a-space>
+            </a-card>
         </a-form>
     </AppLayout>
 </template>
 
 <style scoped>
-.sec :deep(.ant-card-head-title) {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.form-card {
+    margin-bottom: 10px;
 }
-.sec :deep(.ant-card-head-title)::before {
-    display: none !important;
+.form-card :deep(.ant-tabs-nav) {
+    margin-bottom: 10px;
 }
-.sec :deep(.ant-card-head-title .anticon) {
-    color: var(--sigam-teal);
-    font-size: 15px;
+.tab-ayuda {
+    margin: -4px 0 10px;
+    font-size: 12.5px;
+    color: var(--sigam-tenue);
+}
+.form-acciones {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
 }
 </style>

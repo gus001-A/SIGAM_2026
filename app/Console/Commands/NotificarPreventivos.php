@@ -2,28 +2,26 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Equipo;
 use App\Models\PlanMantenimiento;
 use App\Support\Notificaciones;
 use Illuminate\Console\Command;
 
 /**
- * Genera notificaciones in-app de preventivos próximos / vencidos y garantías
- * por vencer. Pensado para ejecutarse a diario (§12).
+ * Genera notificaciones in-app de preventivos próximos / vencidos, solo para
+ * quien tiene el plan asignado (técnico o responsable del equipo). Pensado
+ * para ejecutarse a diario (§12).
  */
 class NotificarPreventivos extends Command
 {
-    protected $signature = 'sigam:notificar-preventivos {--dias-garantia=30 : Ventana de aviso para garantías}';
+    protected $signature = 'sigam:notificar-preventivos';
 
-    protected $description = 'Notifica preventivos próximos/vencidos y garantías por vencer';
+    protected $description = 'Notifica preventivos próximos/vencidos a quien los tiene asignados';
 
     public function handle(): int
     {
-        $proximos = $this->preventivos();
-        $garantias = $this->garantias((int) $this->option('dias-garantia'));
+        $n = $this->preventivos();
 
-        $this->info("Preventivos notificados: {$proximos}");
-        $this->info("Garantías notificadas: {$garantias}");
+        $this->info("Preventivos notificados: {$n}");
 
         return self::SUCCESS;
     }
@@ -57,43 +55,10 @@ class NotificarPreventivos extends Command
 
             $destinatarios = collect([$plan->tecnico_id, $plan->equipo?->responsable_id])->filter()->unique();
 
-            if ($destinatarios->isEmpty()) {
-                Notificaciones::paraRoles(['supervisor', 'superadministrador'], $tipo, $titulo, $cuerpo, $datos);
-                $n++;
-
-                continue;
-            }
-
             foreach ($destinatarios as $usuarioId) {
                 Notificaciones::crear($usuarioId, $tipo, $titulo, $cuerpo, $datos);
                 $n++;
             }
-        }
-
-        return $n;
-    }
-
-    private function garantias(int $dias): int
-    {
-        $equipos = Equipo::query()
-            ->with('responsable:id')
-            ->whereNotNull('garantia_hasta')
-            ->whereDate('garantia_hasta', '>=', today())
-            ->whereDate('garantia_hasta', '<=', today()->addDays($dias))
-            ->get();
-
-        $n = 0;
-        foreach ($equipos as $equipo) {
-            $titulo = "Garantía por vencer: {$equipo->codigo_activo}";
-            $cuerpo = 'La garantía vence el '.$equipo->garantia_hasta->format('d/m/Y').'.';
-            $datos = ['ref' => "equipo-garantia:{$equipo->id}", 'url' => route('equipos.show', $equipo->id)];
-
-            if ($equipo->responsable_id) {
-                Notificaciones::crear($equipo->responsable_id, 'garantia_por_vencer', $titulo, $cuerpo, $datos);
-            } else {
-                Notificaciones::paraRoles(['supervisor', 'superadministrador'], 'garantia_por_vencer', $titulo, $cuerpo, $datos);
-            }
-            $n++;
         }
 
         return $n;

@@ -4,19 +4,26 @@ import { Head, router } from '@inertiajs/vue3';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 import {
+    ArrowRightOutlined,
     CalendarOutlined,
+    CheckSquareOutlined,
+    EnvironmentOutlined,
     FilterOutlined,
+    FlagOutlined,
     LeftOutlined,
     RightOutlined,
     ToolOutlined,
+    UserOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import ListaDatos from '@/Components/ListaDatos.vue';
 
 dayjs.locale('es');
 
 const props = defineProps({
     eventos: { type: Array, default: () => [] },
     rango: { type: Object, required: true },
+    sucursalId: { type: [Number, String], default: null },
     filtros: { type: Object, default: () => ({}) },
     catalogos: { type: Object, default: () => ({}) },
 });
@@ -24,14 +31,17 @@ const props = defineProps({
 const mesActual = ref(dayjs(props.rango.desde));
 
 const filtros = ref({
-    sucursal_id: props.filtros.sucursal_id ?? undefined,
+    sucursal_id: props.sucursalId ?? 'todas',
     tipo_id: props.filtros.tipo_id ?? undefined,
     prioridad_id: props.filtros.prioridad_id ?? undefined,
     estado_id: props.filtros.estado_id ?? undefined,
     tecnico_id: props.filtros.tecnico_id ?? undefined,
 });
 
-const hayFiltros = computed(() => Object.values(filtros.value).some((v) => v !== undefined && v !== null && v !== ''));
+const hayFiltros = computed(() =>
+    filtros.value.sucursal_id !== 'todas'
+    || Object.entries(filtros.value).some(([k, v]) => k !== 'sucursal_id' && v !== undefined && v !== null && v !== ''),
+);
 
 const navegar = (fechaBase) => {
     const desde = fechaBase.startOf('month').format('YYYY-MM-DD');
@@ -53,7 +63,7 @@ const irHoy = () => {
 };
 const aplicarFiltros = () => navegar(mesActual.value);
 const limpiarFiltros = () => {
-    filtros.value = { sucursal_id: undefined, tipo_id: undefined, prioridad_id: undefined, estado_id: undefined, tecnico_id: undefined };
+    filtros.value = { sucursal_id: 'todas', tipo_id: undefined, prioridad_id: undefined, estado_id: undefined, tecnico_id: undefined };
     navegar(mesActual.value);
 };
 
@@ -69,14 +79,62 @@ const eventosPorDia = computed(() => {
 });
 
 const colorCategoria = (cat) =>
-    ({ preventivo: '#1f9e86', correctivo: '#e08a1e', predictivo: '#0d84c9' })[cat] ?? '#64748b';
+    ({ preventivo: '#1f9e86', correctivo: '#e08a1e', predictivo: '#0d84c9', tarea: '#6b4bc9' })[cat] ?? '#64748b';
+
+const iconoEvento = (tipoEvento) => {
+    if (tipoEvento === 'orden') return ToolOutlined;
+    if (tipoEvento === 'tarea') return CheckSquareOutlined;
+    return CalendarOutlined;
+};
 
 const hoy = dayjs().format('YYYY-MM-DD');
 
 const opciones = (l, label = 'nombre') => (l ?? []).map((o) => ({ label: o[label], value: o.id }));
+const opcionesSucursal = computed(() => [
+    { value: 'todas', label: 'Todas las sucursales' },
+    ...opciones(props.catalogos.sucursales),
+]);
 
-const abrirEvento = (ev) => {
+// --- Vista rápida del evento ----------------------------------------
+const eventoSeleccionado = ref(null);
+const abrirEvento = (ev) => (eventoSeleccionado.value = ev);
+const cerrarEvento = () => (eventoSeleccionado.value = null);
+
+const ETIQUETA_TIPO_EVENTO = { orden: 'Orden de mantenimiento', ocurrencia: 'Preventivo programado', tarea: 'Tarea' };
+const ETIQUETA_ESTADO_TAREA = { pendiente: 'Pendiente', en_proceso: 'En proceso', realizada: 'Realizada', cancelada: 'Cancelada' };
+
+const estadoEvento = (ev) => {
+    if (!ev) return '';
+    if (ev.tipo_evento === 'tarea') return ETIQUETA_ESTADO_TAREA[ev.estado] ?? ev.estado;
+    if (ev.tipo_evento === 'orden') return ev.estado_nombre ?? ev.estado;
+    return ev.estado;
+};
+
+const fechaHora = (v) => (v ? dayjs(v).format('D [de] MMMM, YYYY h:mm A') : null);
+
+const datosEvento = computed(() => {
+    const ev = eventoSeleccionado.value;
+    if (!ev) return [];
+    const filas = [];
+    if (ev.objetivo) {
+        filas.push({ icono: ev.objetivo_tipo === 'ubicacion' ? EnvironmentOutlined : ToolOutlined, label: 'Equipo / instalación', valor: ev.objetivo, color: '#0d84c9' });
+    }
+    if (ev.descripcion) filas.push({ icono: CheckSquareOutlined, label: 'Descripción', valor: ev.descripcion, color: '#6b4bc9' });
+    filas.push({ icono: CalendarOutlined, label: 'Fecha', valor: fechaHora(ev.inicio), color: '#173a5f' });
+    if (ev.fin) filas.push({ icono: CalendarOutlined, label: 'Hasta', valor: fechaHora(ev.fin), color: '#173a5f' });
+    if (ev.tipo_nombre) filas.push({ icono: ToolOutlined, label: 'Tipo', valor: ev.tipo_nombre, color: '#1f9e86' });
+    if (ev.prioridad_nombre) filas.push({ icono: FlagOutlined, label: 'Prioridad', valor: ev.prioridad_nombre, color: ev.color || '#d64545' });
+    if (ev.sucursal_nombre) filas.push({ icono: EnvironmentOutlined, label: 'Sucursal', valor: ev.sucursal_nombre, color: '#e08a1e' });
+    if (ev.tecnicos) filas.push({ icono: UserOutlined, label: 'Técnico(s)', valor: ev.tecnicos, color: '#173a5f' });
+    if (ev.responsables) filas.push({ icono: UserOutlined, label: 'Responsable(s)', valor: ev.responsables, color: '#173a5f' });
+    return filas;
+});
+
+const verCompleto = () => {
+    const ev = eventoSeleccionado.value;
+    if (!ev) return;
     if (ev.tipo_evento === 'orden') router.visit(route('mantenimientos.show', ev.id));
+    else if (ev.tipo_evento === 'tarea') router.visit(route('tareas.show', ev.id));
     else if (ev.plan_id) router.visit(route('planes.show', ev.plan_id));
 };
 
@@ -84,13 +142,15 @@ const resumen = computed(() => {
     const total = props.eventos.length;
     const preventivos = props.eventos.filter((e) => e.categoria === 'preventivo').length;
     const correctivos = props.eventos.filter((e) => e.categoria === 'correctivo').length;
-    return { total, preventivos, correctivos };
+    const tareas = props.eventos.filter((e) => e.tipo_evento === 'tarea').length;
+    return { total, preventivos, correctivos, tareas };
 });
 
 const tarjetas = computed(() => [
     { etq: 'Eventos del mes', val: resumen.value.total, color: '#173a5f', icono: CalendarOutlined },
     { etq: 'Preventivos', val: resumen.value.preventivos, color: '#1f9e86', icono: CalendarOutlined },
     { etq: 'Correctivos', val: resumen.value.correctivos, color: '#e08a1e', icono: ToolOutlined },
+    { etq: 'Tareas', val: resumen.value.tareas, color: '#6b4bc9', icono: CheckSquareOutlined },
 ]);
 </script>
 
@@ -120,7 +180,7 @@ const tarjetas = computed(() => [
                 </a-col>
                 <a-col :xs="24" :md="16">
                     <div class="filtros">
-                        <a-select v-model:value="filtros.sucursal_id" :options="opciones(catalogos.sucursales)" allow-clear placeholder="Sucursal" size="small" @change="aplicarFiltros" />
+                        <a-select v-model:value="filtros.sucursal_id" :options="opcionesSucursal" placeholder="Sucursal" size="small" @change="aplicarFiltros" />
                         <a-select v-model:value="filtros.tipo_id" :options="opciones(catalogos.tipos)" allow-clear placeholder="Tipo" size="small" @change="aplicarFiltros" />
                         <a-select v-model:value="filtros.prioridad_id" :options="opciones(catalogos.prioridades)" allow-clear placeholder="Prioridad" size="small" @change="aplicarFiltros" />
                         <a-select v-model:value="filtros.estado_id" :options="opciones(catalogos.estados)" allow-clear placeholder="Estado" size="small" @change="aplicarFiltros" />
@@ -131,7 +191,7 @@ const tarjetas = computed(() => [
         </a-card>
 
         <a-row :gutter="12" class="mb-3">
-            <a-col v-for="t in tarjetas" :key="t.etq" :xs="8">
+            <a-col v-for="t in tarjetas" :key="t.etq" :xs="12" :sm="6">
                 <div class="ctarj" :style="{ '--acc': t.color }">
                     <span class="ctarj__ic"><component :is="t.icono" /></span>
                     <div>
@@ -159,7 +219,7 @@ const tarjetas = computed(() => [
                                 :style="{ '--c': ev.color || colorCategoria(ev.categoria) }"
                                 @click.stop="abrirEvento(ev)"
                             >
-                                <component :is="ev.tipo_evento === 'orden' ? ToolOutlined : CalendarOutlined" />
+                                <component :is="iconoEvento(ev.tipo_evento)" />
                                 <span class="evento__t">{{ ev.titulo }}</span>
                             </li>
                         </ul>
@@ -167,6 +227,31 @@ const tarjetas = computed(() => [
                 </template>
             </a-calendar>
         </a-card>
+
+        <a-modal
+            :open="!!eventoSeleccionado"
+            :footer="null"
+            centered
+            :width="480"
+            @cancel="cerrarEvento"
+        >
+            <template #title>
+                <span class="evt-titulo">
+                    <component :is="iconoEvento(eventoSeleccionado?.tipo_evento)" :style="{ color: eventoSeleccionado?.color || colorCategoria(eventoSeleccionado?.categoria) }" />
+                    {{ ETIQUETA_TIPO_EVENTO[eventoSeleccionado?.tipo_evento] ?? 'Evento' }}
+                </span>
+            </template>
+            <div v-if="eventoSeleccionado" class="evt-body">
+                <div class="evt-desc">{{ eventoSeleccionado.titulo }}</div>
+                <a-tag v-if="estadoEvento(eventoSeleccionado)" class="mb-3">{{ estadoEvento(eventoSeleccionado) }}</a-tag>
+                <ListaDatos :datos="datosEvento" compacto />
+                <div class="evt-acciones">
+                    <a-button type="primary" @click="verCompleto">
+                        Ver completo <ArrowRightOutlined />
+                    </a-button>
+                </div>
+            </div>
+        </a-modal>
     </AppLayout>
 </template>
 
@@ -287,5 +372,26 @@ const tarjetas = computed(() => [
 }
 .evento:hover {
     filter: brightness(0.96);
+}
+
+.evt-titulo {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+}
+.evt-desc {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--sigam-navy);
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+.evt-acciones {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--sigam-borde-suave);
 }
 </style>

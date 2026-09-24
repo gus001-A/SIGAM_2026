@@ -84,10 +84,50 @@ export const reglaNoFutura = (msg = 'La fecha no puede ser futura.') => ({
             : Promise.reject(msg),
 });
 
-export const reglaDespuesDe = (obtener, msg = 'Debe ser posterior a la fecha anterior.') => ({
+/**
+ * La fecha debe ser hoy o posterior (no se permite una fecha ya pasada).
+ * Con `estricto` la fecha debe ser POSTERIOR a hoy (hoy tampoco se acepta).
+ */
+export const reglaNoPasada = (msg = 'La fecha no puede ser anterior a hoy.', estricto = false) => ({
     validator: (_r, v) => {
-        const otra = obtener();
-        if (!v || !otra || new Date(v) >= new Date(otra)) return Promise.resolve();
-        return Promise.reject(msg);
+        if (!v) return Promise.resolve();
+        const hoy = new Date(new Date().toDateString());
+        const ok = estricto ? new Date(v) > hoy : new Date(v) >= hoy;
+        return ok ? Promise.resolve() : Promise.reject(msg);
     },
 });
+
+/** Con `estricto` exige estrictamente posterior (no acepta la misma fecha/hora). */
+export const reglaDespuesDe = (obtener, msg = 'Debe ser posterior a la fecha anterior.', estricto = false) => ({
+    validator: (_r, v) => {
+        const otra = obtener();
+        if (!v || !otra) return Promise.resolve();
+        const ok = estricto ? new Date(v) > new Date(otra) : new Date(v) >= new Date(otra);
+        return ok ? Promise.resolve() : Promise.reject(msg);
+    },
+});
+
+/**
+ * Fecha de HOY en hora LOCAL (no UTC) como "YYYY-MM-DD", para atributos
+ * `min`/`max` de inputs de fecha. `new Date().toISOString()` por sí solo usa
+ * UTC y puede mostrar el día equivocado (mañana o ayer) cerca de medianoche
+ * en la zona horaria de México — por eso nunca se usa directo en el sistema.
+ */
+export const hoyISO = () => {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
+
+/** Igual que `hoyISO()` pero con hora, para inputs `datetime-local`. */
+export const ahoraISO = () => {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+
+/** Mañana (hoy + 1 día) en hora local como "YYYY-MM-DD" — para el `min` de
+ * fechas que deben ser ESTRICTAMENTE posteriores a hoy (hoy no se acepta). */
+export const mananaISO = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};

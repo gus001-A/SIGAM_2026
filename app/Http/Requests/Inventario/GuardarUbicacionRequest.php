@@ -16,6 +16,12 @@ class GuardarUbicacionRequest extends FormRequest
         );
     }
 
+    /** La ubicación se guarda en MAYÚSCULAS; normaliza antes de validar `unique:codigo`. */
+    protected function prepareForValidation(): void
+    {
+        $this->merge(Ubicacion::normalizarMayusculas($this->all()));
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -30,8 +36,11 @@ class GuardarUbicacionRequest extends FormRequest
                 Rule::exists('ubicaciones', 'id')->where('sucursal_id', $this->input('sucursal_id')),
             ],
             'tipo_id' => ['nullable', 'integer', Rule::exists('tipos_ubicacion', 'id')],
+            'tipo_area_id' => ['nullable', 'integer', Rule::exists('tipos_area', 'id')],
+            'tipo_limpieza_id' => ['nullable', 'integer', Rule::exists('tipos_limpieza', 'id')],
+            // Si se deja en blanco, el controlador genera "4 letras + consecutivo" del nombre.
             'codigo' => [
-                'required', 'string', 'max:60',
+                'nullable', 'string', 'max:60',
                 Rule::unique('ubicaciones', 'codigo')
                     ->where('sucursal_id', $this->input('sucursal_id'))
                     ->ignore($ubicacion?->id),

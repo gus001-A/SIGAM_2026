@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Catalogo;
 
 use App\Http\Controllers\Controller;
+use App\Support\Auditoria;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -31,6 +33,9 @@ abstract class CatalogoController extends Controller
 
     /** Columnas extra por las que se permite ordenar (además de $buscables). */
     protected array $ordenablesExtra = [];
+
+    /** Columnas de coincidencia exacta (select), p. ej. booleanas o de categoría corta. */
+    protected array $filtrosExactos = [];
 
     /** Genera automáticamente la columna `clave` a partir del nombre al crear. */
     protected bool $generaClave = false;
@@ -78,6 +83,15 @@ abstract class CatalogoController extends Controller
                         $q->where($columna, 'like', '%'.trim((string) $valor).'%');
                     }
                 }
+                foreach ($this->filtrosExactos as $columna) {
+                    $valor = $request->query($columna);
+                    if ($valor !== null && $valor !== '') {
+                        $q->where($columna, $valor);
+                    }
+                }
+            })
+            ->when($request->filled('registrado_por'), function (Builder $q) use ($request): void {
+                $q->whereIn('id', Auditoria::idsCreadosPor($this->modelo, trim((string) $request->query('registrado_por'))));
             })
             ->when(
                 in_array($request->query('estado'), ['activo', 'inactivo'], true),
@@ -87,18 +101,25 @@ abstract class CatalogoController extends Controller
             ->paginate($this->porPagina)
             ->withQueryString();
 
+        $creadores = Auditoria::creadoPorMasivo($this->modelo, $registros->pluck('id'));
+        $registros->through(fn (Model $r) => tap($r, function (Model $r) use ($creadores): void {
+            $r->setAttribute('creado_por', $creadores[$r->getKey()]['usuario'] ?? null);
+            $r->setAttribute('creado_en', $creadores[$r->getKey()]['fecha'] ?? null);
+        }));
+
         return Inertia::render("{$this->vista}/Index", [
             'titulo' => $this->titulo,
             'registros' => $registros,
-            'filtros' => $request->only([...$this->buscables, 'buscar', 'estado']),
+            'filtros' => $request->only([...$this->buscables, ...$this->filtrosExactos, 'buscar', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $this->authorize('catalogos.crear');
 
+        $request->merge($this->modelo::normalizarMayusculas($request->all()));
         $datos = $request->validate($this->reglas($request));
 
         if ($this->generaClave && empty($datos['clave'])) {
@@ -106,40 +127,70 @@ abstract class CatalogoController extends Controller
         }
         $datos['estado'] ??= 'activo';
 
-        $this->modelo::create($datos);
+        $registro = $this->modelo::create($datos);
+
+        if ($this->esAltaRapida($request)) {
+            return response()->json($registro);
+        }
 
         return back()->with('exito', "{$this->titulo}: registro creado.");
     }
 
-    public function update(Request $request, int $id): RedirectResponse
+    public function update(Request $request, int $id): RedirectResponse|JsonResponse
     {
         $this->authorize('catalogos.editar');
 
         $registro = $this->modelo::findOrFail($id);
+        $request->merge($this->modelo::normalizarMayusculas($request->all()));
         $datos = $request->validate($this->reglas($request, $registro));
 
         $registro->update($datos);
+
+        if ($this->esAltaRapida($request)) {
+            return response()->json($registro->fresh());
+        }
 
         return back()->with('exito', "{$this->titulo}: registro actualizado.");
     }
 
     /** Baja lógica: los catálogos no se borran, se desactivan (§5.13). */
-    public function destroy(int $id): RedirectResponse
+    public function destroy(Request $request, int $id): RedirectResponse|JsonResponse
     {
         $this->authorize('catalogos.desactivar');
 
         $this->modelo::findOrFail($id)->update(['estado' => 'inactivo']);
 
+        if ($this->esAltaRapida($request)) {
+            return response()->json(['ok' => true]);
+        }
+
         return back()->with('exito', "{$this->titulo}: registro desactivado.");
     }
 
-    public function activar(int $id): RedirectResponse
+    public function activar(Request $request, int $id): RedirectResponse|JsonResponse
     {
         $this->authorize('catalogos.editar');
 
-        $this->modelo::findOrFail($id)->update(['estado' => 'activo']);
+        $registro = $this->modelo::findOrFail($id);
+        $registro->update(['estado' => 'activo']);
+
+        if ($this->esAltaRapida($request)) {
+            return response()->json($registro->fresh());
+        }
 
         return back()->with('exito', "{$this->titulo}: registro reactivado.");
+    }
+
+    /**
+     * Las llamadas de "alta rápida" (el botón «+» junto a los selects de
+     * catálogo, en cualquier formulario del sistema) se marcan explícitamente
+     * con este header desde <SelectCatalogo> y responden JSON en vez de
+     * redirigir — cualquier otra petición (Inertia, pruebas, etc.) se
+     * comporta exactamente igual que antes.
+     */
+    private function esAltaRapida(Request $request): bool
+    {
+        return $request->header('X-Alta-Rapida') === '1';
     }
 
     private function claveUnica(string $nombre): string

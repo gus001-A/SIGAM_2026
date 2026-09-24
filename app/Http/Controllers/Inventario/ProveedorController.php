@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Inventario;
 
 use App\Http\Controllers\Controller;
+use App\Models\Documento;
 use App\Models\Proveedor;
+use App\Support\Auditoria;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -47,25 +50,33 @@ class ProveedorController extends Controller
                 $request->query('estado') === 'inactivo',
                 fn (Builder $q) => $q->onlyTrashed(),
             )
+            ->when($request->filled('registrado_por'), fn (Builder $q) => $q->whereIn(
+                'id',
+                Auditoria::idsCreadosPor(Proveedor::class, trim((string) $request->query('registrado_por'))),
+            ))
             ->orderBy($orden, $dir)
             ->paginate(self::POR_PAGINA)
-            ->withQueryString()
-            ->through(fn (Proveedor $p) => [
-                'id' => $p->id,
-                'razon_social' => $p->razon_social,
-                'nombre_comercial' => $p->nombre_comercial,
-                'rfc' => $p->rfc,
-                'contacto' => $p->contacto,
-                'telefono' => $p->telefono,
-                'correo' => $p->correo,
-                'especialidad' => $p->especialidad,
-                'equipos_count' => $p->equipos_count,
-                'estado' => $p->estado,
-            ]);
+            ->withQueryString();
+
+        $creadores = Auditoria::creadoPorMasivo(Proveedor::class, $proveedores->pluck('id'));
+        $proveedores->through(fn (Proveedor $p) => [
+            'id' => $p->id,
+            'razon_social' => $p->razon_social,
+            'nombre_comercial' => $p->nombre_comercial,
+            'rfc' => $p->rfc,
+            'contacto' => $p->contacto,
+            'telefono' => $p->telefono,
+            'correo' => $p->correo,
+            'especialidad' => $p->especialidad,
+            'equipos_count' => $p->equipos_count,
+            'estado' => $p->estado,
+            'creado_por' => $creadores[$p->id]['usuario'] ?? null,
+            'creado_en' => $creadores[$p->id]['fecha'] ?? null,
+        ]);
 
         return Inertia::render('Inventario/Proveedores/Index', [
             'proveedores' => $proveedores,
-            'filtros' => $request->only(['razon_social', 'rfc', 'contacto', 'especialidad', 'estado']),
+            'filtros' => $request->only(['razon_social', 'rfc', 'contacto', 'especialidad', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
         ]);
     }
@@ -81,7 +92,36 @@ class ProveedorController extends Controller
     {
         $this->authorize('proveedores.crear');
 
-        $proveedor = Proveedor::create($this->validar($request));
+        $datos = $this->validar($request);
+        $request->validate([
+            'documentos' => ['nullable', 'array', 'max:5'],
+            'documentos.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx'],
+        ]);
+
+        $proveedor = DB::transaction(function () use ($datos, $request) {
+            $proveedor = Proveedor::create($datos);
+
+            foreach ($request->file('documentos', []) as $archivo) {
+                $ruta = $archivo->store('documentos/'.now()->format('Y/m'), 'local');
+
+                $documento = Documento::create([
+                    'disco' => 'local',
+                    'ruta' => $ruta,
+                    'nombre_original' => $archivo->getClientOriginalName(),
+                    'titulo' => 'Contrato / documento del proveedor',
+                    'categoria' => 'contrato',
+                    'tipo_mime' => $archivo->getClientMimeType(),
+                    'tamano' => $archivo->getSize(),
+                    'checksum' => hash_file('sha256', $archivo->getRealPath()),
+                    'visibilidad' => 'privado',
+                    'subido_por' => $request->user()->id,
+                ]);
+
+                $proveedor->documentos()->attach($documento->id, ['rol' => 'contrato']);
+            }
+
+            return $proveedor;
+        });
 
         return redirect()->route('proveedores.show', $proveedor)->with('exito', 'Proveedor creado.');
     }
@@ -92,7 +132,7 @@ class ProveedorController extends Controller
 
         $proveedor->load(['documentos', 'equipos:id,codigo_activo,descripcion,proveedor_id']);
 
-        return Inertia::render('Inventario/Proveedores/Show', ['proveedor' => $proveedor]);
+        return Inertia::render('Inventario/Proveedores/Show', ['proveedor' => $proveedor, 'sello' => $proveedor->selloAuditoria()]);
     }
 
     public function edit(Proveedor $proveedor): Response
@@ -137,6 +177,8 @@ class ProveedorController extends Controller
      */
     private function validar(Request $request, ?Proveedor $proveedor = null): array
     {
+        $request->merge(Proveedor::normalizarMayusculas($request->all()));
+
         return $request->validate([
             'razon_social' => ['required', 'string', 'max:255'],
             'nombre_comercial' => ['nullable', 'string', 'max:255'],

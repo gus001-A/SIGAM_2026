@@ -18,6 +18,8 @@ class TipoUbicacionController extends CatalogoController
 
     protected bool $generaClave = true;
 
+    protected array $buscables = ['nombre', 'descripcion'];
+
     protected function consulta(): Builder
     {
         return TipoUbicacion::query()->withCount('ubicaciones');

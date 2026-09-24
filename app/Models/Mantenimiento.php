@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneDocumentos;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,12 +18,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Mantenimiento extends Model
 {
-    use EsAuditable, HasFactory, SoftDeletes, TieneDocumentos;
+    use ConvierteMayusculas, EsAuditable, HasFactory, SoftDeletes, TieneDocumentos;
 
     protected $table = 'mantenimientos';
 
     protected $fillable = [
-        'folio', 'solicitud_id', 'plan_id', 'equipo_id', 'sucursal_id', 'tipo_id', 'prioridad_id', 'estado_id',
+        'folio', 'solicitud_id', 'plan_id', 'equipo_id', 'ubicacion_id', 'sucursal_id', 'tipo_id', 'prioridad_id', 'estado_id',
         'programado_inicio', 'programado_fin', 'autorizado_at', 'iniciado_at', 'completado_at', 'supervisado_at', 'cerrado_at',
         'problema_reportado', 'diagnostico', 'descripcion_trabajo', 'observaciones', 'condicion_final',
         'costo_mano_obra', 'costo_otros', 'creado_por', 'autorizado_por', 'supervisor_id',
@@ -48,9 +49,19 @@ class Mantenimiento extends Model
         return 'mantenimientos';
     }
 
+    protected function camposMayusculas(): array
+    {
+        return ['problema_reportado', 'diagnostico', 'descripcion_trabajo', 'observaciones', 'condicion_final'];
+    }
+
     public function equipo(): BelongsTo
     {
         return $this->belongsTo(Equipo::class);
+    }
+
+    public function ubicacion(): BelongsTo
+    {
+        return $this->belongsTo(Ubicacion::class);
     }
 
     public function sucursal(): BelongsTo

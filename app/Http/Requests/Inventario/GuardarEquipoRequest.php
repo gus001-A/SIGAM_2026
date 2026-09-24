@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Inventario;
 
+use App\Models\Equipo;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -18,6 +19,12 @@ class GuardarEquipoRequest extends FormRequest
         return $this->user()->can(
             $this->routeIs('equipos.store') ? 'equipos.crear' : 'equipos.editar',
         );
+    }
+
+    /** El equipo se guarda en MAYÚSCULAS; normaliza antes de validar `unique:codigo_activo`. */
+    protected function prepareForValidation(): void
+    {
+        $this->merge(Equipo::normalizarMayusculas($this->all()));
     }
 
     /**
@@ -53,6 +60,11 @@ class GuardarEquipoRequest extends FormRequest
             'normas' => ['array'],
             'normas.*' => ['integer', Rule::exists('normas', 'id')],
             'motivo_cambio_ubicacion' => ['nullable', 'string', 'max:255', 'regex:'.self::RE_TEXTO],
+            'foto_referencia' => ['nullable', 'file', 'image', 'max:8192'],
+            'plan_preventivo' => ['nullable', 'boolean'],
+            'plan_tipo_mantenimiento_id' => ['required_if:plan_preventivo,1', 'nullable', 'integer', Rule::exists('tipos_mantenimiento', 'id')],
+            'plan_tipo_frecuencia' => ['required_if:plan_preventivo,1', 'nullable', Rule::in(['dias', 'semanal', 'mensual', 'bimestral', 'trimestral', 'semestral', 'anual'])],
+            'plan_valor_frecuencia' => ['required_if:plan_preventivo,1', 'nullable', 'integer', 'min:1'],
         ];
     }
 

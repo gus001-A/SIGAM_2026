@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // Notificaciones diarias de preventivos y garantías (§12).
 Schedule::command('sigam:notificar-preventivos')->dailyAt('07:00');
+
+// Alerta diaria de tareas vencidas (Propuesta técnica — anexo "TAREAS").
+Schedule::command('sigam:notificar-tareas-vencidas')->dailyAt('07:15');

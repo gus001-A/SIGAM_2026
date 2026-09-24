@@ -12,8 +12,8 @@ defineProps({
 const columnas = [
     { key: 'codigo', title: 'Código', filtro: 'texto', sorter: true, width: 150 },
     { key: 'nombre', title: 'Material / refacción', filtro: 'texto', enlace: true, sorter: true, width: 300 },
-    { key: 'unidad', title: 'Unidad', width: 120 },
-    { key: 'costo_referencia', title: 'Costo referencia', tipo: 'money', align: 'right', width: 160 },
+    { key: 'unidad', title: 'Unidad', filtro: 'texto', width: 120 },
+    { key: 'costo_referencia', title: 'Costo referencia', tipo: 'money', filtro: 'texto', align: 'right', width: 160 },
 ];
 
 const campos = [

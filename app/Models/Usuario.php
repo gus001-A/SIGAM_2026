@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ConvierteMayusculas;
 use App\Models\Concerns\EsAuditable;
 use App\Models\Concerns\TieneEstadoActivo;
 use App\Notifications\RestablecerContrasena;
@@ -24,7 +25,7 @@ use Spatie\Permission\Traits\HasRoles;
 class Usuario extends Authenticatable
 {
     /** @use HasFactory<UsuarioFactory> */
-    use EsAuditable, HasFactory, HasRoles, Notifiable, SoftDeletes, TieneEstadoActivo;
+    use ConvierteMayusculas, EsAuditable, HasFactory, HasRoles, Notifiable, SoftDeletes, TieneEstadoActivo;
 
     protected $table = 'usuarios';
 
@@ -115,6 +116,25 @@ class Usuario extends Authenticatable
         return $this->hasMany(Notificacion::class);
     }
 
+    /** Tareas en las que el usuario participa como responsable. */
+    public function tareasAsignadas(): BelongsToMany
+    {
+        return $this->belongsToMany(Tarea::class, 'tarea_responsables', 'usuario_id', 'tarea_id')
+            ->withPivot(['es_principal', 'asignado_por', 'asignado_at', 'desasignado_at', 'notas']);
+    }
+
+    /** Tipos de equipo en los que el técnico es especialista (para delegar mejor). */
+    public function especialidadesEquipo(): BelongsToMany
+    {
+        return $this->belongsToMany(TipoEquipo::class, 'usuario_tipo_equipo');
+    }
+
+    /** Tipos de mantenimiento en los que el técnico es especialista. */
+    public function especialidadesMantenimiento(): BelongsToMany
+    {
+        return $this->belongsToMany(TipoMantenimiento::class, 'usuario_tipo_mantenimiento');
+    }
+
     public function registrosAuditoria(): HasMany
     {
         return $this->hasMany(RegistroAuditoria::class);
@@ -134,5 +154,10 @@ class Usuario extends Authenticatable
     public function getNombreCompletoAttribute(): string
     {
         return trim($this->nombre.' '.(string) $this->apellidos);
+    }
+
+    protected function camposMayusculas(): array
+    {
+        return ['nombre', 'apellidos'];
     }
 }

@@ -8,7 +8,9 @@ use App\Http\Controllers\Catalogo\EstadoMantenimientoController;
 use App\Http\Controllers\Catalogo\MarcaController;
 use App\Http\Controllers\Catalogo\MaterialController;
 use App\Http\Controllers\Catalogo\PrioridadController;
+use App\Http\Controllers\Catalogo\TipoAreaController;
 use App\Http\Controllers\Catalogo\TipoEquipoController;
+use App\Http\Controllers\Catalogo\TipoLimpiezaController;
 use App\Http\Controllers\Catalogo\TipoMantenimientoController;
 use App\Http\Controllers\Catalogo\TipoUbicacionController;
 use App\Http\Controllers\DashboardController;
@@ -28,6 +30,8 @@ use App\Http\Controllers\Mantenimiento\PlanMantenimientoController;
 use App\Http\Controllers\Mantenimiento\SolicitudMantenimientoController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\Tareas\TareaController;
+use App\Http\Controllers\Tareas\TareaResponsableController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -52,7 +56,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     Route::get('equipos/importar/plantilla', [EquipoController::class, 'plantillaImportar'])->name('equipos.importar.plantilla');
     Route::post('equipos/importar', [EquipoController::class, 'importar'])->name('equipos.importar');
+    Route::get('equipos/por-sucursal', [EquipoController::class, 'porSucursal'])->name('equipos.por_sucursal');
     Route::resource('equipos', EquipoController::class)->parameters(['equipos' => 'equipo']);
+    Route::put('equipos/{equipo}/reactivar', [EquipoController::class, 'restore'])->name('equipos.restore');
     Route::get('equipos/{equipo}/qr', [EquipoController::class, 'qr'])->name('equipos.qr');
     Route::get('equipos/{equipo}/qr.json', [EquipoController::class, 'qrData'])->name('equipos.qr_data');
     Route::get('equipos/{equipo}/qr.pdf', [EquipoController::class, 'qrPdf'])->name('equipos.qr_pdf');
@@ -77,6 +83,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         'catalogos/prioridades' => PrioridadController::class,
         'catalogos/estados-mantenimiento' => EstadoMantenimientoController::class,
         'catalogos/materiales' => MaterialController::class,
+        'catalogos/tipos-area' => TipoAreaController::class,
+        'catalogos/tipos-limpieza' => TipoLimpiezaController::class,
     ] as $ruta => $controlador) {
         $nombre = str_replace(['catalogos/', '-'], ['catalogos.', '_'], $ruta);
         Route::get($ruta, [$controlador, 'index'])->name("{$nombre}.index");
@@ -104,9 +112,18 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     Route::resource('planes', PlanMantenimientoController::class)->parameters(['planes' => 'plan']);
     Route::post('planes/{plan}/ocurrencias', [PlanMantenimientoController::class, 'generarOcurrencias'])->name('planes.ocurrencias.generar');
+    Route::delete('planes/{plan}/ocurrencias/{ocurrencia}', [PlanMantenimientoController::class, 'destroyOcurrencia'])->name('planes.ocurrencias.destroy');
     Route::post('planes/{plan}/orden', [PlanMantenimientoController::class, 'generarOrden'])->name('planes.orden.generar');
 
     Route::get('calendario', [CalendarioController::class, 'index'])->name('calendario.index');
+
+    // --- Tareas -------------------------------------------------------
+    Route::resource('tareas', TareaController::class)
+        ->parameters(['tareas' => 'tarea'])
+        ->only(['index', 'create', 'store', 'show', 'update', 'destroy']);
+    Route::post('tareas/{tarea}/transicion', [TareaController::class, 'transicion'])->name('tareas.transicion');
+    Route::post('tareas/{tarea}/responsables', [TareaResponsableController::class, 'store'])->name('tareas.responsables.store');
+    Route::delete('tareas/{tarea}/responsables/{responsable}', [TareaResponsableController::class, 'destroy'])->name('tareas.responsables.destroy');
 
     // --- Documentos --------------------------------------------------
     Route::post('documentos', [DocumentoController::class, 'store'])->name('documentos.store');

@@ -94,7 +94,7 @@ class ReportesTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('totales.equipos', 3)
                 ->where('totales.valor', 1800)
-                ->where('filas.0.0', 'Norte')
+                ->where('filas.0.0', 'NORTE')
                 ->where('filas.0.1', 2));
     }
 
@@ -120,21 +120,6 @@ class ReportesTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('totales.planes', 1)
                 ->where('totales.ventana_dias', 30));
-    }
-
-    public function test_exportar_csv_lleva_bom_utf8_y_respeta_acentos(): void
-    {
-        Sucursal::create(['codigo' => 'S1', 'nombre' => 'Súcursal Ñandú «Norte»', 'estado' => 'activo']);
-
-        $respuesta = $this->actingAs($this->admin)
-            ->get(route('reportes.exportar', ['clave' => 'inventario_por_sucursal', 'formato' => 'csv']));
-
-        $respuesta->assertOk();
-        $this->assertStringContainsString('text/csv', $respuesta->headers->get('content-type'));
-
-        $contenido = $respuesta->streamedContent();
-        $this->assertStringStartsWith("\xEF\xBB\xBF", $contenido, 'El CSV debe empezar con el BOM UTF-8');
-        $this->assertStringContainsString('Súcursal Ñandú «Norte»', $contenido);
     }
 
     public function test_exportar_pdf_incluye_el_logo(): void
@@ -181,7 +166,7 @@ class ReportesTest extends TestCase
         $tecnico->assignRole('tecnico');
 
         $this->actingAs($tecnico)
-            ->get(route('reportes.exportar', ['clave' => 'inventario_general', 'formato' => 'csv']))
+            ->get(route('reportes.exportar', ['clave' => 'inventario_general', 'formato' => 'pdf']))
             ->assertForbidden();
     }
 }

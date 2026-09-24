@@ -131,7 +131,7 @@ class NormasFormatosTest extends TestCase
 
         $formato->refresh()->load('campos');
         $this->assertSame('1.1', $formato->version);
-        $this->assertEqualsCanonicalizing(['Campo nuevo A', 'Campo nuevo B'], $formato->campos->pluck('etiqueta')->all());
+        $this->assertEqualsCanonicalizing(['CAMPO NUEVO A', 'CAMPO NUEVO B'], $formato->campos->pluck('etiqueta')->all());
     }
 
     public function test_formato_campo_con_tipo_invalido_es_rechazado(): void

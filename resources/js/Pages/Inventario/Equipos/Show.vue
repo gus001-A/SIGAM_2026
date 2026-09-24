@@ -20,8 +20,10 @@ import {
     QrcodeOutlined,
     SafetyCertificateOutlined,
     ShopOutlined,
+    StopOutlined,
     TagOutlined,
     ToolOutlined,
+    UndoOutlined,
     UserOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -30,6 +32,7 @@ import FichaEncabezado from '@/Components/FichaEncabezado.vue';
 import ListaDatos from '@/Components/ListaDatos.vue';
 import ListaDocumentos from '@/Components/ListaDocumentos.vue';
 import ModalQr from '@/Components/ModalQr.vue';
+import ModalBajaEquipo from '@/Components/ModalBajaEquipo.vue';
 import SeccionFicha from '@/Components/SeccionFicha.vue';
 import { usePermisos } from '@/composables/usePermisos';
 
@@ -37,12 +40,16 @@ const props = defineProps({
     equipo: { type: Object, required: true },
     mantenimientos: { type: Array, default: () => [] },
     solicitudes: { type: Array, default: () => [] },
+    sello: { type: Object, default: null },
 });
 
 const { puede } = usePermisos();
 const tab = ref('resumen');
 const confirmar = ref(null);
 const modalQr = ref(null);
+const modalBaja = ref(null);
+
+const dadoDeBaja = computed(() => !!props.equipo.deleted_at);
 
 const NA = 'No especificado';
 const moneda = (v) =>
@@ -76,6 +83,10 @@ const grupoAdquisicion = computed(() => [
 
 const especificaciones = computed(() => Object.entries(props.equipo.especificaciones ?? {}));
 
+const fotoReferencia = computed(() =>
+    (props.equipo.documentos ?? []).find((d) => d.pivot?.rol === 'foto_referencia'),
+);
+
 const tarjetas = computed(() => [
     { clave: 'mant', etiqueta: 'Mantenimientos', valor: props.mantenimientos.length, icono: ToolOutlined, color: '#0d84c9' },
     { clave: 'sol', etiqueta: 'Solicitudes', valor: props.solicitudes.length, icono: FormOutlined, color: '#6b4bc9' },
@@ -85,18 +96,17 @@ const tarjetas = computed(() => [
 
 const irA = (nombre, params) => router.visit(route(nombre, params));
 
-const darBaja = async () => {
+const reactivar = async () => {
     const ok = await confirmar.value.abrir({
-        titulo: `Dar de baja ${props.equipo.codigo_activo}`,
-        mensaje: 'El equipo se conservará en el historial pero dejará de aparecer en el inventario activo.',
-        confirmar: 'Dar de baja',
-        peligro: true,
+        titulo: `Reactivar ${props.equipo.codigo_activo}`,
+        mensaje: 'El equipo volverá a aparecer en el inventario activo.',
+        confirmar: 'Reactivar',
     });
-    if (ok) router.delete(route('equipos.destroy', props.equipo.id));
+    if (ok) router.put(route('equipos.restore', props.equipo.id));
 };
 
 const menuAcciones = [{ key: 'baja', label: 'Dar de baja', danger: true, icon: () => h(DeleteOutlined) }];
-const onMenuAccion = ({ key }) => key === 'baja' && darBaja();
+const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.equipo);
 </script>
 
 <template>
@@ -108,36 +118,56 @@ const onMenuAccion = ({ key }) => key === 'baja' && darBaja();
             :subtitulo="equipo.descripcion"
             :icono="ToolOutlined"
             :color="equipo.estado?.color || '#1e5eb8'"
-            volver="equipos.index"
+            volver="equipos.por_sucursal"
+            :volver-params="{ sucursal_id: equipo.sucursal_id }"
+            :sello="sello"
         >
             <template #tags>
-                <a-tag v-if="equipo.estado" :color="equipo.estado.color || 'default'">{{ equipo.estado.nombre }}</a-tag>
+                <a-tag v-if="dadoDeBaja" color="error"><StopOutlined /> Dado de baja</a-tag>
+                <a-tag v-else-if="equipo.estado" :color="equipo.estado.color || 'default'">{{ equipo.estado.nombre }}</a-tag>
                 <a-tag v-if="enGarantia" color="green"><SafetyCertificateOutlined /> En garantía</a-tag>
             </template>
             <template #acciones>
-                <a-button @click="modalQr.abrir(equipo.id)">
-                    <template #icon><QrcodeOutlined /></template>
-                    QR
-                </a-button>
-                <a-button
-                    v-if="puede('solicitudes.crear')"
-                    @click="router.visit(route('solicitudes.create', { equipo_id: equipo.id }))"
-                >
-                    <template #icon><FormOutlined /></template>
-                    Solicitar mantenimiento
-                </a-button>
-                <a-button v-if="puede('equipos.editar')" type="primary" @click="irA('equipos.edit', equipo.id)">
-                    <template #icon><EditOutlined /></template>
-                    Editar
-                </a-button>
-                <a-dropdown v-if="puede('equipos.desactivar')">
-                    <a-button type="text"><template #icon><EllipsisOutlined /></template></a-button>
-                    <template #overlay>
-                        <a-menu :items="menuAcciones" @click="onMenuAccion" />
-                    </template>
-                </a-dropdown>
+                <template v-if="dadoDeBaja">
+                    <a-button v-if="puede('equipos.editar')" type="primary" @click="reactivar">
+                        <template #icon><UndoOutlined /></template>
+                        Reactivar
+                    </a-button>
+                </template>
+                <template v-else>
+                    <a-button @click="modalQr.abrir(equipo.id)">
+                        <template #icon><QrcodeOutlined /></template>
+                        QR
+                    </a-button>
+                    <a-button
+                        v-if="puede('solicitudes.crear')"
+                        @click="router.visit(route('solicitudes.create', { equipo_id: equipo.id }))"
+                    >
+                        <template #icon><FormOutlined /></template>
+                        Solicitar mantenimiento
+                    </a-button>
+                    <a-button v-if="puede('equipos.editar')" type="primary" @click="irA('equipos.edit', equipo.id)">
+                        <template #icon><EditOutlined /></template>
+                        Editar
+                    </a-button>
+                    <a-dropdown v-if="puede('equipos.desactivar')">
+                        <a-button type="text"><template #icon><EllipsisOutlined /></template></a-button>
+                        <template #overlay>
+                            <a-menu :items="menuAcciones" @click="onMenuAccion" />
+                        </template>
+                    </a-dropdown>
+                </template>
             </template>
         </FichaEncabezado>
+
+        <a-alert
+            v-if="dadoDeBaja"
+            type="error"
+            show-icon
+            class="mb-3"
+            :message="`Este equipo fue dado de baja${equipo.baja_por?.nombre ? ' por ' + equipo.baja_por.nombre : ''}${equipo.baja_en ? ' el ' + fecha(equipo.baja_en) : ''}.`"
+            :description="equipo.motivo_baja ? `Motivo: ${equipo.motivo_baja}` : 'Sin motivo registrado.'"
+        />
 
         <a-row :gutter="14" class="tarjetas">
             <a-col v-for="t in tarjetas" :key="t.clave" :xs="12" :md="6">
@@ -158,6 +188,14 @@ const onMenuAccion = ({ key }) => key === 'baja' && darBaja();
                     <a-row :gutter="28" class="pb-4">
                         <a-col :xs="24" :md="14">
                             <SeccionFicha titulo="Identificación" :icono="TagOutlined" color="#0d84c9">
+                                <a
+                                    v-if="fotoReferencia"
+                                    :href="route('documentos.ver', fotoReferencia.id)"
+                                    target="_blank"
+                                    class="foto-referencia"
+                                >
+                                    <img :src="route('documentos.ver', fotoReferencia.id)" alt="Foto de referencia del equipo" />
+                                </a>
                                 <ListaDatos :datos="grupoIdentificacion" />
                             </SeccionFicha>
 
@@ -301,6 +339,7 @@ const onMenuAccion = ({ key }) => key === 'baja' && darBaja();
 
         <ConfirmarDialog ref="confirmar" />
         <ModalQr ref="modalQr" />
+        <ModalBajaEquipo ref="modalBaja" />
     </AppLayout>
 </template>
 
@@ -533,6 +572,20 @@ const onMenuAccion = ({ key }) => key === 'baja' && darBaja();
     border-radius: 10px;
     padding: 10px 12px;
     margin: 0;
+}
+.foto-referencia {
+    display: block;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--sigam-borde);
+    max-width: 220px;
+}
+.foto-referencia img {
+    display: block;
+    width: 100%;
+    max-height: 160px;
+    object-fit: cover;
 }
 </style>
 

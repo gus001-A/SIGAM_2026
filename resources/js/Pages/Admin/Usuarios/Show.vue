@@ -7,10 +7,12 @@ import {
     ClockCircleOutlined,
     DeleteOutlined,
     EditOutlined,
+    EllipsisOutlined,
     KeyOutlined,
     MailOutlined,
     PhoneOutlined,
     SafetyCertificateOutlined,
+    StarOutlined,
     TeamOutlined,
     UndoOutlined,
 } from '@ant-design/icons-vue';
@@ -18,12 +20,12 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import FichaEncabezado from '@/Components/FichaEncabezado.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
 import { usePermisos } from '@/composables/usePermisos';
-import { colorRol, etiquetaRol } from '@/utils/roles';
+import { colorHexRol, descripcionRol, etiquetaRol } from '@/utils/roles';
 
 const props = defineProps({
     usuario: { type: Object, required: true },
-    permisosEfectivos: { type: Array, default: () => [] },
     actividad: { type: Array, default: () => [] },
+    sello: { type: Object, default: null },
 });
 
 const { puede, usuario: yo } = usePermisos();
@@ -71,12 +73,10 @@ const desactivar = async () => {
 
 const reactivar = () => router.put(route('usuarios.restore', props.usuario.id));
 
-const menuAcciones = computed(() => [
-    { key: 'clave', label: 'Restablecer contraseña', icon: () => h(KeyOutlined) },
-    ...(esYo.value ? [] : [{ key: 'baja', label: 'Desactivar usuario', danger: true, icon: () => h(DeleteOutlined) }]),
-]);
+const menuAcciones = computed(() =>
+    esYo.value ? [] : [{ key: 'baja', label: 'Desactivar usuario', danger: true, icon: () => h(DeleteOutlined) }],
+);
 const onMenuAccion = ({ key }) => {
-    if (key === 'clave') restablecer();
     if (key === 'baja') desactivar();
 };
 </script>
@@ -91,6 +91,7 @@ const onMenuAccion = ({ key }) => {
             :iniciales="iniciales"
             :icono="TeamOutlined"
             volver="usuarios.index"
+            :sello="sello"
         >
             <template #tags>
                 <a-tag :color="inactivo ? 'default' : 'green'">{{ inactivo ? 'Inactivo' : 'Activo' }}</a-tag>
@@ -107,8 +108,12 @@ const onMenuAccion = ({ key }) => {
                     <template #icon><EditOutlined /></template>
                     Editar
                 </a-button>
-                <a-dropdown v-if="!inactivo && puede('usuarios.editar')">
-                    <a-button type="text"><template #icon><KeyOutlined /></template></a-button>
+                <a-button v-if="!inactivo && puede('usuarios.editar')" @click="restablecer">
+                    <template #icon><KeyOutlined /></template>
+                    Restablecer contraseña
+                </a-button>
+                <a-dropdown v-if="!inactivo && puede('usuarios.editar') && menuAcciones.length">
+                    <a-button type="text"><template #icon><EllipsisOutlined /></template></a-button>
                     <template #overlay>
                         <a-menu :items="menuAcciones" @click="onMenuAccion" />
                     </template>
@@ -135,12 +140,37 @@ const onMenuAccion = ({ key }) => {
 
                 <a-card size="small" class="tarjeta">
                     <template #title><span class="tt"><SafetyCertificateOutlined /> Roles asignados</span></template>
-                    <a-space wrap>
-                        <a-tag v-for="r in usuario.roles" :key="r" :color="colorRol(r)" class="rol-tag">
-                            {{ etiquetaRol(r) }}
-                        </a-tag>
-                        <span v-if="!usuario.roles.length" class="vacio">Sin roles asignados</span>
-                    </a-space>
+                    <div v-if="usuario.roles.length" class="roles-usuario">
+                        <div
+                            v-for="r in usuario.roles"
+                            :key="r"
+                            class="roles-usuario__card"
+                            :style="{ '--rol-color': colorHexRol(r) }"
+                        >
+                            <span class="roles-usuario__titulo">{{ etiquetaRol(r) }}</span>
+                            <span class="roles-usuario__desc">{{ descripcionRol(r) }}</span>
+                        </div>
+                    </div>
+                    <span v-else class="vacio">Sin roles asignados</span>
+                </a-card>
+
+                <a-card v-if="usuario.roles.includes('tecnico')" size="small" class="tarjeta">
+                    <template #title><span class="tt"><StarOutlined /> Especialidades</span></template>
+                    <p class="especialidades-ayuda">En qué es bueno — se usa para sugerirlo al delegar una orden.</p>
+                    <div class="especialidades-grupo">
+                        <span class="especialidades-l">Tipos de equipo</span>
+                        <a-space wrap>
+                            <a-tag v-for="e in usuario.especialidades_equipo" :key="e" color="blue">{{ e }}</a-tag>
+                            <span v-if="!usuario.especialidades_equipo?.length" class="vacio">Ninguna registrada</span>
+                        </a-space>
+                    </div>
+                    <div class="especialidades-grupo">
+                        <span class="especialidades-l">Tipos de mantenimiento</span>
+                        <a-space wrap>
+                            <a-tag v-for="e in usuario.especialidades_mantenimiento" :key="e" color="purple">{{ e }}</a-tag>
+                            <span v-if="!usuario.especialidades_mantenimiento?.length" class="vacio">Ninguna registrada</span>
+                        </a-space>
+                    </div>
                 </a-card>
             </a-col>
 
@@ -217,13 +247,55 @@ const onMenuAccion = ({ key }) => {
     color: var(--sigam-texto);
     font-weight: 500;
 }
-.rol-tag {
-    font-size: 12px;
-    padding: 2px 10px;
+.roles-usuario {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.roles-usuario__card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 12px;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--rol-color) 6%, #fff);
+    border: 1px solid color-mix(in srgb, var(--rol-color) 20%, #fff);
+    border-left: 4px solid var(--rol-color);
+}
+.roles-usuario__titulo {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--rol-color);
+}
+.roles-usuario__desc {
+    font-size: 12.5px;
+    color: var(--sigam-texto);
+    line-height: 1.5;
 }
 .vacio {
     color: var(--sigam-tenue);
     font-size: 12.5px;
+}
+.especialidades-ayuda {
+    margin: -4px 0 12px;
+    font-size: 12px;
+    color: var(--sigam-tenue);
+}
+.especialidades-grupo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.especialidades-grupo:last-child {
+    margin-bottom: 0;
+}
+.especialidades-l {
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--sigam-tenue);
 }
 .act {
     display: flex;

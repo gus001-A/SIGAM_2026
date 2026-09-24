@@ -11,7 +11,7 @@ defineProps({
 
 const columnas = [
     { key: 'nombre', title: 'Marca', filtro: 'texto', sorter: true, width: 260 },
-    { key: 'descripcion', title: 'Descripción', width: 320 },
+    { key: 'descripcion', title: 'Descripción', filtro: 'texto', width: 320 },
     { key: 'equipos_count', title: 'Equipos', tipo: 'count', align: 'right', width: 110 },
 ];
 

@@ -14,7 +14,6 @@ use App\Models\Sucursal;
 use App\Models\TipoEquipo;
 use App\Models\TipoMantenimiento;
 use App\Models\Usuario;
-use App\Support\ExportadorCsv;
 use App\Support\Marca;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,7 +25,6 @@ use Inertia\Response;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Catálogo de reportes. Especificación v2.0 §10-§11.
@@ -52,13 +50,14 @@ class ReporteController extends Controller
         'auditoria' => 'RPT-14 Auditoría',
         'catalogos_trazabilidad' => 'RPT-15 Catálogos y trazabilidad',
         'indicadores_ejecutivos' => 'RPT-16 Indicadores ejecutivos',
+        'cumplimiento_tareas' => 'RPT-17 Cumplimiento de tareas',
     ];
 
     /** Agrupación para el catálogo de reportes (§10). */
     public const GRUPOS = [
         'Inventario' => ['inventario_general', 'inventario_por_sucursal', 'ficha_equipo', 'documentos_activos', 'catalogos_trazabilidad'],
         'Mantenimiento' => ['mantenimientos_por_periodo', 'preventivos_proximos', 'preventivos_vencidos', 'correctivos', 'urgencias', 'cumplimiento_preventivo'],
-        'Desempeño y costos' => ['productividad_tecnico', 'solicitudes_por_usuario', 'costos_mantenimiento', 'indicadores_ejecutivos'],
+        'Desempeño y costos' => ['productividad_tecnico', 'solicitudes_por_usuario', 'costos_mantenimiento', 'indicadores_ejecutivos', 'cumplimiento_tareas'],
         'Control' => ['auditoria'],
     ];
 
@@ -75,6 +74,7 @@ class ReporteController extends Controller
         'documentos_activos' => ['sucursal_id'],
         'costos_mantenimiento' => ['desde', 'hasta', 'sucursal_id'],
         'solicitudes_por_usuario' => [],
+        'cumplimiento_tareas' => ['desde', 'hasta'],
     ];
 
     public function index(): Response
@@ -136,7 +136,7 @@ class ReporteController extends Controller
         abort_unless(array_key_exists($clave, self::REPORTES), 404);
 
         $formato = $request->query('formato', 'xlsx');
-        abort_unless(in_array($formato, ['csv', 'xlsx', 'pdf'], true), 422, 'Formato no admitido.');
+        abort_unless(in_array($formato, ['xlsx', 'pdf'], true), 422, 'Formato no admitido.');
 
         ['columnas' => $columnas, 'filas' => $filas, 'totales' => $totales] = [
             'totales' => [],
@@ -146,19 +146,9 @@ class ReporteController extends Controller
         $base = Str::slug($clave).'-'.now()->format('Ymd-His');
 
         return match ($formato) {
-            'csv' => $this->exportarCsv($columnas, $filas, "{$base}.csv"),
             'xlsx' => $this->exportarXlsx($columnas, $filas, "{$base}.xlsx"),
             'pdf' => $this->exportarPdf($clave, $columnas, $filas, $totales, "{$base}.pdf", $request),
         };
-    }
-
-    /**
-     * @param  list<string>  $columnas
-     * @param  list<array<int, mixed>>  $filas
-     */
-    private function exportarCsv(array $columnas, array $filas, string $nombre): StreamedResponse
-    {
-        return ExportadorCsv::descargar($nombre, $columnas, $filas);
     }
 
     /**
@@ -220,6 +210,7 @@ class ReporteController extends Controller
             'documentos_activos' => $this->documentosActivos($request),
             'solicitudes_por_usuario' => $this->solicitudesPorUsuario($request),
             'costos_mantenimiento' => $this->costosMantenimiento($request),
+            'cumplimiento_tareas' => $this->cumplimientoTareas($request),
             default => ['columnas' => [], 'filas' => [], 'pendiente' => true],
         };
     }
@@ -250,7 +241,7 @@ class ReporteController extends Controller
         $hasta = Carbon::parse($request->query('hasta', now()->toDateString()))->endOfDay();
 
         $ordenes = Mantenimiento::query()
-            ->with(['equipo:id,codigo_activo', 'tipo:id,nombre', 'estado:id,nombre', 'prioridad:id,nombre', 'tecnicos:id,nombre'])
+            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'tipo:id,nombre', 'estado:id,nombre', 'prioridad:id,nombre', 'tecnicos:id,nombre'])
             ->whereBetween('created_at', [$desde, $hasta])
             ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
             ->when($request->integer('tipo_mant_id'), fn (Builder $q, $v) => $q->where('tipo_id', $v))
@@ -259,9 +250,9 @@ class ReporteController extends Controller
             ->get();
 
         return [
-            'columnas' => ['Folio', 'Equipo', 'Tipo', 'Técnico(s)', 'Programado', 'Completado', 'Prioridad', 'Estado'],
+            'columnas' => ['Folio', 'Equipo / instalación', 'Tipo', 'Técnico(s)', 'Programado', 'Completado', 'Prioridad', 'Estado'],
             'filas' => $ordenes->map(fn (Mantenimiento $m) => [
-                $m->folio, $m->equipo?->codigo_activo, $m->tipo?->nombre,
+                $m->folio, $m->equipo?->codigo_activo ?? $m->ubicacion?->nombre, $m->tipo?->nombre,
                 $m->tecnicos->pluck('nombre')->implode(', '),
                 optional($m->programado_inicio)->format('Y-m-d'),
                 optional($m->completado_at)->format('Y-m-d'),
@@ -274,16 +265,16 @@ class ReporteController extends Controller
     private function preventivosVencidos(): array
     {
         $planes = PlanMantenimiento::query()
-            ->with(['equipo:id,codigo_activo,descripcion', 'tecnico:id,nombre'])
+            ->with(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'tecnico:id,nombre'])
             ->where('estado', 'activo')
             ->whereDate('proxima_fecha', '<', today())
             ->orderBy('proxima_fecha')
             ->get();
 
         return [
-            'columnas' => ['Equipo', 'Descripción', 'Próxima fecha', 'Días vencidos', 'Técnico'],
+            'columnas' => ['Equipo / instalación', 'Descripción', 'Próxima fecha', 'Días vencidos', 'Técnico'],
             'filas' => $planes->map(fn (PlanMantenimiento $p) => [
-                $p->equipo?->codigo_activo, $p->equipo?->descripcion,
+                $p->equipo?->codigo_activo ?? $p->ubicacion?->nombre, $p->equipo?->descripcion,
                 optional($p->proxima_fecha)->format('Y-m-d'),
                 $p->proxima_fecha ? today()->diffInDays(Carbon::parse($p->proxima_fecha)) : null,
                 $p->tecnico?->nombre,
@@ -295,16 +286,16 @@ class ReporteController extends Controller
     private function urgencias(): array
     {
         $ordenes = Mantenimiento::query()
-            ->with(['equipo:id,codigo_activo', 'estado:id,nombre', 'prioridad:id,nombre', 'tecnicos:id,nombre'])
+            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'estado:id,nombre', 'prioridad:id,nombre', 'tecnicos:id,nombre'])
             ->whereHas('prioridad', fn (Builder $q) => $q->whereIn('clave', ['urgente', 'critica']))
             ->whereHas('estado', fn (Builder $q) => $q->where('es_abierto', true))
             ->orderBy('programado_inicio')
             ->get();
 
         return [
-            'columnas' => ['Folio', 'Equipo', 'Prioridad', 'Programado', 'Técnico(s)', 'Estado'],
+            'columnas' => ['Folio', 'Equipo / instalación', 'Prioridad', 'Programado', 'Técnico(s)', 'Estado'],
             'filas' => $ordenes->map(fn (Mantenimiento $m) => [
-                $m->folio, $m->equipo?->codigo_activo, $m->prioridad?->nombre,
+                $m->folio, $m->equipo?->codigo_activo ?? $m->ubicacion?->nombre, $m->prioridad?->nombre,
                 optional($m->programado_inicio)->format('Y-m-d H:i'),
                 $m->tecnicos->pluck('nombre')->implode(', '), $m->estado?->nombre,
             ]),
@@ -331,7 +322,7 @@ class ReporteController extends Controller
     private function costosMantenimiento(Request $request): array
     {
         $ordenes = Mantenimiento::query()
-            ->with('equipo:id,codigo_activo')
+            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre'])
             ->withSum('materiales as costo_materiales', 'costo_unitario')
             ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
             ->when($request->filled('desde'), fn (Builder $q) => $q->whereDate('created_at', '>=', $request->date('desde')))
@@ -339,16 +330,53 @@ class ReporteController extends Controller
             ->get();
 
         return [
-            'columnas' => ['Folio', 'Equipo', 'Mano de obra', 'Materiales', 'Otros', 'Total'],
+            'columnas' => ['Folio', 'Equipo / instalación', 'Mano de obra', 'Materiales', 'Otros', 'Total'],
             'filas' => $ordenes->map(function (Mantenimiento $m) {
                 $total = (float) $m->costo_mano_obra + (float) $m->costo_materiales + (float) $m->costo_otros;
 
-                return [$m->folio, $m->equipo?->codigo_activo, $m->costo_mano_obra, $m->costo_materiales, $m->costo_otros, $total];
+                return [$m->folio, $m->equipo?->codigo_activo ?? $m->ubicacion?->nombre, $m->costo_mano_obra, $m->costo_materiales, $m->costo_otros, $total];
             }),
             'totales' => [
                 'mano_obra' => (float) $ordenes->sum('costo_mano_obra'),
                 'materiales' => (float) $ordenes->sum('costo_materiales'),
                 'otros' => (float) $ordenes->sum('costo_otros'),
+            ],
+        ];
+    }
+
+    /** Cumplimiento de tareas por responsable: a tiempo, retrasadas, canceladas. */
+    private function cumplimientoTareas(Request $request): array
+    {
+        $desde = Carbon::parse($request->query('desde', now()->startOfMonth()->toDateString()));
+        $hasta = Carbon::parse($request->query('hasta', now()->toDateString()))->endOfDay();
+
+        $usuarios = Usuario::query()
+            ->withCount([
+                'tareasAsignadas as asignadas' => fn (Builder $q) => $q->whereBetween('tareas.created_at', [$desde, $hasta]),
+                'tareasAsignadas as completadas' => fn (Builder $q) => $q
+                    ->whereBetween('tareas.created_at', [$desde, $hasta])->where('tareas.estado', 'realizada'),
+                'tareasAsignadas as a_tiempo' => fn (Builder $q) => $q
+                    ->whereBetween('tareas.created_at', [$desde, $hasta])->where('tareas.estado', 'realizada')
+                    ->whereRaw('date(tareas.realizada_at) <= tareas.fecha_limite'),
+                'tareasAsignadas as canceladas' => fn (Builder $q) => $q
+                    ->whereBetween('tareas.created_at', [$desde, $hasta])->where('tareas.estado', 'cancelada'),
+            ])
+            ->having('asignadas', '>', 0)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'apellidos']);
+
+        return [
+            'columnas' => ['Responsable', 'Asignadas', 'Completadas', 'A tiempo', 'Retrasadas', 'Canceladas', '% cumplimiento'],
+            'filas' => $usuarios->map(function (Usuario $u) {
+                $retrasadas = $u->completadas - $u->a_tiempo;
+                $pct = $u->asignadas > 0 ? round($u->a_tiempo / $u->asignadas * 100, 1) : 0.0;
+
+                return [$u->nombre_completo, $u->asignadas, $u->completadas, $u->a_tiempo, $retrasadas, $u->canceladas, $pct];
+            }),
+            'totales' => [
+                'responsables' => $usuarios->count(),
+                'asignadas' => (int) $usuarios->sum('asignadas'),
+                'completadas' => (int) $usuarios->sum('completadas'),
             ],
         ];
     }
@@ -380,22 +408,21 @@ class ReporteController extends Controller
         $limite = today()->addDays($dias);
 
         $planes = PlanMantenimiento::query()
-            ->with(['equipo:id,codigo_activo,descripcion,sucursal_id', 'equipo.sucursal:id,nombre', 'tecnico:id,nombre'])
+            ->with(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'tecnico:id,nombre'])
             ->where('estado', 'activo')
             ->whereNotNull('proxima_fecha')
             ->whereDate('proxima_fecha', '>=', today())
             ->whereDate('proxima_fecha', '<=', $limite)
-            ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q
-                ->whereHas('equipo', fn (Builder $e) => $e->where('sucursal_id', $v)))
+            ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
             ->orderBy('proxima_fecha')
             ->get();
 
         return [
-            'columnas' => ['Equipo', 'Descripción', 'Sucursal', 'Próxima fecha', 'Días restantes', 'Técnico'],
+            'columnas' => ['Equipo / instalación', 'Descripción', 'Sucursal', 'Próxima fecha', 'Días restantes', 'Técnico'],
             'filas' => $planes->map(fn (PlanMantenimiento $p) => [
-                $p->equipo?->codigo_activo,
+                $p->equipo?->codigo_activo ?? $p->ubicacion?->nombre,
                 $p->equipo?->descripcion,
-                $p->equipo?->sucursal?->nombre,
+                $p->sucursal?->nombre,
                 optional($p->proxima_fecha)->format('Y-m-d'),
                 $p->proxima_fecha ? (int) round(today()->diffInDays(Carbon::parse($p->proxima_fecha), false)) : null,
                 $p->tecnico?->nombre,
@@ -410,7 +437,7 @@ class ReporteController extends Controller
         $hasta = Carbon::parse($request->query('hasta', now()->toDateString()))->endOfDay();
 
         $ordenes = Mantenimiento::query()
-            ->with(['equipo:id,codigo_activo', 'sucursal:id,nombre', 'estado:id,nombre', 'tecnicos:id,nombre'])
+            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'estado:id,nombre', 'tecnicos:id,nombre'])
             ->whereHas('tipo', fn (Builder $q) => $q->where('categoria', 'correctivo'))
             ->whereBetween('created_at', [$desde, $hasta])
             ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
@@ -418,9 +445,9 @@ class ReporteController extends Controller
             ->get();
 
         return [
-            'columnas' => ['Folio', 'Equipo', 'Sucursal', 'Reportado', 'Completado', 'Técnico(s)', 'Estado'],
+            'columnas' => ['Folio', 'Equipo / instalación', 'Sucursal', 'Reportado', 'Completado', 'Técnico(s)', 'Estado'],
             'filas' => $ordenes->map(fn (Mantenimiento $m) => [
-                $m->folio, $m->equipo?->codigo_activo, $m->sucursal?->nombre,
+                $m->folio, $m->equipo?->codigo_activo ?? $m->ubicacion?->nombre, $m->sucursal?->nombre,
                 optional($m->created_at)->format('Y-m-d'),
                 optional($m->completado_at)->format('Y-m-d'),
                 $m->tecnicos->pluck('nombre')->implode(', '),
