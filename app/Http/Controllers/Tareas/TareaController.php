@@ -40,17 +40,29 @@ class TareaController extends Controller
         $texto = fn (string $c): ?string => filled($request->query($c)) ? trim((string) $request->query($c)) : null;
         $vista = $request->query('vista') === 'completadas' ? 'completadas' : 'activas';
 
+        // Alcance visible del usuario (sin filtros de la vista/búsqueda) para
+        // los KPIs — así se quedan estables al cambiar de pestaña o filtrar.
+        $visibles = fn (Builder $q) => $q->when(
+            ! $usuario->hasRole('superadministrador'),
+            fn (Builder $w) => $w->where(fn (Builder $ww) => $ww
+                ->whereHas('responsables', fn (Builder $r) => $r
+                    ->where('usuarios.id', $usuario->id)->whereNull('tarea_responsables.desasignado_at'))
+                ->orWhere('creado_por', $usuario->id)),
+        );
+
+        $kpis = [
+            'total' => Tarea::query()->tap($visibles)->count(),
+            'vencidas' => Tarea::query()->tap($visibles)
+                ->whereIn('estado', self::ESTADOS_ACTIVOS)->whereDate('fecha_limite', '<', today())->count(),
+            'pendientes' => Tarea::query()->tap($visibles)->where('estado', 'pendiente')->count(),
+            'en_proceso' => Tarea::query()->tap($visibles)->where('estado', 'en_proceso')->count(),
+        ];
+
         $tareas = Tarea::query()
             ->with(['responsables' => fn ($q) => $q->wherePivotNull('desasignado_at'), 'prioridad:id,nombre,color', 'creadoPor:id,nombre'])
             // Solo el superadministrador ve las tareas de todos; el resto solo
             // ve las que le asignaron o las que él mismo registró.
-            ->when(
-                ! $usuario->hasRole('superadministrador'),
-                fn (Builder $q) => $q->where(fn (Builder $w) => $w
-                    ->whereHas('responsables', fn (Builder $r) => $r
-                        ->where('usuarios.id', $usuario->id)->whereNull('tarea_responsables.desasignado_at'))
-                    ->orWhere('creado_por', $usuario->id)),
-            )
+            ->tap($visibles)
             ->when($vista === 'completadas', fn (Builder $q) => $q->whereIn('estado', self::ESTADOS_COMPLETADOS))
             ->when($vista === 'activas', fn (Builder $q) => $q->whereIn('estado', self::ESTADOS_ACTIVOS))
             ->when($texto('descripcion'), fn (Builder $q, $v) => $q->where(fn (Builder $w) => $w
@@ -90,6 +102,7 @@ class TareaController extends Controller
 
         return Inertia::render('Tareas/Index', [
             'tareas' => $tareas,
+            'kpis' => $kpis,
             'vista' => $vista,
             'filtros' => $request->only(['descripcion', 'estado', 'responsable', 'prioridad_id', 'desde', 'hasta', 'vencidas', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],

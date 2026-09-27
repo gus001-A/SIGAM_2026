@@ -50,6 +50,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::resource('sucursales', SucursalController::class)->parameters(['sucursales' => 'sucursal']);
     Route::put('sucursales/{sucursal}/reactivar', [SucursalController::class, 'restore'])->name('sucursales.restore');
 
+    Route::put('ubicaciones/{ubicacion}/reactivar', [UbicacionController::class, 'restore'])->name('ubicaciones.restore');
     Route::resource('ubicaciones', UbicacionController::class)
         ->parameters(['ubicaciones' => 'ubicacion'])
         ->only(['index', 'store', 'update', 'destroy']);

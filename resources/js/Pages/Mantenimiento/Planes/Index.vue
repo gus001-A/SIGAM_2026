@@ -1,7 +1,18 @@
 <script setup>
 import { computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import { BankOutlined, EnvironmentOutlined, EyeOutlined, FilterOutlined, PlusOutlined, ToolOutlined } from '@ant-design/icons-vue';
+import {
+    BankOutlined,
+    CalendarOutlined,
+    CheckCircleOutlined,
+    EnvironmentOutlined,
+    ExclamationCircleOutlined,
+    EyeOutlined,
+    FilterOutlined,
+    PlusOutlined,
+    StopOutlined,
+    ToolOutlined,
+} from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTableInertia from '@/Components/DataTableInertia.vue';
 import CeldaRegistro from '@/Components/CeldaRegistro.vue';
@@ -10,11 +21,19 @@ import { useTablaInertia } from '@/composables/useTablaInertia';
 
 const props = defineProps({
     planes: { type: Object, required: true },
+    kpis: { type: Object, default: () => ({}) },
     sucursalId: { type: [Number, String], default: null },
     filtros: { type: Object, default: () => ({}) },
     orden: { type: Object, default: () => ({}) },
     catalogos: { type: Object, default: () => ({}) },
 });
+
+const tarjetas = computed(() => [
+    { label: 'Planes totales', valor: props.kpis.total ?? 0, icono: CalendarOutlined, color: '#0d84c9' },
+    { label: 'Activos', valor: props.kpis.activos ?? 0, icono: CheckCircleOutlined, color: '#1f9e86' },
+    { label: 'Vencidos', valor: props.kpis.vencidos ?? 0, icono: ExclamationCircleOutlined, color: '#d64545' },
+    { label: 'Inactivos', valor: props.kpis.inactivos ?? 0, icono: StopOutlined, color: '#6b4bc9' },
+]);
 
 const { puede } = usePermisos();
 
@@ -115,6 +134,19 @@ const irA = (n, p) => router.visit(route(n, p));
             </a-button>
         </template>
 
+        <!-- KPIs con colores sólidos -->
+        <div class="kpis">
+            <div v-for="k in tarjetas" :key="k.label" class="kpi" :style="{ '--acc': k.color }">
+                <div class="kpi__icono">
+                    <component :is="k.icono" />
+                </div>
+                <div class="kpi__txt">
+                    <div class="kpi__valor">{{ k.valor }}</div>
+                    <div class="kpi__etq">{{ k.label }}</div>
+                </div>
+            </div>
+        </div>
+
         <div class="selector-sucursal">
             <span class="selector-sucursal__ic"><BankOutlined /></span>
             <span class="selector-sucursal__l">Sucursal</span>
@@ -189,6 +221,74 @@ const irA = (n, p) => router.visit(route(n, p));
 </template>
 
 <style scoped>
+/* ==========================================================
+   KPIs con colores sólidos
+   ========================================================== */
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 11px;
+    margin-bottom: 14px;
+}
+
+.kpi {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 14px;
+    background: #fff;
+    border: 1px solid var(--sigam-borde);
+    border-radius: 13px;
+    box-shadow: 0 1px 3px rgba(15, 37, 71, 0.06);
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--acc);
+}
+
+.kpi__icono {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    color: #fff;
+    background: var(--acc);
+    flex-shrink: 0;
+}
+
+.kpi__valor {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--sigam-navy);
+    line-height: 1.1;
+}
+
+.kpi__etq {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 700;
+    color: var(--sigam-tenue);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 767px) {
+    .kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 .selector-sucursal {
     display: flex;
     align-items: center;

@@ -19,6 +19,13 @@ class AsignacionMantenimiento extends Model
         'mantenimiento_id', 'tecnico_id', 'asignado_por', 'es_principal', 'asignado_at', 'desasignado_at', 'notas',
     ];
 
+    protected $appends = ['asignado_por_nombre'];
+
+    public function getAsignadoPorNombreAttribute(): ?string
+    {
+        return $this->asignadoPor?->nombre;
+    }
+
     protected function camposMayusculas(): array
     {
         return ['notas'];

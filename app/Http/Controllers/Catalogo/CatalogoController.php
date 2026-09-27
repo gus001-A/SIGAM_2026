@@ -110,6 +110,11 @@ abstract class CatalogoController extends Controller
         return Inertia::render("{$this->vista}/Index", [
             'titulo' => $this->titulo,
             'registros' => $registros,
+            'kpis' => [
+                'total' => $this->consulta()->count(),
+                'activos' => $this->consulta()->where('estado', 'activo')->count(),
+                'inactivos' => $this->consulta()->where('estado', 'inactivo')->count(),
+            ],
             'filtros' => $request->only([...$this->buscables, ...$this->filtrosExactos, 'buscar', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
         ]);
@@ -125,6 +130,7 @@ abstract class CatalogoController extends Controller
         if ($this->generaClave && empty($datos['clave'])) {
             $datos['clave'] = $this->claveUnica($datos['nombre'] ?? '');
         }
+        $datos = $this->completarDatos($datos);
         $datos['estado'] ??= 'activo';
 
         $registro = $this->modelo::create($datos);
@@ -143,6 +149,7 @@ abstract class CatalogoController extends Controller
         $registro = $this->modelo::findOrFail($id);
         $request->merge($this->modelo::normalizarMayusculas($request->all()));
         $datos = $request->validate($this->reglas($request, $registro));
+        $datos = $this->completarDatos($datos, $registro);
 
         $registro->update($datos);
 
@@ -191,6 +198,16 @@ abstract class CatalogoController extends Controller
     private function esAltaRapida(Request $request): bool
     {
         return $request->header('X-Alta-Rapida') === '1';
+    }
+
+    /**
+     * Punto de extensión para que un catálogo concreto complete campos
+     * derivados (p. ej. un código autogenerado) antes de guardar. Por
+     * defecto no hace nada.
+     */
+    protected function completarDatos(array $datos, ?Model $registro = null): array
+    {
+        return $datos;
     }
 
     private function claveUnica(string $nombre): string

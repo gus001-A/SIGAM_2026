@@ -35,8 +35,6 @@ class GuardarSucursalRequest extends FormRequest
             'direccion' => ['nullable', 'string', 'max:255'],
             'telefono' => ['nullable', 'digits:10'],
             'correo' => ['nullable', 'email', 'max:255'],
-            'responsable_id' => ['nullable', 'integer', Rule::exists('usuarios', 'id')],
-            'estado' => ['required', Rule::in(['activo', 'inactivo'])],
             'notas' => ['nullable', 'string'],
         ];
     }

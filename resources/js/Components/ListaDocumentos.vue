@@ -11,6 +11,7 @@ import {
     FileWordOutlined,
     FileUnknownOutlined,
     PaperClipOutlined,
+    PictureOutlined,
 } from '@ant-design/icons-vue';
 import SubirDocumento from '@/Components/SubirDocumento.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
@@ -67,8 +68,8 @@ const eliminar = async (d) => {
     if (ok) router.delete(route('documentos.destroy', d.id), { preserveScroll: true });
 };
 
-const abrirSubir = () => subir.value.abrir();
-defineExpose({ abrirSubir });
+const abrirSubirImagen = () => subir.value.abrirImagen();
+const abrirSubirPdf = () => subir.value.abrirPdf();
 
 const vacio = computed(() => props.documentos.length === 0);
 </script>
@@ -76,10 +77,22 @@ const vacio = computed(() => props.documentos.length === 0);
 <template>
     <div class="ldoc">
         <div v-if="puedeSubir" class="ldoc__top">
-            <a-button type="primary" ghost size="small" @click="abrirSubir">
-                <template #icon><PaperClipOutlined /></template>
-                Adjuntar documento
-            </a-button>
+            <a-dropdown trigger="click" :get-popup-container="(trigger) => trigger.closest('dialog') ?? document.body">
+                <a-button type="primary" ghost size="small">
+                    <template #icon><PaperClipOutlined /></template>
+                    Adjuntar documento
+                </a-button>
+                <template #overlay>
+                    <a-menu>
+                        <a-menu-item key="imagen" @click="abrirSubirImagen">
+                            <PictureOutlined /> Imagen (o tomar foto)
+                        </a-menu-item>
+                        <a-menu-item key="pdf" @click="abrirSubirPdf">
+                            <FilePdfOutlined /> PDF
+                        </a-menu-item>
+                    </a-menu>
+                </template>
+            </a-dropdown>
         </div>
 
         <div v-if="!vacio" class="ldoc__grid">

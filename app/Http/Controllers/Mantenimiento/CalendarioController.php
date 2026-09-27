@@ -34,7 +34,8 @@ class CalendarioController extends Controller
         $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
 
         $ordenes = Mantenimiento::query()
-            ->with(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'tipo:id,nombre,categoria', 'prioridad:id,nombre,color', 'estado:id,nombre,clave', 'tecnicos:id,nombre'])
+            ->with(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'tipo:id,nombre,categoria', 'prioridad:id,nombre,color', 'estado:id,nombre,clave',
+                'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at')])
             ->whereBetween('programado_inicio', [$desde, $hasta])
             ->when($sucursalId, fn (Builder $q, $v) => $q->where('sucursal_id', $v))
             ->when($request->integer('tipo_id'), fn (Builder $q, $v) => $q->where('tipo_id', $v))

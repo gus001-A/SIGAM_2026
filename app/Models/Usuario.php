@@ -9,7 +9,6 @@ use App\Notifications\RestablecerContrasena;
 use Database\Factories\UsuarioFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -39,9 +38,9 @@ class Usuario extends Authenticatable
         'email',
         'telefono',
         'password',
-        'sucursal_id',
         'estado',
         'ultimo_acceso_at',
+        // `sucursal_id` se eliminó: ahora la relación es multi-sucursal (pivote).
     ];
 
     protected $hidden = [
@@ -74,9 +73,15 @@ class Usuario extends Authenticatable
 
     // --- Relaciones -----------------------------------------------------
 
-    public function sucursal(): BelongsTo
+    /** Sucursales a las que pertenece el usuario (muchas a muchas). */
+    public function sucursales(): BelongsToMany
     {
-        return $this->belongsTo(Sucursal::class);
+        return $this->belongsToMany(
+            Sucursal::class,
+            'sucursal_usuario',
+            'usuario_id',
+            'sucursal_id',
+        )->withTimestamps();
     }
 
     public function sucursalesResponsable(): HasMany

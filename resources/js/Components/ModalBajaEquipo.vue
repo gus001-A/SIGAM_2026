@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import { InboxOutlined } from '@ant-design/icons-vue';
+import BotonTomarFoto from '@/Components/BotonTomarFoto.vue';
 
 const abierto = ref(false);
 const equipo = ref(null);
@@ -48,21 +49,21 @@ defineExpose({ abrir });
 <template>
     <a-modal
         v-model:open="abierto"
-        title="Dar de baja el equipo"
-        ok-text="Dar de baja"
+        title="Marcar el equipo como fuera de servicio"
+        ok-text="Marcar fuera de servicio"
         cancel-text="Cancelar"
         :confirm-loading="form.processing"
         :ok-button-props="{ danger: true }"
         @ok="enviar"
     >
         <p v-if="equipo" class="opacity-70 mb-3">
-            <strong>{{ equipo.codigo_activo }}</strong> — {{ equipo.descripcion }}. Se conservará en el
-            historial y podrás consultarlo o reactivarlo después.
+            <strong>{{ equipo.codigo_activo }}</strong> — {{ equipo.descripcion }}. Seguirá visible en el
+            listado con estado "Fuera de servicio"; puedes reactivarlo editándolo cuando quieras.
         </p>
 
         <a-form layout="vertical">
             <a-form-item
-                label="Motivo de la baja"
+                label="Motivo"
                 required
                 :validate-status="form.errors.motivo ? 'error' : ''"
                 :help="form.errors.motivo"
@@ -90,6 +91,8 @@ defineExpose({ abrir });
                     <p class="ant-upload-text">Foto o reporte del estado del equipo</p>
                     <p class="ant-upload-hint">PDF, JPG, PNG o WEBP · máx. 20 MB</p>
                 </a-upload-dragger>
+                <BotonTomarFoto block class="mt-2" texto="O tomar foto con la cámara"
+                    titulo="Evidencia de baja" @capturada="antesDeSubir" />
             </a-form-item>
         </a-form>
     </a-modal>

@@ -20,6 +20,7 @@ use App\Models\TipoMantenimiento;
 use App\Models\Ubicacion;
 use App\Models\Usuario;
 use App\Support\Auditoria;
+use App\Support\Documentos;
 use App\Support\Folios;
 use App\Support\Frecuencia;
 use App\Support\ImportadorEquipos;
@@ -60,11 +61,6 @@ class EquipoController extends Controller
         return redirect()->route('equipos.por_sucursal', $request->query());
     }
 
-    /**
-     * Panorama del inventario por sucursal: comparativa de valor/cantidad
-     * entre sucursales + KPIs de la sucursal seleccionada, para toma de
-     * decisiones (RF de negocio: "trabajar por sucursales, como en el RIC").
-     */
     public function porSucursal(Request $request): Response
     {
         $this->authorize('equipos.ver');
@@ -86,18 +82,27 @@ class EquipoController extends Controller
         $modoTodas = $sucursalId === null;
         $sucursal = $modoTodas || $resumen->firstWhere('id', $sucursalId);
 
+        // 👇 Modo "ver dados de baja" — viene del frontend como 1/0
+        $verBajas = $request->boolean('bajas');
+
         $kpis = null;
         if ($sucursal) {
             $abiertos = EstadoMantenimiento::where('es_abierto', true)->pluck('id');
-            $equipos = Equipo::when($sucursalId, fn (Builder $q, $v) => $q->where('sucursal_id', $v));
+
+            // Para KPIs de activos, siempre excluimos trashed (solo activos)
+            $equiposActivos = Equipo::query()
+                ->when($sucursalId, fn (Builder $q, $v) => $q->where('sucursal_id', $v));
 
             $kpis = [
-                'total_equipos' => (clone $equipos)->count(),
-                'valor_total' => (float) (clone $equipos)->sum('valor_adquisicion'),
-                'operativos' => (clone $equipos)->whereHas('estado', fn (Builder $q) => $q->where('es_operativo', true))->count(),
-                'fuera_operacion' => (clone $equipos)->whereHas('estado', fn (Builder $q) => $q->where('es_operativo', false))->count(),
+                'total_equipos' => (clone $equiposActivos)->count(),
+                'valor_total' => (float) (clone $equiposActivos)->sum('valor_adquisicion'),
+                'operativos' => (clone $equiposActivos)->whereHas('estado', fn (Builder $q) => $q->where('es_operativo', true))->count(),
+                'fuera_operacion' => (clone $equiposActivos)->whereHas('estado', fn (Builder $q) => $q->where('es_operativo', false))->count(),
                 'mantenimientos_pendientes' => Mantenimiento::when($sucursalId, fn (Builder $q, $v) => $q->where('sucursal_id', $v))->whereIn('estado_id', $abiertos)->count(),
                 'solicitudes_abiertas' => SolicitudMantenimiento::when($sucursalId, fn (Builder $q, $v) => $q->where('sucursal_id', $v))->whereIn('estado_id', $abiertos)->count(),
+                'dados_de_baja' => Equipo::onlyTrashed()
+                    ->when($sucursalId, fn (Builder $q, $v) => $q->where('sucursal_id', $v))
+                    ->count(),
             ];
         }
 
@@ -107,10 +112,18 @@ class EquipoController extends Controller
 
         $listado = null;
         if ($sucursal) {
-            $listado = Equipo::query()
-                ->when($request->boolean('bajas'), fn (Builder $q) => $q->onlyTrashed())
+            // 👇 CLAVE: si $verBajas, SOLO trashed. Si no, SOLO activos (default del modelo).
+            $query = $verBajas ? Equipo::onlyTrashed() : Equipo::query();
+
+            $listado = $query
                 ->when($sucursalId, fn (Builder $q, $v) => $q->where('sucursal_id', $v))
-                ->with(['tipo:id,nombre', 'marca:id,nombre', 'ubicacion:id,nombre', 'estado:id,nombre,color', 'bajaPor:id,nombre'])
+                ->with([
+                    'tipo:id,nombre',
+                    'marca:id,nombre',
+                    'ubicacion:id,nombre',
+                    'estado:id,nombre,color',
+                    'bajaPor:id,nombre',
+                ])
                 ->when($texto('codigo'), fn (Builder $q, $v) => $q->where('codigo_activo', 'like', "%{$v}%"))
                 ->when($texto('descripcion'), fn (Builder $q, $v) => $q->where('descripcion', 'like', "%{$v}%"))
                 ->when($texto('serie'), fn (Builder $q, $v) => $q->where('numero_serie', 'like', "%{$v}%"))
@@ -150,6 +163,7 @@ class EquipoController extends Controller
                 'motivo_baja' => $e->motivo_baja,
                 'baja_por' => $e->bajaPor?->nombre,
                 'baja_en' => $e->baja_en,
+                'deleted_at' => $e->deleted_at,
             ]);
         }
 
@@ -230,12 +244,17 @@ class EquipoController extends Controller
         return redirect()->route('equipos.show', $equipo)->with('exito', 'Equipo registrado.');
     }
 
-    /** Acepta también equipos dados de baja, para poder consultarlos (§13). */
+    /**
+     * Muestra el expediente del equipo. Ahora también permite ver equipos
+     * dados de baja (modo lectura, marcado con `dado_de_baja = true`) para
+     * poder consultar su registro histórico desde el listado de bajas.
+     */
     public function show(int $equipo): Response
     {
         $this->authorize('equipos.ver');
 
         $equipo = Equipo::withTrashed()->findOrFail($equipo);
+
         $equipo->load([
             'tipo:id,nombre', 'marca:id,nombre', 'sucursal:id,nombre', 'ubicacion:id,nombre',
             'proveedor:id,razon_social,nombre_comercial', 'responsable:id,nombre', 'estado',
@@ -250,7 +269,9 @@ class EquipoController extends Controller
 
         return Inertia::render('Inventario/Equipos/Show', [
             'equipo' => $equipo,
+            'dadoDeBaja' => $equipo->trashed(),   // 👈 para que Show.vue lo marque visualmente
             'sello' => $equipo->selloAuditoria(),
+            'estados' => EstadoEquipo::activos()->orderBy('nombre')->get(['id', 'nombre']),
             'mantenimientos' => $equipo->mantenimientos()
                 ->with(['tipo:id,nombre', 'estado:id,nombre', 'prioridad:id,nombre'])
                 ->latest('id')
@@ -310,6 +331,11 @@ class EquipoController extends Controller
         return redirect()->route('equipos.show', $equipo)->with('exito', 'Equipo actualizado.');
     }
 
+    /**
+     * "Eliminar" un equipo aplica un soft delete real: desaparece del listado
+     * activo y sólo se ve en "Ver dados de baja". Guarda motivo y evidencia
+     * en su expediente para trazabilidad (§13).
+     */
     public function destroy(Request $request, Equipo $equipo): RedirectResponse
     {
         $this->authorize('equipos.desactivar');
@@ -322,43 +348,54 @@ class EquipoController extends Controller
         $sucursalId = $equipo->sucursal_id;
 
         if ($request->hasFile('evidencia')) {
-            $archivo = $request->file('evidencia');
-            $ruta = $archivo->store('documentos/'.now()->format('Y/m'), 'local');
-
-            $documento = Documento::create([
-                'disco' => 'local',
-                'ruta' => $ruta,
-                'nombre_original' => $archivo->getClientOriginalName(),
-                'titulo' => 'Evidencia de baja',
-                'categoria' => 'baja',
-                'tipo_mime' => $archivo->getClientMimeType(),
-                'tamano' => $archivo->getSize(),
-                'checksum' => hash_file('sha256', $archivo->getRealPath()),
-                'visibilidad' => 'privado',
-                'subido_por' => $request->user()->id,
-            ]);
-
-            $equipo->documentos()->attach($documento->id, ['rol' => 'baja']);
+            Documentos::adjuntarEvidencia(
+                $equipo,
+                $request->file('evidencia'),
+                $request->user()->id,
+                'Evidencia de baja',
+                'baja',
+            );
         }
 
-        $equipo->update([
-            'motivo_baja' => $datos['motivo'],
-            'baja_por' => $request->user()->id,
-            'baja_en' => now(),
-        ]);
-        $equipo->delete();
+        DB::transaction(function () use ($equipo, $datos, $request): void {
+            $equipo->update([
+                'motivo_baja' => $datos['motivo'],
+                'baja_por' => $request->user()->id,
+                'baja_en' => now(),
+            ]);
 
-        return redirect()->route('equipos.por_sucursal', ['sucursal_id' => $sucursalId])->with('exito', 'Equipo dado de baja.');
+            // 👇 Soft delete real: pasa a "solo bajas", ya no se puede ver ni editar.
+            $equipo->delete();
+        });
+
+        return redirect()
+            ->route('equipos.por_sucursal', ['sucursal_id' => $sucursalId, 'bajas' => 1])
+            ->with('exito', 'Equipo dado de baja.');
     }
 
-    /** Reactiva un equipo dado de baja — RF de trazabilidad (§13). */
-    public function restore(int $equipo): RedirectResponse
+    /**
+     * Reactiva un equipo dado de baja. El usuario elige el estado con el que
+     * se reactiva (por defecto "Operativo").
+     */
+    public function restore(Request $request, int $equipo): RedirectResponse
     {
         $this->authorize('equipos.editar');
 
+        $datos = $request->validate([
+            'estado_id' => ['required', 'integer', 'exists:estados_equipo,id'],
+        ]);
+
         $registro = Equipo::onlyTrashed()->findOrFail($equipo);
-        $registro->restore();
-        $registro->update(['motivo_baja' => null, 'baja_por' => null, 'baja_en' => null]);
+
+        DB::transaction(function () use ($registro, $datos): void {
+            $registro->restore();
+            $registro->update([
+                'estado_id' => $datos['estado_id'],
+                'motivo_baja' => null,
+                'baja_por' => null,
+                'baja_en' => null,
+            ]);
+        });
 
         return back()->with('exito', 'Equipo reactivado.');
     }

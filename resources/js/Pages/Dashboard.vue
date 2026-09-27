@@ -2,7 +2,6 @@
 import { computed } from 'vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import {
-    ApartmentOutlined,
     ArrowRightOutlined,
     CalendarOutlined,
     CheckSquareOutlined,
@@ -11,11 +10,12 @@ import {
     EnvironmentOutlined,
     ExclamationCircleOutlined,
     FileTextOutlined,
+    SafetyCertificateOutlined,
     ThunderboltOutlined,
     ToolOutlined,
+    UserOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import SeccionFicha from '@/Components/SeccionFicha.vue';
 
 const props = defineProps({
     tarjetas: { type: Object, default: () => ({}) },
@@ -24,6 +24,7 @@ const props = defineProps({
     preventivos_proximos: { type: Array, default: () => [] },
     tareas_proximas: { type: Array, default: () => [] },
 });
+
 const page = usePage();
 const nombre = computed(() => (page.props.auth.user?.nombre ?? page.props.auth.user?.name ?? '').split(' ')[0]);
 
@@ -33,6 +34,7 @@ const saludo = computed(() => {
     if (h < 19) return 'Buenas tardes';
     return 'Buenas noches';
 });
+
 const hoy = computed(() =>
     new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
 );
@@ -40,24 +42,30 @@ const hoy = computed(() =>
 const moneda = (v) =>
     new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(v || 0);
 
+/* ------------------------------------------------------------------ */
+/* KPIs                                                                */
+/* ------------------------------------------------------------------ */
 const kpis = computed(() => [
-    { titulo: 'Equipos', valor: props.tarjetas.total_equipos ?? 0, icon: ToolOutlined, color: '#0d84c9', ruta: 'equipos.por_sucursal' },
-    { titulo: 'Valor de inventario', valor: moneda(props.tarjetas.valor_inventario), icon: DollarOutlined, color: '#1f9e86' },
-    { titulo: 'Mantenimientos pendientes', valor: props.tarjetas.mantenimientos_pendientes ?? 0, icon: ClockCircleOutlined, color: '#173a5f', ruta: 'mantenimientos.index' },
-    { titulo: 'Órdenes urgentes', valor: props.tarjetas.urgentes ?? 0, icon: ThunderboltOutlined, color: '#d64545' },
-    { titulo: 'Preventivos vencidos', valor: props.tarjetas.preventivos_vencidos ?? 0, icon: CalendarOutlined, color: '#e08a1e', ruta: 'planes.index' },
-    { titulo: 'Solicitudes abiertas', valor: props.tarjetas.solicitudes_abiertas ?? 0, icon: FileTextOutlined, color: '#6b4bc9', ruta: 'solicitudes.index' },
-    { titulo: 'Tareas pendientes', valor: props.tarjetas.tareas_pendientes ?? 0, icon: CheckSquareOutlined, color: '#0d84c9', ruta: 'tareas.index' },
-    { titulo: 'Tareas vencidas', valor: props.tarjetas.tareas_vencidas ?? 0, icon: ExclamationCircleOutlined, color: '#d64545', ruta: 'tareas.index' },
+    { titulo: 'Equipos', valor: props.tarjetas.total_equipos ?? 0, icon: ToolOutlined, color: '#0d84c9', grad: 'linear-gradient(135deg, #0d84c9, #38a8e8)', bg: 'rgba(13, 132, 201, 0.14)', ruta: 'equipos.por_sucursal', trend: null },
+    { titulo: 'Inventario', valor: moneda(props.tarjetas.valor_inventario), icon: DollarOutlined, color: '#1f9e86', grad: 'linear-gradient(135deg, #1f9e86, #4fd4b6)', bg: 'rgba(31, 158, 134, 0.14)', ruta: null, trend: 'up' },
+    { titulo: 'Mant. pendientes', valor: props.tarjetas.mantenimientos_pendientes ?? 0, icon: ClockCircleOutlined, color: '#173a5f', grad: 'linear-gradient(135deg, #173a5f, #3f6b9c)', bg: 'rgba(23, 58, 95, 0.14)', ruta: 'mantenimientos.index', trend: null },
+    { titulo: 'Urgentes', valor: props.tarjetas.urgentes ?? 0, icon: ThunderboltOutlined, color: '#d64545', grad: 'linear-gradient(135deg, #d64545, #ff7a7a)', bg: 'rgba(214, 69, 69, 0.14)', ruta: 'mantenimientos.index', trend: 'alert' },
+    { titulo: 'Prev. vencidos', valor: props.tarjetas.preventivos_vencidos ?? 0, icon: CalendarOutlined, color: '#e08a1e', grad: 'linear-gradient(135deg, #e08a1e, #ffb85c)', bg: 'rgba(224, 138, 30, 0.16)', ruta: 'planes.index', trend: 'alert' },
+    { titulo: 'Solicitudes', valor: props.tarjetas.solicitudes_abiertas ?? 0, icon: FileTextOutlined, color: '#6b4bc9', grad: 'linear-gradient(135deg, #6b4bc9, #a48bff)', bg: 'rgba(107, 75, 201, 0.14)', ruta: 'solicitudes.index', trend: null },
+    { titulo: 'Tareas pend.', valor: props.tarjetas.tareas_pendientes ?? 0, icon: CheckSquareOutlined, color: '#0d84c9', grad: 'linear-gradient(135deg, #0d84c9, #38a8e8)', bg: 'rgba(13, 132, 201, 0.14)', ruta: 'tareas.index', trend: null },
+    { titulo: 'Tareas venc.', valor: props.tarjetas.tareas_vencidas ?? 0, icon: ExclamationCircleOutlined, color: '#d64545', grad: 'linear-gradient(135deg, #d64545, #ff7a7a)', bg: 'rgba(214, 69, 69, 0.14)', ruta: 'tareas.index', trend: 'alert' },
 ]);
 
-const alertasHero = computed(() =>
-    [
-        props.tarjetas.urgentes ? { texto: `${props.tarjetas.urgentes} orden${props.tarjetas.urgentes === 1 ? '' : 'es'} urgente${props.tarjetas.urgentes === 1 ? '' : 's'}`, ruta: 'mantenimientos.index' } : null,
-        props.tarjetas.preventivos_vencidos ? { texto: `${props.tarjetas.preventivos_vencidos} preventivo${props.tarjetas.preventivos_vencidos === 1 ? '' : 's'} vencido${props.tarjetas.preventivos_vencidos === 1 ? '' : 's'}`, ruta: 'planes.index' } : null,
-        props.tarjetas.tareas_vencidas ? { texto: `${props.tarjetas.tareas_vencidas} tarea${props.tarjetas.tareas_vencidas === 1 ? '' : 's'} vencida${props.tarjetas.tareas_vencidas === 1 ? '' : 's'}`, ruta: 'tareas.index' } : null,
-    ].filter(Boolean),
-);
+/* Límite de cards visibles por panel (6 por panel = grid 3×2) */
+const LIMITE = 6;
+const agendaVisibles = computed(() => props.agenda.slice(0, LIMITE));
+const agendaResto = computed(() => Math.max(0, props.agenda.length - LIMITE));
+const urgenciasVisibles = computed(() => props.urgencias.slice(0, LIMITE));
+const urgenciasResto = computed(() => Math.max(0, props.urgencias.length - LIMITE));
+const preventivosVisibles = computed(() => props.preventivos_proximos.slice(0, LIMITE));
+const preventivosResto = computed(() => Math.max(0, props.preventivos_proximos.length - LIMITE));
+const tareasVisibles = computed(() => props.tareas_proximas.slice(0, LIMITE));
+const tareasResto = computed(() => Math.max(0, props.tareas_proximas.length - LIMITE));
 
 const fecha = (v) => (v ? new Date(v).toLocaleDateString('es-MX') : '—');
 const ir = (ruta, params) => ruta && router.visit(route(ruta, params));
@@ -70,42 +78,8 @@ const diasRestantes = (v) => {
     objetivo.setHours(0, 0, 0, 0);
     return Math.round((objetivo - hoy) / 86400000);
 };
+
 const etiquetaDias = (v) => {
-    const d = diasRestantes(v);
-    if (d === null) return '';
-    if (d < 0) return 'Vencido';
-    if (d === 0) return 'Hoy';
-    if (d === 1) return 'Mañana';
-    if (d <= 30) return `En ${d} días`;
-
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const objetivo = new Date(v);
-    objetivo.setHours(0, 0, 0, 0);
-
-    let meses = (objetivo.getFullYear() - hoy.getFullYear()) * 12 + (objetivo.getMonth() - hoy.getMonth());
-    let dias = objetivo.getDate() - hoy.getDate();
-    if (dias < 0) {
-        meses -= 1;
-        dias += new Date(objetivo.getFullYear(), objetivo.getMonth(), 0).getDate();
-    }
-
-    const partes = [];
-    if (meses > 0) partes.push(`${meses} ${meses === 1 ? 'mes' : 'meses'}`);
-    if (dias > 0) partes.push(`${dias} ${dias === 1 ? 'día' : 'días'}`);
-
-    return `En ${partes.join(' y ')}`;
-};
-const colorDias = (v) => {
-    const d = diasRestantes(v);
-    if (d === null) return 'default';
-    if (d <= 3) return 'error';
-    if (d <= 7) return 'warning';
-    return 'success';
-};
-
-/** Igual que etiquetaDias pero abreviada (11 M 23 D en vez de "En 11 meses y 23 días"), para las tarjetas del panel de preventivos. */
-const tiempoAbrev = (v) => {
     const d = diasRestantes(v);
     if (d === null) return '';
     if (d < 0) return 'Vencido';
@@ -124,530 +98,851 @@ const tiempoAbrev = (v) => {
         meses -= 1;
         dias += new Date(objetivo.getFullYear(), objetivo.getMonth(), 0).getDate();
     }
-
     const partes = [];
     if (meses > 0) partes.push(`${meses} M`);
     if (dias > 0) partes.push(`${dias} D`);
     return partes.join(' ') || '0 D';
 };
 
+const colorDias = (v) => {
+    const d = diasRestantes(v);
+    if (d === null) return 'default';
+    if (d <= 3) return 'error';
+    if (d <= 7) return 'warning';
+    return 'success';
+};
+
 const COLOR_ESTADO_TAREA = { pendiente: 'gold', en_proceso: 'blue', realizada: 'green', cancelada: 'red' };
 const ETIQUETA_ESTADO_TAREA = { pendiente: 'Pendiente', en_proceso: 'En proceso', realizada: 'Realizada', cancelada: 'Cancelada' };
+
+const PANEL_COLORS = {
+    agenda: '#0d84c9',
+    urgencias: '#d64545',
+    preventivos: '#e08a1e',
+    tareas: '#6b4bc9',
+};
+const PANEL_GRADS = {
+    agenda: 'linear-gradient(135deg, #0d84c9, #38a8e8)',
+    urgencias: 'linear-gradient(135deg, #d64545, #ff7a7a)',
+    preventivos: 'linear-gradient(135deg, #e08a1e, #ffb85c)',
+    tareas: 'linear-gradient(135deg, #6b4bc9, #a48bff)',
+};
 </script>
 
 <template>
     <Head title="Panel de control" />
 
     <AppLayout titulo="Panel de control">
-        <div class="hero">
-            <div class="hero__txt">
-                <div class="hero__saludo">{{ saludo }}, {{ nombre || 'bienvenido' }}</div>
-                <div class="hero__fecha">{{ hoy }}</div>
-                <div v-if="alertasHero.length" class="hero__alertas">
-                    <button v-for="a in alertasHero" :key="a.texto" type="button" class="hero__alerta" @click="ir(a.ruta)">
-                        <ExclamationCircleOutlined /> {{ a.texto }}
-                    </button>
+        <div class="dash">
+            <!-- ============ HERO ============ -->
+            <div class="hero">
+                <div class="hero__deco hero__deco--1"></div>
+                <div class="hero__deco hero__deco--2"></div>
+                <div class="hero__shine"></div>
+
+                <div class="hero__txt">
+                    <div class="hero__saludo">{{ saludo }}, {{ nombre || 'bienvenido' }}</div>
+                    <div class="hero__fecha">
+                        <CalendarOutlined /> {{ hoy }}
+                    </div>
+                </div>
+
+                <div class="hero__ok">
+                    <SafetyCertificateOutlined /> Todo en orden
                 </div>
             </div>
-        </div>
 
-        <div class="kpis">
-            <button
-                v-for="kpi in kpis"
-                :key="kpi.titulo"
-                type="button"
-                class="kpi"
-                :class="{ 'kpi--link': kpi.ruta }"
-                :style="{ '--acc': kpi.color }"
-                @click="ir(kpi.ruta)"
-            >
-                <span class="kpi__ic"><component :is="kpi.icon" /></span>
-                <span class="kpi__t">
-                    <span class="kpi__v">{{ kpi.valor }}</span>
-                    <span class="kpi__l">{{ kpi.titulo }}</span>
-                </span>
-                <ArrowRightOutlined v-if="kpi.ruta" class="kpi__arrow" />
-            </button>
-        </div>
+            <!-- ============ KPIs ============ -->
+            <div class="kpis">
+                <button
+                    v-for="(kpi, i) in kpis"
+                    :key="kpi.titulo"
+                    type="button"
+                    class="kpi"
+                    :class="{ 'kpi--link': kpi.ruta, 'kpi--alert': kpi.trend === 'alert' }"
+                    :style="{ '--acc': kpi.color, '--acc-bg': kpi.bg, '--acc-grad': kpi.grad, animationDelay: `${i * 0.04}s` }"
+                    @click="ir(kpi.ruta)"
+                >
+                    <span class="kpi__ic"><component :is="kpi.icon" /></span>
+                    <span class="kpi__t">
+                        <span class="kpi__v">{{ kpi.valor }}</span>
+                        <span class="kpi__l">{{ kpi.titulo }}</span>
+                    </span>
+                    <span v-if="kpi.trend === 'alert'" class="kpi__pulse"></span>
+                </button>
+            </div>
 
-        <a-row :gutter="[16, 16]" class="mt-4">
-            <a-col :xs="24" :lg="12">
-                <a-card size="small" class="panel" style="--acc: #0d84c9">
-                    <SeccionFicha titulo="Agenda de próximos trabajos" :icono="CalendarOutlined" color="#0d84c9">
-                        <template #extra>
-                            <span class="panel__extra">
-                                <span class="panel-contador" style="--bc: #0d84c9">{{ agenda.length }}</span>
-                                <a class="panel__link" @click="ir('mantenimientos.index')">Ver todos <ArrowRightOutlined /></a>
-                            </span>
-                        </template>
-                        <div v-if="agenda.length" class="filas">
+            <!-- ============ PANELES ============ -->
+            <div class="paneles">
+                <!-- Agenda -->
+                <section class="panel-card" :style="{ '--acc': PANEL_COLORS.agenda, '--acc-grad': PANEL_GRADS.agenda, '--acc-bg': 'rgba(13, 132, 201, 0.14)' }">
+                    <header class="panel-card__head">
+                        <span class="panel-card__ic"><CalendarOutlined /></span>
+                        <div class="panel-card__tt">
+                            <h3 class="panel-card__t">Agenda próximos</h3>
+                            <span class="panel-card__s">Trabajos programados</span>
+                        </div>
+                        <span class="panel-card__contador">{{ agenda.length }}</span>
+                        <a class="panel-card__link" @click="ir('mantenimientos.index')">
+                            Ver <ArrowRightOutlined />
+                        </a>
+                    </header>
+                    <div class="panel-card__body">
+                        <div v-if="agenda.length" class="mini-grid">
                             <button
-                                v-for="item in agenda"
+                                v-for="(item, i) in agendaVisibles"
                                 :key="item.id"
                                 type="button"
-                                class="fila"
+                                class="mini-card"
+                                :style="{ '--c': PANEL_COLORS.agenda, '--cg': PANEL_GRADS.agenda, animationDelay: `${i * 0.03}s` }"
                                 @click="router.visit(route('mantenimientos.show', item.id))"
                             >
-                                <span class="fila__ic" style="--c: #0d84c9"><ToolOutlined /></span>
-                                <span class="fila__c">
-                                    <span class="fila__t">{{ item.folio }} · {{ item.equipo?.codigo_activo ?? item.ubicacion?.nombre ?? '' }}</span>
-                                    <span class="fila__s">{{ item.tipo?.nombre }} — {{ fecha(item.programado_inicio) }}</span>
+                                <span class="mini-card__top">
+                                    <span class="mini-card__ic"><ToolOutlined /></span>
+                                    <a-tag class="mini-card__tag" :color="item.prioridad?.color || 'default'">
+                                        {{ item.prioridad?.nombre }}
+                                    </a-tag>
                                 </span>
-                                <a-tag :color="item.prioridad?.color || 'default'">{{ item.prioridad?.nombre }}</a-tag>
+                                <span class="mini-card__t1">{{ item.folio }}</span>
+                                <span class="mini-card__t2">
+                                    {{ item.equipo?.codigo_activo ?? item.ubicacion?.nombre ?? '—' }}
+                                </span>
+                                <span class="mini-card__meta">
+                                    <ClockCircleOutlined /> {{ fecha(item.programado_inicio) }}
+                                </span>
+                            </button>
+                            <button v-if="agendaResto" type="button" class="mini-mas" @click="ir('mantenimientos.index')">
+                                +{{ agendaResto }} más <ArrowRightOutlined />
                             </button>
                         </div>
-                        <div v-else class="vacio-mini">
-                            <CalendarOutlined /> Sin trabajos programados
-                        </div>
-                    </SeccionFicha>
-                </a-card>
-            </a-col>
+                        <div v-else class="vacio-mini"><CalendarOutlined /> Sin trabajos</div>
+                    </div>
+                </section>
 
-            <a-col :xs="24" :lg="12">
-                <a-card size="small" class="panel" style="--acc: #d64545">
-                    <SeccionFicha titulo="Urgencias abiertas" :icono="ThunderboltOutlined" color="#d64545">
-                        <template #extra>
-                            <span class="panel-contador" style="--bc: #d64545">{{ urgencias.length }}</span>
-                        </template>
-                        <div v-if="urgencias.length" class="filas">
+                <!-- Urgencias -->
+                <section class="panel-card" :style="{ '--acc': PANEL_COLORS.urgencias, '--acc-grad': PANEL_GRADS.urgencias, '--acc-bg': 'rgba(214, 69, 69, 0.14)' }">
+                    <header class="panel-card__head">
+                        <span class="panel-card__ic"><ThunderboltOutlined /></span>
+                        <div class="panel-card__tt">
+                            <h3 class="panel-card__t">Urgencias abiertas</h3>
+                            <span class="panel-card__s">Requieren atención</span>
+                        </div>
+                        <span class="panel-card__contador">{{ urgencias.length }}</span>
+                    </header>
+                    <div class="panel-card__body">
+                        <div v-if="urgencias.length" class="mini-grid">
                             <button
-                                v-for="item in urgencias"
+                                v-for="(item, i) in urgenciasVisibles"
                                 :key="item.id"
                                 type="button"
-                                class="fila fila--alerta"
+                                class="mini-card mini-card--alerta"
+                                :style="{ '--c': PANEL_COLORS.urgencias, '--cg': PANEL_GRADS.urgencias, animationDelay: `${i * 0.03}s` }"
                                 @click="router.visit(route('mantenimientos.show', item.id))"
                             >
-                                <span class="fila__ic" style="--c: #d64545"><ThunderboltOutlined /></span>
-                                <span class="fila__c">
-                                    <span class="fila__t">{{ item.folio }} · {{ item.equipo?.codigo_activo ?? item.ubicacion?.nombre ?? '' }}</span>
-                                    <span class="fila__s">{{ item.estado?.nombre }}</span>
+                                <span class="mini-card__top">
+                                    <span class="mini-card__ic"><ThunderboltOutlined /></span>
+                                    <a-tag class="mini-card__tag" :color="item.prioridad?.color || 'red'">
+                                        {{ item.prioridad?.nombre ?? 'Urgente' }}
+                                    </a-tag>
                                 </span>
-                                <ArrowRightOutlined class="fila__go" />
+                                <span class="mini-card__t1">{{ item.folio }}</span>
+                                <span class="mini-card__t2">
+                                    {{ item.equipo?.codigo_activo ?? item.ubicacion?.nombre ?? '—' }}
+                                </span>
+                                <span class="mini-card__meta">
+                                    <ThunderboltOutlined /> {{ item.estado?.nombre ?? 'Abierta' }}
+                                </span>
+                            </button>
+                            <button v-if="urgenciasResto" type="button" class="mini-mas mini-mas--alert" @click="ir('mantenimientos.index')">
+                                +{{ urgenciasResto }} más <ArrowRightOutlined />
                             </button>
                         </div>
-                        <div v-else class="vacio-mini vacio-mini--ok">
-                            <ThunderboltOutlined /> Sin urgencias pendientes
-                        </div>
-                    </SeccionFicha>
-                </a-card>
-            </a-col>
+                        <div v-else class="vacio-mini vacio-mini--ok"><SafetyCertificateOutlined /> Sin urgencias</div>
+                    </div>
+                </section>
 
-            <a-col :xs="24" :lg="12">
-                <a-card size="small" class="panel" style="--acc: #e08a1e">
-                    <SeccionFicha titulo="Preventivos próximos" :icono="CalendarOutlined" color="#e08a1e">
-                        <template #extra>
-                            <span class="panel-contador" style="--bc: #e08a1e">{{ preventivos_proximos.length }}</span>
-                        </template>
-                        <div v-if="preventivos_proximos.length" class="filas">
+                <!-- Preventivos -->
+                <section class="panel-card" :style="{ '--acc': PANEL_COLORS.preventivos, '--acc-grad': PANEL_GRADS.preventivos, '--acc-bg': 'rgba(224, 138, 30, 0.16)' }">
+                    <header class="panel-card__head">
+                        <span class="panel-card__ic"><CalendarOutlined /></span>
+                        <div class="panel-card__tt">
+                            <h3 class="panel-card__t">Preventivos próximos</h3>
+                            <span class="panel-card__s">Mantenimiento programado</span>
+                        </div>
+                        <span class="panel-card__contador">{{ preventivos_proximos.length }}</span>
+                    </header>
+                    <div class="panel-card__body">
+                        <div v-if="preventivos_proximos.length" class="mini-grid">
                             <button
-                                v-for="(item, i) in preventivos_proximos"
+                                v-for="(item, i) in preventivosVisibles"
                                 :key="i"
                                 type="button"
-                                class="fila fila--doble"
+                                class="mini-card"
+                                :style="{ '--c': PANEL_COLORS.preventivos, '--cg': PANEL_GRADS.preventivos, animationDelay: `${i * 0.03}s` }"
                                 @click="router.visit(route('planes.show', item.plan.id))"
                             >
-                                <span class="fila__ic" style="--c: #e08a1e">
-                                    <ToolOutlined v-if="item.plan?.equipo" />
-                                    <EnvironmentOutlined v-else />
+                                <span class="mini-card__top">
+                                    <span class="mini-card__ic">
+                                        <ToolOutlined v-if="item.plan?.equipo" />
+                                        <EnvironmentOutlined v-else />
+                                    </span>
+                                    <a-tag class="mini-card__tag" :color="colorDias(item.fecha_programada)">
+                                        {{ etiquetaDias(item.fecha_programada) }}
+                                    </a-tag>
                                 </span>
-                                <span class="fila__c">
-                                    <span class="fila__linea">
-                                        <span class="fila__t">
-                                            {{ item.plan?.equipo?.codigo_activo ?? item.plan?.ubicacion?.codigo ?? '—' }}
-                                            · {{ item.plan?.tipo?.nombre ?? 'Preventivo' }}
-                                        </span>
-                                        <a-tag class="fila__chip" :color="colorDias(item.fecha_programada)">{{ tiempoAbrev(item.fecha_programada) }}</a-tag>
-                                    </span>
-                                    <span class="fila__linea">
-                                        <span class="fila__s">{{ item.plan?.sucursal?.nombre ?? '—' }}</span>
-                                        <span class="fila__s">{{ fecha(item.fecha_programada) }}</span>
-                                    </span>
+                                <span class="mini-card__t1">
+                                    {{ item.plan?.equipo?.codigo_activo ?? item.plan?.ubicacion?.codigo ?? '—' }}
+                                </span>
+                                <span class="mini-card__t2">{{ item.plan?.tipo?.nombre ?? 'Preventivo' }}</span>
+                                <span class="mini-card__meta">
+                                    <EnvironmentOutlined /> {{ item.plan?.sucursal?.nombre ?? fecha(item.fecha_programada) }}
                                 </span>
                             </button>
+                            <button v-if="preventivosResto" type="button" class="mini-mas mini-mas--warn" @click="ir('planes.index')">
+                                +{{ preventivosResto }} más <ArrowRightOutlined />
+                            </button>
                         </div>
-                        <div v-else class="vacio-mini">
-                            <CalendarOutlined /> Sin preventivos programados
-                        </div>
-                    </SeccionFicha>
-                </a-card>
-            </a-col>
+                        <div v-else class="vacio-mini"><CalendarOutlined /> Sin preventivos</div>
+                    </div>
+                </section>
 
-            <a-col :xs="24" :lg="12">
-                <a-card size="small" class="panel" style="--acc: #6b4bc9">
-                    <SeccionFicha titulo="Tareas próximas" :icono="CheckSquareOutlined" color="#6b4bc9">
-                        <template #extra>
-                            <span class="panel__extra">
-                                <span class="panel-contador" style="--bc: #6b4bc9">{{ tareas_proximas.length }}</span>
-                                <a class="panel__link" @click="ir('tareas.index')">Ver todas <ArrowRightOutlined /></a>
-                            </span>
-                        </template>
-                        <div v-if="tareas_proximas.length" class="filas">
+                <!-- Tareas -->
+                <section class="panel-card" :style="{ '--acc': PANEL_COLORS.tareas, '--acc-grad': PANEL_GRADS.tareas, '--acc-bg': 'rgba(107, 75, 201, 0.14)' }">
+                    <header class="panel-card__head">
+                        <span class="panel-card__ic"><CheckSquareOutlined /></span>
+                        <div class="panel-card__tt">
+                            <h3 class="panel-card__t">Tareas próximas</h3>
+                            <span class="panel-card__s">Pendientes por vencer</span>
+                        </div>
+                        <span class="panel-card__contador">{{ tareas_proximas.length }}</span>
+                        <a class="panel-card__link" @click="ir('tareas.index')">
+                            Ver <ArrowRightOutlined />
+                        </a>
+                    </header>
+                    <div class="panel-card__body">
+                        <div v-if="tareas_proximas.length" class="mini-grid">
                             <button
-                                v-for="item in tareas_proximas"
+                                v-for="(item, i) in tareasVisibles"
                                 :key="item.id"
                                 type="button"
-                                class="fila"
-                                :class="{ 'fila--alerta': diasRestantes(item.fecha_limite) < 0 }"
+                                class="mini-card"
+                                :class="{ 'mini-card--alerta': diasRestantes(item.fecha_limite) < 0 }"
+                                :style="{ '--c': PANEL_COLORS.tareas, '--cg': PANEL_GRADS.tareas, animationDelay: `${i * 0.03}s` }"
                                 @click="router.visit(route('tareas.show', item.id))"
                             >
-                                <span class="fila__ic" style="--c: #6b4bc9"><CheckSquareOutlined /></span>
-                                <span class="fila__c">
-                                    <span class="fila__t">{{ item.titulo || item.descripcion }}</span>
-                                    <span class="fila__s">{{ item.responsables?.map((r) => r.nombre).join(', ') || 'Sin responsable' }}</span>
+                                <span class="mini-card__top">
+                                    <span class="mini-card__ic"><CheckSquareOutlined /></span>
+                                    <a-tag class="mini-card__tag" :color="COLOR_ESTADO_TAREA[item.estado] ?? 'default'">
+                                        {{ ETIQUETA_ESTADO_TAREA[item.estado] ?? item.estado }}
+                                    </a-tag>
                                 </span>
-                                <a-tag :color="COLOR_ESTADO_TAREA[item.estado] ?? 'default'">{{ ETIQUETA_ESTADO_TAREA[item.estado] ?? item.estado }}</a-tag>
-                                <a-tag v-if="item.prioridad" :color="item.prioridad.color || 'default'">{{ item.prioridad.nombre }}</a-tag>
-                                <a-tag :color="colorDias(item.fecha_limite)">{{ etiquetaDias(item.fecha_limite) }}</a-tag>
+                                <span class="mini-card__t1">{{ item.titulo || item.descripcion }}</span>
+                                <span class="mini-card__t2">
+                                    <UserOutlined />
+                                    {{ item.responsables?.map((r) => r.nombre).join(', ') || 'Sin responsable' }}
+                                </span>
+                                <span class="mini-card__meta">
+                                    <ClockCircleOutlined /> {{ etiquetaDias(item.fecha_limite) }}
+                                </span>
+                            </button>
+                            <button v-if="tareasResto" type="button" class="mini-mas mini-mas--purple" @click="ir('tareas.index')">
+                                +{{ tareasResto }} más <ArrowRightOutlined />
                             </button>
                         </div>
-                        <div v-else class="vacio-mini vacio-mini--ok">
-                            <CheckSquareOutlined /> Sin tareas pendientes
-                        </div>
-                    </SeccionFicha>
-                </a-card>
-            </a-col>
-        </a-row>
+                        <div v-else class="vacio-mini vacio-mini--ok"><CheckSquareOutlined /> Sin tareas</div>
+                    </div>
+                </section>
+            </div>
+        </div>
     </AppLayout>
 </template>
 
 <style scoped>
-/* ---------- Banner de bienvenida ---------- */
+/* ================================================================
+   ANIMACIONES GLOBALES
+   ================================================================ */
+@keyframes sigam-fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes sigam-pop {
+    0%   { opacity: 0; transform: scale(0.94); }
+    60%  { opacity: 1; transform: scale(1.02); }
+    100% { opacity: 1; transform: scale(1); }
+}
+@keyframes sigam-shine {
+    0%   { transform: translateX(-120%) skewX(-20deg); opacity: 0; }
+    40%  { opacity: 0.55; }
+    100% { transform: translateX(220%) skewX(-20deg); opacity: 0; }
+}
+@keyframes sigam-pulse {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--acc) 55%, transparent); }
+    70%  { box-shadow: 0 0 0 8px color-mix(in srgb, var(--acc) 0%, transparent); }
+    100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--acc) 0%, transparent); }
+}
+@keyframes sigam-blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+
+/* ================================================================
+   LAYOUT GENERAL (sin scroll)
+   ================================================================ */
+.dash {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    min-height: 0;
+}
+
+/* ================================================================
+   HERO
+   ================================================================ */
 .hero {
     flex: none;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding: 22px 24px;
-    border-radius: 18px;
-    margin-bottom: 18px;
+    gap: 14px;
+    padding: 16px 22px;
+    border-radius: 16px;
     background: var(--sigam-grad);
     background-size: 200% 200%;
     animation: sigam-grad-shift 12s ease infinite;
-    box-shadow: 0 18px 40px -20px rgba(15, 44, 74, 0.55);
+    box-shadow: 0 18px 38px -20px rgba(15, 44, 74, 0.65), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
     position: relative;
     overflow: hidden;
 }
-.hero::after {
-    content: '';
+.hero__deco {
     position: absolute;
-    right: -60px;
-    top: -80px;
-    width: 240px;
-    height: 240px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+}
+.hero__deco--1 {
+    right: -50px;
+    top: -70px;
+    width: 210px;
+    height: 210px;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.02) 60%);
+}
+.hero__deco--2 {
+    left: -40px;
+    bottom: -60px;
+    width: 140px;
+    height: 140px;
+    background: radial-gradient(circle at 60% 40%, rgba(120, 230, 200, 0.22), rgba(255, 255, 255, 0.02) 70%);
+}
+.hero__shine {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: translateX(-120%) skewX(-20deg);
+    animation: sigam-shine 6s ease-in-out infinite;
+    pointer-events: none;
+}
+.hero__txt {
+    position: relative;
+    z-index: 1;
+    min-width: 220px;
 }
 .hero__saludo {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 800;
     color: #fff;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 .hero__saludo::first-letter {
     text-transform: uppercase;
 }
 .hero__fecha {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.82);
-    margin-top: 2px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.9);
+    margin-top: 3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 .hero__fecha::first-letter {
     text-transform: uppercase;
 }
-.hero__alertas {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 10px;
-}
-.hero__alerta {
+
+.hero__ok {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 11px;
+    padding: 6px 12px;
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    background: rgba(0, 0, 0, 0.14);
-    color: #fff;
+    background: rgba(31, 158, 134, 0.28);
+    border: 1px solid rgba(120, 230, 200, 0.5);
+    color: #e6fff8;
     font-size: 11.5px;
     font-weight: 700;
-    cursor: pointer;
-    transition: background 0.15s ease;
-    animation: sigam-fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    position: relative;
+    z-index: 1;
+    animation: sigam-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.hero__alerta:hover {
-    background: rgba(0, 0, 0, 0.26);
-}
-.hero__alerta .anticon {
-    color: #ffd7d7;
-}
-/* ---------- KPIs ---------- */
+
+/* ================================================================
+   KPIs
+   ================================================================ */
 .kpis {
+    flex: none;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 8px;
 }
-@media (max-width: 1100px) {
+@media (max-width: 1400px) {
     .kpis {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(4, 1fr);
     }
 }
-@media (max-width: 480px) {
+@media (max-width: 700px) {
     .kpis {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 .kpi {
     display: flex;
     align-items: center;
-    gap: 13px;
-    padding: 15px 16px;
+    gap: 9px;
+    padding: 10px 12px;
     background: #fff;
     border: 1px solid var(--sigam-borde);
-    border-radius: 15px;
+    border-radius: 12px;
     box-shadow: var(--sigam-sombra-sm);
     text-align: left;
     cursor: default;
     position: relative;
     overflow: hidden;
     transition: box-shadow 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
+    min-height: 60px;
+    animation: sigam-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .kpi::before {
     content: '';
     position: absolute;
     inset: 0 auto 0 0;
     width: 4px;
-    background: var(--acc);
+    background: var(--acc-grad);
 }
 .kpi::after {
     content: '';
     position: absolute;
     right: -30px;
     bottom: -30px;
-    width: 90px;
-    height: 90px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
-    background: color-mix(in srgb, var(--acc) 7%, transparent);
+    background: color-mix(in srgb, var(--acc) 8%, transparent);
+    transition: transform 0.3s ease;
+    pointer-events: none;
 }
 .kpi--link {
     cursor: pointer;
 }
 .kpi--link:hover {
-    box-shadow: 0 16px 30px -18px color-mix(in srgb, var(--acc) 55%, transparent);
+    box-shadow: 0 16px 30px -16px color-mix(in srgb, var(--acc) 65%, transparent);
     transform: translateY(-3px);
-    border-color: color-mix(in srgb, var(--acc) 40%, var(--sigam-borde));
+    border-color: color-mix(in srgb, var(--acc) 45%, var(--sigam-borde));
+}
+.kpi--link:hover::after {
+    transform: scale(1.4);
+}
+.kpi--alert {
+    background: linear-gradient(180deg, #fff 0%, #fff5f5 100%);
 }
 .kpi__ic {
-    width: 46px;
-    height: 46px;
+    width: 36px;
+    height: 36px;
     flex: none;
-    border-radius: 13px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 21px;
-    color: var(--acc);
-    background: color-mix(in srgb, var(--acc) 13%, #fff);
-    position: relative;
+    font-size: 17px;
+    color: #fff;
+    background: var(--acc-grad);
+    box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--acc) 70%, transparent);
+    transition: transform 0.2s ease;
+}
+.kpi--link:hover .kpi__ic {
+    transform: scale(1.08) rotate(-3deg);
 }
 .kpi__t {
     display: flex;
     flex-direction: column;
     min-width: 0;
     flex: 1;
-    position: relative;
 }
 .kpi__v {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 800;
     color: var(--sigam-navy);
     line-height: 1.05;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .kpi__l {
-    font-size: 11.5px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
     color: var(--sigam-tenue);
     margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.kpi__arrow {
-    color: #cbd5e1;
-    flex: none;
-    transition: color 0.15s ease, transform 0.15s ease;
-    position: relative;
+.kpi__pulse {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--acc);
+    animation: sigam-blink 1.6s ease-in-out infinite;
 }
-.kpi--link:hover .kpi__arrow {
-    color: var(--acc);
-    transform: translateX(3px);
+.kpi__pulse::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid var(--acc);
+    opacity: 0.4;
+    animation: sigam-pulse 1.8s ease-out infinite;
 }
 
-/* ---------- Paneles ---------- */
-.panel {
-    height: 100%;
-    border-top: 3px solid var(--acc, var(--sigam-teal));
-    border-radius: 10px;
-    transition: box-shadow 0.16s ease, transform 0.16s ease;
+/* ================================================================
+   PANELES (grid 2x2)
+   ================================================================ */
+.paneles {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 12px;
 }
-.panel:hover {
-    box-shadow: var(--sigam-sombra-sm);
+@media (max-width: 900px) {
+    .paneles {
+        grid-template-columns: 1fr;
+        grid-template-rows: none;
+        flex: none;
+    }
 }
-.panel__extra {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-}
-.panel-contador {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 21px;
-    height: 21px;
-    padding: 0 6px;
-    border-radius: 999px;
-    font-size: 11.5px;
-    font-weight: 800;
-    background: color-mix(in srgb, var(--bc, var(--sigam-navy)) 13%, #fff);
-    color: var(--bc, var(--sigam-navy));
-}
-.panel__link {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--sigam-teal-700);
-    cursor: pointer;
-    white-space: nowrap;
-}
-.filas {
+
+.panel-card {
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    min-height: 0;
+    background: #fff;
+    border: 1px solid var(--sigam-borde);
+    border-top: 3px solid transparent;
+    border-image: var(--acc-grad) 1;
+    border-radius: 12px;
+    box-shadow: var(--sigam-sombra-sm);
+    overflow: hidden;
+    transition: box-shadow 0.16s ease, transform 0.16s ease;
+    position: relative;
 }
-.fila {
+.panel-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--acc-grad);
+}
+.panel-card:hover {
+    box-shadow: 0 18px 34px -18px color-mix(in srgb, var(--acc) 55%, transparent);
+    transform: translateY(-2px);
+}
+
+.panel-card__head {
+    flex: none;
     display: flex;
     align-items: center;
-    gap: 11px;
-    width: 100%;
-    text-align: left;
-    padding: 9px 11px;
-    border: 1px solid var(--sigam-borde-suave);
-    border-radius: 11px;
-    background: #fff;
-    cursor: pointer;
-    transition: border-color 0.13s ease, box-shadow 0.13s ease, transform 0.13s ease, background 0.13s ease;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--sigam-borde-suave);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--acc) 7%, #fff) 0%, #fff 100%);
+    position: relative;
 }
-.fila--plano {
-    cursor: default;
-}
-.fila--alerta {
-    background: #fdf4f4;
-    border-color: #f4dede;
-}
-.fila:not(.fila--plano):hover {
-    border-color: var(--sigam-navy-100);
-    box-shadow: var(--sigam-sombra-sm);
-    transform: translateX(3px);
-}
-.fila__ic {
-    width: 33px;
-    height: 33px;
+.panel-card__ic {
+    width: 30px;
+    height: 30px;
     flex: none;
-    border-radius: 10px;
+    border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
-    color: var(--c);
-    background: color-mix(in srgb, var(--c) 14%, #fff);
+    font-size: 15px;
+    color: #fff;
+    background: var(--acc-grad);
+    box-shadow: 0 6px 12px -6px color-mix(in srgb, var(--acc) 65%, transparent);
+    transition: transform 0.2s ease;
 }
-.fila__c {
+.panel-card:hover .panel-card__ic {
+    transform: rotate(-6deg) scale(1.06);
+}
+.panel-card__tt {
     display: flex;
     flex-direction: column;
     min-width: 0;
     flex: 1;
 }
-.fila__t {
-    font-size: 13px;
+.panel-card__t {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--sigam-navy);
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.panel-card__s {
+    font-size: 10.5px;
+    color: var(--sigam-tenue);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.panel-card__contador {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    background: var(--acc-bg);
+    color: var(--acc);
+    flex: none;
+    border: 1px solid color-mix(in srgb, var(--acc) 25%, transparent);
+}
+.panel-card__link {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--acc);
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex: none;
+    transition: gap 0.15s ease, color 0.15s ease;
+}
+.panel-card__link:hover {
+    gap: 6px;
+    color: color-mix(in srgb, var(--acc) 80%, #000);
+}
+
+.panel-card__body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px 12px;
+}
+
+/* ================================================================
+   MINI-CARDS (grid 3×2 = 6 items)
+   ================================================================ */
+.mini-grid {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 8px;
+}
+.mini-card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 9px;
+    border: 1px solid var(--sigam-borde-suave);
+    border-left: 3px solid var(--c);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
+    transition: border-color 0.13s ease, box-shadow 0.13s ease, transform 0.13s ease, background 0.13s ease;
+    animation: sigam-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.mini-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--c) 8%, transparent), transparent 60%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+.mini-card:hover {
+    border-color: color-mix(in srgb, var(--c) 45%, var(--sigam-borde-suave));
+    box-shadow: 0 10px 20px -12px color-mix(in srgb, var(--c) 70%, transparent);
+    transform: translateY(-2px);
+}
+.mini-card:hover::after {
+    opacity: 1;
+}
+.mini-card--alerta {
+    background: linear-gradient(180deg, #fff 0%, color-mix(in srgb, var(--c) 6%, #fff) 100%);
+    border-color: color-mix(in srgb, var(--c) 30%, var(--sigam-borde-suave));
+}
+.mini-card__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+}
+.mini-card__ic {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #fff;
+    background: var(--cg);
+    box-shadow: 0 4px 8px -4px color-mix(in srgb, var(--c) 70%, transparent);
+    transition: transform 0.2s ease;
+}
+.mini-card:hover .mini-card__ic {
+    transform: scale(1.1) rotate(-4deg);
+}
+.mini-card__tag {
+    margin-inline-end: 0 !important;
+    font-size: 9.5px !important;
+    line-height: 15px !important;
+    height: 17px !important;
+    padding-inline: 5px !important;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: 999px !important;
+}
+.mini-card__t1 {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--sigam-navy);
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.15;
+    position: relative;
+    z-index: 1;
+}
+.mini-card__t2 {
+    font-size: 10px;
     font-weight: 600;
     color: var(--sigam-texto);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-.fila__s {
-    font-size: 11.5px;
-    color: var(--sigam-tenue);
-}
-.fila__go {
-    color: #cbd5e1;
-    flex: none;
-    font-size: 12px;
-}
-.fila--alerta:hover .fila__go {
-    color: #d64545;
-}
-
-/* ---------- Filas de dos líneas (preventivos: código+tipo / sucursal+fecha) ---------- */
-.fila--doble {
-    align-items: flex-start;
-}
-.fila--doble .fila__c {
-    gap: 3px;
-}
-.fila__linea {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    gap: 3px;
+    line-height: 1.15;
+    position: relative;
+    z-index: 1;
 }
-.fila__linea .fila__t {
-    flex: 1;
-    min-width: 0;
-}
-.fila__linea .fila__s {
-    flex: none;
-    white-space: nowrap;
-}
-.fila__linea .fila__s:first-child {
-    flex: 1;
-    min-width: 0;
+.mini-card__meta {
+    font-size: 9.5px;
+    color: var(--sigam-tenue);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: auto;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-.fila__chip {
-    flex: none;
-    margin-inline-end: 0 !important;
-}
-
-/* ---------- Responsivo ---------- */
-@media (max-width: 560px) {
-    .hero {
-        padding: 18px;
-    }
-    .hero__saludo {
-        font-size: 19px;
-    }
-    .kpi {
-        padding: 13px 14px;
-    }
+    line-height: 1.15;
+    position: relative;
+    z-index: 1;
 }
 
-/* ---------- Vacíos ---------- */
+.mini-mas {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px dashed var(--sigam-borde);
+    border-radius: 10px;
+    background: #fafbfc;
+    color: var(--sigam-tenue);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.13s ease, color 0.13s ease, border-color 0.13s ease, transform 0.13s ease;
+    animation: sigam-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.mini-mas:hover {
+    background: #eff6fc;
+    color: var(--sigam-navy);
+    border-color: color-mix(in srgb, var(--sigam-navy) 30%, var(--sigam-borde));
+    transform: translateY(-1px);
+}
+.mini-mas--alert:hover {
+    background: #fdf4f4;
+    color: #d64545;
+    border-color: #f4dede;
+}
+.mini-mas--warn:hover {
+    background: #fdf7ec;
+    color: #e08a1e;
+    border-color: #f7e4c4;
+}
+.mini-mas--purple:hover {
+    background: #f5f1fd;
+    color: #6b4bc9;
+    border-color: #ddd2f5;
+}
+
+/* ================================================================
+   VACÍOS
+   ================================================================ */
 .vacio-mini {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 30px 0 22px;
+    gap: 6px;
+    padding: 18px 0;
     color: var(--sigam-tenue);
-    font-size: 12.5px;
+    font-size: 12px;
     text-align: center;
+    flex: 1;
 }
 .vacio-mini .anticon {
-    font-size: 26px;
+    font-size: 22px;
     opacity: 0.35;
 }
 .vacio-mini--ok {

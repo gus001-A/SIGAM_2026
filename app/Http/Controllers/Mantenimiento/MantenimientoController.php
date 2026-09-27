@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Mantenimiento;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Mantenimiento\GuardarMantenimientoRequest;
+use App\Models\Documento;
 use App\Models\Equipo;
 use App\Models\EstadoMantenimiento;
 use App\Models\Mantenimiento;
@@ -15,6 +16,7 @@ use App\Models\Ubicacion;
 use App\Models\Usuario;
 use App\Support\Auditoria;
 use App\Support\CicloMantenimiento;
+use App\Support\Documentos;
 use App\Support\Folios;
 use App\Support\SeleccionSucursal;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,6 +46,27 @@ class MantenimientoController extends Controller
         $texto = fn (string $c): ?string => filled($request->query($c)) ? trim((string) $request->query($c)) : null;
         $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
 
+        // Alcance visible del usuario + sucursal (sin los demás filtros de
+        // texto/columna) para los KPIs — se quedan estables al filtrar.
+        $visibles = fn (Builder $q) => $q
+            ->when(
+                $usuario->hasRole('tecnico') && ! $usuario->hasAnyRole(['superadministrador', 'supervisor']),
+                fn (Builder $w) => $w->whereHas('asignaciones', fn (Builder $a) => $a->where('tecnico_id', $usuario->id)->whereNull('desasignado_at')),
+            )
+            ->when($sucursalId, fn (Builder $w, $v) => $w->where('sucursal_id', $v));
+
+        $kpis = [
+            'total' => Mantenimiento::query()->tap($visibles)->count(),
+            'abiertas' => Mantenimiento::query()->tap($visibles)
+                ->whereHas('estado', fn (Builder $q) => $q->where('es_abierto', true))->count(),
+            'vencidas' => Mantenimiento::query()->tap($visibles)
+                ->whereHas('estado', fn (Builder $q) => $q->where('es_abierto', true))
+                ->whereDate('programado_inicio', '<', today())->count(),
+            'sin_tecnico' => Mantenimiento::query()->tap($visibles)
+                ->whereHas('estado', fn (Builder $q) => $q->where('es_abierto', true))
+                ->whereDoesntHave('asignaciones', fn (Builder $q) => $q->whereNull('desasignado_at'))->count(),
+        ];
+
         $mantenimientos = Mantenimiento::query()
             ->with([
                 'equipo:id,codigo_activo,descripcion',
@@ -52,9 +75,13 @@ class MantenimientoController extends Controller
                 'tipo:id,nombre,categoria',
                 'prioridad:id,nombre,color',
                 'estado:id,nombre,clave',
-                'tecnicos:id,nombre',
+                // Solo la asignación vigente: `tecnicos` incluye por defecto a
+                // TODO técnico que alguna vez pasó por la orden (la relación no
+                // filtra por pivote), lo que duplicaba nombres en el listado
+                // cuando se reasignaba (el técnico quitado seguía apareciendo).
+                'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at'),
+                'creadoPor:id,nombre',
             ])
-            // El técnico solo ve las órdenes que tiene asignadas (§4).
             ->when(
                 $usuario->hasRole('tecnico') && ! $usuario->hasAnyRole(['superadministrador', 'supervisor']),
                 fn (Builder $q) => $q->whereHas('asignaciones', fn (Builder $a) => $a->where('tecnico_id', $usuario->id)->whereNull('desasignado_at')),
@@ -93,12 +120,14 @@ class MantenimientoController extends Controller
             'tecnicos' => $m->tecnicos->pluck('nombre')->implode(', '),
             'programado_inicio' => $m->programado_inicio,
             'completado_at' => $m->completado_at,
-            'creado_por' => $creadores[$m->id]['usuario'] ?? null,
+            'creado_por' => $m->creadoPor?->nombre ?? ($creadores[$m->id]['usuario'] ?? null),
             'creado_en' => $creadores[$m->id]['fecha'] ?? null,
+            'created_at' => $m->created_at,
         ]);
 
         return Inertia::render('Mantenimiento/Ordenes/Index', [
             'mantenimientos' => $mantenimientos,
+            'kpis' => $kpis,
             'sucursalId' => $sucursalId,
             'filtros' => $request->only(['folio', 'equipo', 'tipo_id', 'prioridad_id', 'estado_id', 'tecnico_id', 'desde', 'hasta', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
@@ -174,15 +203,35 @@ class MantenimientoController extends Controller
             'observaciones.usuario:id,nombre',
             'materiales.material:id,nombre,unidad',
             'normas:id,codigo,nombre',
-            'historialEstados.estadoOrigen:id,nombre',
-            'historialEstados.estadoDestino:id,nombre',
+            'historialEstados.estadoOrigen:id,nombre,clave',
+            'historialEstados.estadoDestino:id,nombre,clave',
             'historialEstados.cambiadoPor:id,nombre',
             'reprogramaciones.reprogramadoPor:id,nombre',
             'documentos',
         ]);
 
+        // Cada documento expone su URL de descarga/previsualización segura
+        // (no un `$doc->url` como propiedad mágica: `url()` es un método
+        // normal del modelo, no una relación, así que hay que llamarlo).
+        $mantenimiento->documentos->each(fn (Documento $doc) => $doc->setAttribute('url', $doc->url()));
+
+        // La relación `observaciones()` (bitácora) y la columna de texto
+        // `observaciones` (captura de diagnóstico/trabajo) comparten nombre;
+        // al serializar, una relación cargada tapa el atributo del mismo
+        // nombre. Se expone la relación bajo otra llave para que ambas
+        // lleguen intactas al frontend.
+        $mantenimiento->setRelation('bitacora', $mantenimiento->getRelation('observaciones'));
+        $mantenimiento->unsetRelation('observaciones');
+        $this->adjuntarEvidenciaABitacora($mantenimiento);
+
+        $data = $mantenimiento->toArray();
+        $data['creado'] = [
+            'usuario' => $mantenimiento->creadoPor?->nombre,
+            'fecha' => $mantenimiento->created_at,
+        ];
+
         return Inertia::render('Mantenimiento/Ordenes/Show', [
-            'mantenimiento' => $mantenimiento,
+            'mantenimiento' => $data,
             'sello' => $mantenimiento->selloAuditoria(),
             'transicionesPosibles' => CicloMantenimiento::siguientes($mantenimiento->estado->clave),
             'faltantesCierre' => CicloMantenimiento::validarCierre($mantenimiento),
@@ -195,10 +244,39 @@ class MantenimientoController extends Controller
     }
 
     /**
-     * Técnicos activos, marcando como "recomendado" a quien tenga una
-     * especialidad de catálogo (tipo de equipo o de mantenimiento) que
-     * coincide con esta orden — para delegar con mejor criterio (Fase 38).
+     * transicion()/reprogramar() crean, en la misma transacción, tanto la
+     * entrada de bitácora como su documento de evidencia con un título
+     * predecible ("Evidencia: {estado}" / "Evidencia: reprogramación").
+     * Se empareja aquí para que la vista muestre la foto junto al
+     * movimiento sin tener que adivinarlo en el frontend.
      */
+    private function adjuntarEvidenciaABitacora(Mantenimiento $mantenimiento): void
+    {
+        $documentos = $mantenimiento->documentos;
+
+        $mantenimiento->bitacora->each(function ($obs) use ($documentos): void {
+            // `ConvierteMayusculas` ya guardó `cuerpo` y `titulo` en mayúsculas
+            // (ver camposMayusculas() de ObservacionMantenimiento/Documento).
+            $cuerpo = mb_strtoupper((string) $obs->cuerpo);
+            if (preg_match('/^SE MOVIÓ LA ORDEN A «(.+?)»\./u', $cuerpo, $coincidencia)) {
+                $titulo = mb_strtoupper("Evidencia: {$coincidencia[1]}");
+            } elseif (str_starts_with($cuerpo, 'SE REPROGRAMÓ LA ORDEN:')) {
+                $titulo = mb_strtoupper('Evidencia: reprogramación');
+            } else {
+                return;
+            }
+
+            $documento = $documentos
+                ->where('titulo', $titulo)
+                ->sortBy(fn (Documento $d) => abs($d->created_at->diffInSeconds($obs->created_at)))
+                ->first();
+
+            if ($documento) {
+                $obs->setAttribute('evidencia', $documento);
+            }
+        });
+    }
+
     private function tecnicosConRecomendacion(Mantenimiento $mantenimiento): Collection
     {
         return Usuario::role('tecnico')
@@ -211,7 +289,6 @@ class MantenimientoController extends Controller
                 'nombre' => $t->nombre,
                 'recomendado' => ($mantenimiento->equipo?->tipo_id && $t->especialidadesEquipo->pluck('id')->contains($mantenimiento->equipo->tipo_id))
                     || ($mantenimiento->tipo_id && $t->especialidadesMantenimiento->pluck('id')->contains($mantenimiento->tipo_id)),
-                // Resumen de cualidades para mostrar al elegirlo en "Asignar técnico" (§16-17).
                 'cualidades' => $t->especialidadesEquipo->pluck('nombre')
                     ->concat($t->especialidadesMantenimiento->pluck('nombre'))
                     ->values()
@@ -223,11 +300,9 @@ class MantenimientoController extends Controller
 
     public function edit(Mantenimiento $mantenimiento): RedirectResponse
     {
-        // La captura de trabajo se hace desde la ficha de la orden.
         return redirect()->route('mantenimientos.show', $mantenimiento);
     }
 
-    /** Captura de diagnóstico, actividades, observaciones y costos. RF-047. */
     public function update(Request $request, Mantenimiento $mantenimiento): RedirectResponse
     {
         $this->authorize('mantenimientos.editar');
@@ -247,7 +322,6 @@ class MantenimientoController extends Controller
         return back()->with('exito', 'Información de la orden actualizada.');
     }
 
-    /** Transición de estado validada contra la máquina de estados. RF-045. */
     public function transicion(Request $request, Mantenimiento $mantenimiento): RedirectResponse
     {
         $this->authorize('mantenimientos.editar');
@@ -255,6 +329,7 @@ class MantenimientoController extends Controller
         $datos = $request->validate([
             'estado' => ['required', 'string'],
             'nota' => ['nullable', 'string', 'max:500'],
+            'evidencia' => ['required', 'file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp'],
         ]);
 
         $origen = $mantenimiento->estado->clave;
@@ -293,12 +368,26 @@ class MantenimientoController extends Controller
                 'nota' => $datos['nota'] ?? null,
                 'cambiado_at' => now(),
             ]);
+
+            Documentos::adjuntarEvidencia(
+                $mantenimiento,
+                $request->file('evidencia'),
+                $request->user()->id,
+                "Evidencia: {$estadoDestino->nombre}",
+            );
+
+            // 👇 NUEVO: registrar el movimiento en la bitácora (observaciones)
+            $mantenimiento->observaciones()->create([
+                'tipo' => 'comentario',
+                'cuerpo' => "Se movió la orden a «{$estadoDestino->nombre}»."
+                                .(! empty($datos['nota']) ? " Nota: {$datos['nota']}" : ''),
+                'usuario_id' => $request->user()->id,
+            ]);
         });
 
         return back()->with('exito', "Orden movida a «{$destino}».");
     }
 
-    /** Reprogramación con motivo obligatorio; queda en historial. RF-051. */
     public function reprogramar(Request $request, Mantenimiento $mantenimiento): RedirectResponse
     {
         $this->authorize('mantenimientos.editar');
@@ -307,6 +396,7 @@ class MantenimientoController extends Controller
             'programado_inicio' => ['required', 'date', 'after_or_equal:today'],
             'programado_fin' => ['nullable', 'date', 'after:programado_inicio'],
             'motivo' => ['required', 'string', 'max:500'],
+            'evidencia' => ['required', 'file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp'],
         ], [
             'programado_inicio.after_or_equal' => 'La nueva fecha no puede ser anterior a hoy.',
             'programado_fin.after' => 'La fecha de fin debe ser posterior a la de inicio.',
@@ -326,6 +416,20 @@ class MantenimientoController extends Controller
             $mantenimiento->update([
                 'programado_inicio' => $datos['programado_inicio'],
                 'programado_fin' => $datos['programado_fin'] ?? null,
+            ]);
+
+            Documentos::adjuntarEvidencia(
+                $mantenimiento,
+                $request->file('evidencia'),
+                $request->user()->id,
+                'Evidencia: reprogramación',
+            );
+
+            // 👇 Registrar también la reprogramación en bitácora
+            $mantenimiento->observaciones()->create([
+                'tipo' => 'comentario',
+                'cuerpo' => "Se reprogramó la orden: {$datos['motivo']}",
+                'usuario_id' => $request->user()->id,
             ]);
         });
 
@@ -349,7 +453,6 @@ class MantenimientoController extends Controller
             return;
         }
 
-        // El técnico solo modifica trabajos que tiene asignados (§7).
         abort_unless(
             $mantenimiento->asignaciones()->where('tecnico_id', $usuario->id)->whereNull('desasignado_at')->exists(),
             403,

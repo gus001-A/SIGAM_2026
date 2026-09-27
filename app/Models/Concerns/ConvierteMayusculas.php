@@ -32,6 +32,17 @@ trait ConvierteMayusculas
     }
 
     /**
+     * Acceso público a `camposMayusculas()` para código externo al modelo
+     * (p. ej. el comando que reprocesa registros ya existentes).
+     *
+     * @return list<string>
+     */
+    public static function camposAMayuscular(): array
+    {
+        return (new static)->camposMayusculas();
+    }
+
+    /**
      * Sube a MAYÚSCULAS los mismos campos que `camposMayusculas()`, mirados
      * desde afuera del modelo. Se usa ANTES de validar `unique:` (p. ej.
      * `nombre`/`codigo`) para que la comparación no se rompa por diferencia

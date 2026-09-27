@@ -34,6 +34,10 @@ class ProveedorController extends Controller
 
         $texto = fn (string $clave): ?string => filled($request->query($clave)) ? trim((string) $request->query($clave)) : null;
 
+        // Filtro de estado: 'activo' | 'inactivo' | (vacío => todos)
+        $estado = $request->query('estado');
+        $estado = in_array($estado, ['activo', 'inactivo'], true) ? $estado : null;
+
         $proveedores = Proveedor::query()
             ->withCount('equipos')
             // Filtros por columna
@@ -46,9 +50,18 @@ class ProveedorController extends Controller
                 ->orWhere('telefono', 'like', "%{$v}%")
                 ->orWhere('correo', 'like', "%{$v}%")))
             ->when($texto('especialidad'), fn (Builder $q, $v) => $q->where('especialidad', 'like', "%{$v}%"))
+            // Filtro de estado: activo = no trashed; inactivo = only trashed; sin filtro = withTrashed (ambos)
             ->when(
-                $request->query('estado') === 'inactivo',
+                $estado === 'inactivo',
                 fn (Builder $q) => $q->onlyTrashed(),
+            )
+            ->when(
+                $estado === 'activo',
+                fn (Builder $q) => $q->whereNull('deleted_at'),
+            )
+            ->when(
+                $estado === null,
+                fn (Builder $q) => $q->withTrashed(),
             )
             ->when($request->filled('registrado_por'), fn (Builder $q) => $q->whereIn(
                 'id',
@@ -76,6 +89,12 @@ class ProveedorController extends Controller
 
         return Inertia::render('Inventario/Proveedores/Index', [
             'proveedores' => $proveedores,
+            'kpis' => [
+                'total' => Proveedor::withTrashed()->count(),
+                'activos' => Proveedor::count(),
+                'inactivos' => Proveedor::onlyTrashed()->count(),
+                'con_equipos' => Proveedor::has('equipos')->count(),
+            ],
             'filtros' => $request->only(['razon_social', 'rfc', 'contacto', 'especialidad', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
         ]);
@@ -155,6 +174,7 @@ class ProveedorController extends Controller
     {
         $this->authorize('proveedores.desactivar');
 
+        // No se borra físicamente: queda inactivo y con soft delete.
         $proveedor->update(['estado' => 'inactivo']);
         $proveedor->delete();
 
@@ -179,7 +199,7 @@ class ProveedorController extends Controller
     {
         $request->merge(Proveedor::normalizarMayusculas($request->all()));
 
-        return $request->validate([
+        $datos = $request->validate([
             'razon_social' => ['required', 'string', 'max:255'],
             'nombre_comercial' => ['nullable', 'string', 'max:255'],
             'rfc' => ['nullable', 'string', 'max:20', Rule::unique('proveedores', 'rfc')->ignore($proveedor?->id)],
@@ -188,8 +208,15 @@ class ProveedorController extends Controller
             'correo' => ['nullable', 'email', 'max:255'],
             'direccion' => ['nullable', 'string', 'max:255'],
             'especialidad' => ['nullable', 'string', 'max:255'],
-            'estado' => ['required', Rule::in(['activo', 'inactivo'])],
+            'estado' => ['nullable', Rule::in(['activo', 'inactivo'])],
             'notas' => ['nullable', 'string'],
         ]);
+
+        // Estado por defecto: activo al crear; se respeta el actual al editar.
+        if (! array_key_exists('estado', $datos) || $datos['estado'] === null) {
+            $datos['estado'] = $proveedor?->estado ?? 'activo';
+        }
+
+        return $datos;
     }
 }

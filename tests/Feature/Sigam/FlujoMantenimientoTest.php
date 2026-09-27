@@ -13,6 +13,7 @@ use App\Support\CicloMantenimiento;
 use Database\Seeders\CatalogosSeeder;
 use Database\Seeders\RolesPermisosSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class FlujoMantenimientoTest extends TestCase
@@ -65,19 +66,31 @@ class FlujoMantenimientoTest extends TestCase
         $this->assertSame('asignado', $orden->refresh()->estado->clave);
 
         // 4. El técnico inicia y documenta.
-        $this->actingAs($tecnico)->post(route('mantenimientos.transicion', $orden), ['estado' => 'en_proceso'])->assertRedirect();
+        $this->actingAs($tecnico)->post(route('mantenimientos.transicion', $orden), [
+            'estado' => 'en_proceso',
+            'evidencia' => UploadedFile::fake()->image('inicio.jpg'),
+        ])->assertRedirect();
         $this->actingAs($tecnico)->patch(route('mantenimientos.update', $orden), [
             'diagnostico' => 'Capacitor dañado.',
             'descripcion_trabajo' => 'Reemplazo de capacitor y prueba.',
         ])->assertRedirect();
-        $this->actingAs($tecnico)->post(route('mantenimientos.transicion', $orden), ['estado' => 'realizado'])->assertRedirect();
+        $this->actingAs($tecnico)->post(route('mantenimientos.transicion', $orden), [
+            'estado' => 'realizado',
+            'evidencia' => UploadedFile::fake()->image('realizado.jpg'),
+        ])->assertRedirect();
 
         // 5. No se puede cerrar sin pasar por supervisión.
         $this->assertFalse(CicloMantenimiento::permite('realizado', 'cerrado'));
 
         // 6. El supervisor supervisa y cierra.
-        $this->actingAs($supervisor)->post(route('mantenimientos.transicion', $orden), ['estado' => 'supervisado'])->assertRedirect();
-        $this->actingAs($supervisor)->post(route('mantenimientos.transicion', $orden), ['estado' => 'cerrado'])->assertRedirect();
+        $this->actingAs($supervisor)->post(route('mantenimientos.transicion', $orden), [
+            'estado' => 'supervisado',
+            'evidencia' => UploadedFile::fake()->image('supervisado.jpg'),
+        ])->assertRedirect();
+        $this->actingAs($supervisor)->post(route('mantenimientos.transicion', $orden), [
+            'estado' => 'cerrado',
+            'evidencia' => UploadedFile::fake()->image('cerrado.jpg'),
+        ])->assertRedirect();
 
         $orden->refresh();
         $this->assertSame('cerrado', $orden->estado->clave);
@@ -85,6 +98,8 @@ class FlujoMantenimientoTest extends TestCase
         $this->assertSame($supervisor->id, $orden->supervisor_id);
         // autorizado, asignado, en_proceso, realizado, supervisado, cerrado
         $this->assertSame(6, $orden->historialEstados()->count());
+        // una evidencia por cada transición hecha vía transicion() (4: en_proceso, realizado, supervisado, cerrado)
+        $this->assertSame(4, $orden->documentos()->wherePivot('rol', 'evidencia')->count());
     }
 
     public function test_no_cierra_sin_campos_minimos(): void
@@ -104,7 +119,10 @@ class FlujoMantenimientoTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->post(route('mantenimientos.transicion', $orden), ['estado' => 'cerrado'])
+            ->post(route('mantenimientos.transicion', $orden), [
+                'estado' => 'cerrado',
+                'evidencia' => UploadedFile::fake()->image('cierre.jpg'),
+            ])
             ->assertRedirect();
 
         $this->assertSame('supervisado', $orden->refresh()->estado->clave);

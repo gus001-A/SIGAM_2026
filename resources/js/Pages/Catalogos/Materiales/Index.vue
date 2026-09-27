@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3';
 import CatalogoTabla from '@/Components/CatalogoTabla.vue';
 
 defineProps({
+    kpis: Object,
     titulo: String,
     registros: Object,
     filtros: Object,
@@ -17,7 +18,7 @@ const columnas = [
 ];
 
 const campos = [
-    { name: 'codigo', label: 'Código', tipo: 'text', ancho: 10 },
+    { name: 'codigo', label: 'Código', tipo: 'text', ayuda: 'Automático si se deja vacío', ancho: 10 },
     { name: 'nombre', label: 'Nombre', tipo: 'text', required: true, ancho: 14 },
     { name: 'unidad', label: 'Unidad de medida', tipo: 'text', required: true, ayuda: 'p. ej. pieza, litro, metro', ancho: 12 },
     { name: 'costo_referencia', label: 'Costo de referencia (MXN)', tipo: 'number', min: 0, ancho: 12 },
@@ -29,6 +30,7 @@ const campos = [
     <CatalogoTabla
         :titulo="titulo"
         :registros="registros"
+        :kpis="kpis"
         :filtros="filtros"
         :orden="orden"
         ruta-base="catalogos.materiales"

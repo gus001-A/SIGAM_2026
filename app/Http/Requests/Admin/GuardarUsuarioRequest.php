@@ -28,12 +28,17 @@ class GuardarUsuarioRequest extends FormRequest
             'apellidos' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('usuarios', 'email')->ignore($id)],
             'telefono' => ['nullable', 'digits:10'],
-            'sucursal_id' => ['nullable', 'integer', Rule::exists('sucursales', 'id')],
-            'estado' => ['required', Rule::in(['activo', 'inactivo'])],
+
+            // Multi-sucursal: array de ids
+            'sucursales' => ['nullable', 'array'],
+            'sucursales.*' => ['integer', Rule::exists('sucursales', 'id')],
+
             'password' => [$creando ? 'required' : 'nullable', 'confirmed', Password::defaults()],
+
             // Un usuario tiene exactamente un rol.
             'roles' => ['required', 'array', 'size:1'],
             'roles.*' => ['string', Rule::exists('roles', 'name')],
+
             'especialidades_equipo' => ['nullable', 'array'],
             'especialidades_equipo.*' => ['integer', Rule::exists('tipos_equipo', 'id')],
             'especialidades_mantenimiento' => ['nullable', 'array'],
@@ -49,6 +54,7 @@ class GuardarUsuarioRequest extends FormRequest
         return [
             'roles.required' => 'Selecciona el rol del usuario.',
             'roles.size' => 'El usuario debe tener exactamente un rol.',
+            'sucursales.*.exists' => 'Una de las sucursales seleccionadas no existe.',
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Catalogo;
 
 use App\Models\Material;
+use App\Support\Folios;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -26,5 +27,14 @@ class MaterialController extends CatalogoController
             'costo_referencia' => ['nullable', 'numeric', 'min:0'],
             'estado' => ['nullable', Rule::in(['activo', 'inactivo'])],
         ];
+    }
+
+    protected function completarDatos(array $datos, ?Model $registro = null): array
+    {
+        if (empty($datos['codigo'])) {
+            $datos['codigo'] = Folios::codigoMaterial($datos['nombre'] ?? '', $registro?->id);
+        }
+
+        return $datos;
     }
 }

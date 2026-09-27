@@ -1,7 +1,17 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import { CheckCircleOutlined, ExclamationCircleOutlined, EyeOutlined, FilterOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons-vue';
+import {
+    CheckCircleOutlined,
+    ClockCircleOutlined,
+    ExclamationCircleOutlined,
+    EyeOutlined,
+    FilterOutlined,
+    HourglassOutlined,
+    PlusOutlined,
+    SyncOutlined,
+    UnorderedListOutlined,
+} from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTableInertia from '@/Components/DataTableInertia.vue';
 import ModalTarea from '@/Components/ModalTarea.vue';
@@ -11,6 +21,7 @@ import { useTablaInertia } from '@/composables/useTablaInertia';
 
 const props = defineProps({
     tareas: { type: Object, required: true },
+    kpis: { type: Object, default: () => ({}) },
     vista: { type: String, default: 'activas' },
     filtros: { type: Object, default: () => ({}) },
     orden: { type: Object, default: () => ({}) },
@@ -93,6 +104,13 @@ const fecha = (v) => (v ? new Date(v).toLocaleDateString('es-MX') : '—');
 const irA = (n, p) => router.visit(route(n, p));
 
 const modalTarea = ref(null);
+
+const tarjetas = computed(() => [
+    { label: 'Tareas totales', valor: props.kpis.total ?? 0, icono: UnorderedListOutlined, color: '#0d84c9' },
+    { label: 'Vencidas', valor: props.kpis.vencidas ?? 0, icono: ExclamationCircleOutlined, color: '#d64545' },
+    { label: 'Pendientes', valor: props.kpis.pendientes ?? 0, icono: HourglassOutlined, color: '#e08a1e' },
+    { label: 'En proceso', valor: props.kpis.en_proceso ?? 0, icono: ClockCircleOutlined, color: '#6b4bc9' },
+]);
 </script>
 
 <template>
@@ -119,6 +137,19 @@ const modalTarea = ref(null);
                 Nueva tarea
             </a-button>
         </template>
+
+        <!-- KPIs con colores sólidos -->
+        <div class="kpis">
+            <div v-for="k in tarjetas" :key="k.label" class="kpi" :style="{ '--acc': k.color }">
+                <div class="kpi__icono">
+                    <component :is="k.icono" />
+                </div>
+                <div class="kpi__txt">
+                    <div class="kpi__valor">{{ k.valor }}</div>
+                    <div class="kpi__etq">{{ k.label }}</div>
+                </div>
+            </div>
+        </div>
 
         <a-tabs :active-key="vista" class="tareas-tabs" @change="cambiarVista">
             <a-tab-pane key="activas">
@@ -190,6 +221,74 @@ const modalTarea = ref(null);
 </template>
 
 <style scoped>
+/* ==========================================================
+   KPIs con colores sólidos
+   ========================================================== */
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 11px;
+    margin-bottom: 14px;
+}
+
+.kpi {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 14px;
+    background: #fff;
+    border: 1px solid var(--sigam-borde);
+    border-radius: 13px;
+    box-shadow: 0 1px 3px rgba(15, 37, 71, 0.06);
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--acc);
+}
+
+.kpi__icono {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    color: #fff;
+    background: var(--acc);
+    flex-shrink: 0;
+}
+
+.kpi__valor {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--sigam-navy);
+    line-height: 1.1;
+}
+
+.kpi__etq {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 700;
+    color: var(--sigam-tenue);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 767px) {
+    .kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 .tareas-tabs {
     margin-bottom: 4px;
 }

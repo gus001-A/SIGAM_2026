@@ -172,7 +172,7 @@ class EquiposTest extends TestCase
             ->assertSessionHasErrors('codigo_activo');
     }
 
-    public function test_baja_logica_del_equipo(): void
+    public function test_eliminar_marca_el_equipo_fuera_de_servicio_sin_ocultarlo(): void
     {
         $equipo = Equipo::create(['codigo_activo' => 'EQ-004', 'descripcion' => 'A', 'sucursal_id' => $this->sucursal->id]);
 
@@ -180,8 +180,31 @@ class EquiposTest extends TestCase
             ->delete(route('equipos.destroy', $equipo), ['motivo' => 'Equipo obsoleto'])
             ->assertRedirect(route('equipos.por_sucursal', ['sucursal_id' => $this->sucursal->id]));
 
-        $this->assertSoftDeleted($equipo);
-        $this->assertSame('EQUIPO OBSOLETO', $equipo->fresh()->motivo_baja);
+        $equipo->refresh();
+        $this->assertNotSoftDeleted($equipo);
+        $this->assertSame('fuera_de_servicio', $equipo->estado->clave);
+        $this->assertSame('EQUIPO OBSOLETO', $equipo->motivo_baja);
+    }
+
+    public function test_se_puede_reactivar_editando_su_estado(): void
+    {
+        $fueraDeServicio = EstadoEquipo::where('clave', 'fuera_de_servicio')->firstOrFail();
+        $operativo = EstadoEquipo::where('clave', 'operativo')->firstOrFail();
+        $equipo = Equipo::create([
+            'codigo_activo' => 'EQ-004D', 'descripcion' => 'A', 'sucursal_id' => $this->sucursal->id,
+            'estado_id' => $fueraDeServicio->id, 'motivo_baja' => 'Ya no se usa',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->put(route('equipos.update', $equipo), [
+                'codigo_activo' => $equipo->codigo_activo,
+                'descripcion' => $equipo->descripcion,
+                'sucursal_id' => $this->sucursal->id,
+                'estado_id' => $operativo->id,
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('operativo', $equipo->fresh()->estado->clave);
     }
 
     public function test_baja_sin_motivo_es_rechazada(): void
@@ -196,10 +219,12 @@ class EquiposTest extends TestCase
         $this->assertNotSoftDeleted($equipo);
     }
 
-    public function test_reactivar_un_equipo_dado_de_baja(): void
+    /** `restore()` sigue vivo para equipos con baja lógica de antes de este cambio. */
+    public function test_restore_reactiva_un_equipo_con_baja_logica_antigua(): void
     {
         $equipo = Equipo::create(['codigo_activo' => 'EQ-004C', 'descripcion' => 'A', 'sucursal_id' => $this->sucursal->id]);
-        $this->actingAs($this->admin)->delete(route('equipos.destroy', $equipo), ['motivo' => 'Ya no se usa']);
+        $equipo->update(['motivo_baja' => 'Ya no se usa', 'baja_por' => $this->admin->id, 'baja_en' => now()]);
+        $equipo->delete();
 
         $this->actingAs($this->admin)
             ->put(route('equipos.restore', $equipo->id))

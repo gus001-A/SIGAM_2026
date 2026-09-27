@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Archivo con metadatos. Especificación v2.0 §14. La relación con las entidades
@@ -47,8 +46,16 @@ class Documento extends Model
         return $this->visibilidad === 'publico';
     }
 
-    public function url(): ?string
+    /**
+     * URL para mostrar/descargar el documento. Deliberadamente NO usa
+     * `Storage::disk($this->disco)->url()`: el disco `local` (documentos
+     * privados, el caso normal) no tiene una URL pública configurada — ese
+     * archivo vive fuera de `public/`, así que una URL de filesystem directa
+     * simplemente no carga (404). Se sirve siempre por la ruta autenticada
+     * que ya valida permisos y hace streaming del archivo real.
+     */
+    public function url(): string
     {
-        return Storage::disk($this->disco)->url($this->ruta);
+        return route('documentos.ver', $this->id);
     }
 }

@@ -30,8 +30,25 @@ class UbicacionController extends Controller
         $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
         $modoTodas = $sucursalId === null;
 
+        // Filtro de estado: 'activo' | 'inactivo' | null (= todos)
+        $estado = $request->query('estado');
+        $estado = in_array($estado, ['activo', 'inactivo'], true) ? $estado : null;
+
         $ubicaciones = Ubicacion::query()
             ->when($sucursalId, fn ($q, $v) => $q->where('sucursal_id', $v))
+            // Filtro de estado: activo = no trashed; inactivo = only trashed; sin filtro = withTrashed (ambos)
+            ->when(
+                $estado === 'inactivo',
+                fn ($q) => $q->onlyTrashed(),
+            )
+            ->when(
+                $estado === 'activo',
+                fn ($q) => $q->whereNull('deleted_at'),
+            )
+            ->when(
+                $estado === null,
+                fn ($q) => $q->withTrashed(),
+            )
             ->with(['tipo:id,nombre', 'sucursal:id,nombre', 'tipoArea:id,nombre,dias_limpieza', 'tipoLimpieza:id,nombre,frecuencia'])
             ->withCount(['hijas', 'equipos', 'solicitudes', 'mantenimientos'])
             ->orderBy('sucursal_id')
@@ -44,10 +61,19 @@ class UbicacionController extends Controller
         return Inertia::render('Inventario/Ubicaciones/Index', [
             'sucursales' => Sucursal::activos()->orderBy('nombre')->get(['id', 'nombre']),
             'sucursalSeleccionada' => $modoTodas ? SeleccionSucursal::TODAS : $sucursalId,
+            'kpis' => [
+                'total' => $ubicaciones->count(),
+                'con_equipos' => $ubicaciones->where('equipos_count', '>', 0)->count(),
+                'solicitudes_abiertas' => $ubicaciones->sum('solicitudes_count'),
+                'ordenes_abiertas' => $ubicaciones->sum('mantenimientos_count'),
+            ],
             'arbol' => $this->armarArbol($ubicaciones, null, $creadores),
             'tipos' => TipoUbicacion::activos()->orderBy('nombre')->get(['id', 'nombre']),
             'tiposArea' => TipoArea::activos()->orderBy('dias_limpieza')->get(['id', 'nombre', 'dias_limpieza']),
             'tiposLimpieza' => TipoLimpieza::activos()->orderBy('nombre')->get(['id', 'nombre', 'frecuencia']),
+            'filtros' => [
+                'estado' => $estado ?? 'todos',
+            ],
         ]);
     }
 
@@ -91,10 +117,36 @@ class UbicacionController extends Controller
             return back()->with('error', 'No se puede desactivar: la ubicación tiene equipos asignados.');
         }
 
+        // No se borra físicamente: queda inactiva y con soft delete.
         $ubicacion->update(['estado' => 'inactivo']);
         $ubicacion->delete();
 
         return back()->with('exito', 'Ubicación desactivada.');
+    }
+
+    /**
+     * Reactiva una ubicación previamente desactivada (soft delete).
+     *
+     * ⚠️ Se recibe el ID como int (no como Ubicacion) para evitar que el
+     * route-model binding falle al no encontrar el registro soft-deleted.
+     * Buscamos manualmente con withTrashed().
+     */
+    public function restore(int $ubicacion): RedirectResponse
+    {
+        $this->authorize('ubicaciones.editar');
+
+        $registro = Ubicacion::withTrashed()->findOrFail($ubicacion);
+
+        // Restaurar el soft delete (si aplica)
+        if ($registro->trashed()) {
+            $registro->restore();
+        }
+
+        // Volver a estado activo explícitamente
+        $registro->estado = 'activo';
+        $registro->save();
+
+        return back()->with('exito', 'Ubicación reactivada.');
     }
 
     /**

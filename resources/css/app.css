@@ -717,6 +717,24 @@ body {
     font-weight: 700;
 }
 
+/* Mayúsculas en vivo mientras se escribe — mismo criterio que el trait
+   `ConvierteMayusculas` en el backend (que ya sube estos mismos campos a
+   mayúsculas al guardar) y mismo look que RIC. Es solo visual: no cambia el
+   valor que se envía. Correo, contraseña y números quedan excluidos porque
+   deben conservar su capitalización real. */
+.ant-input,
+textarea.ant-input {
+    text-transform: uppercase;
+}
+input.ant-input[type='email'],
+input.ant-input[type='number'],
+input.ant-input[type='date'],
+input.ant-input[type='time'],
+input.ant-input[type='datetime-local'],
+.ant-input-password input.ant-input {
+    text-transform: none;
+}
+
 /* Inputs nativos de fecha/hora — se alinean con el resto de la UI */
 input[type='date'],
 input[type='time'],

@@ -10,7 +10,7 @@ import Antd from 'ant-design-vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import iconos from './plugins/iconos';
 
-const appName = import.meta.env.VITE_APP_NAME || 'SIGAM';
+const appName = import.meta.env.VITE_APP_NAME || 'SIGAMM';
 
 createInertiaApp({
     title: (title) => (title ? `${title} · ${appName}` : appName),

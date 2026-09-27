@@ -2,12 +2,16 @@
 import { computed, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
+    CheckCircleOutlined,
     DeleteOutlined,
     EditOutlined,
     EyeOutlined,
     FilterOutlined,
     InfoCircleOutlined,
     PlusOutlined,
+    StopOutlined,
+    TeamOutlined,
+    ToolOutlined,
     UndoOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -20,10 +24,18 @@ import { etiquetaRol, colorRol, colorHexRol, listaRoles } from '@/utils/roles';
 
 const props = defineProps({
     usuarios: { type: Object, required: true },
+    kpis: { type: Object, default: () => ({}) },
     filtros: { type: Object, default: () => ({}) },
     orden: { type: Object, default: () => ({}) },
     catalogos: { type: Object, default: () => ({}) },
 });
+
+const tarjetas = computed(() => [
+    { label: 'Usuarios totales', valor: props.kpis.total ?? 0, icono: TeamOutlined, color: '#0d84c9' },
+    { label: 'Activos', valor: props.kpis.activos ?? 0, icono: CheckCircleOutlined, color: '#1f9e86' },
+    { label: 'Inactivos', valor: props.kpis.inactivos ?? 0, icono: StopOutlined, color: '#d64545' },
+    { label: 'Técnicos', valor: props.kpis.tecnicos ?? 0, icono: ToolOutlined, color: '#6b4bc9' },
+]);
 
 const { puede, usuario: yo } = usePermisos();
 
@@ -101,6 +113,19 @@ const reactivar = (usuario) => router.put(route('usuarios.restore', usuario.id),
                 Nuevo usuario
             </a-button>
         </template>
+
+        <!-- KPIs con colores sólidos -->
+        <div class="kpis">
+            <div v-for="k in tarjetas" :key="k.label" class="kpi" :style="{ '--acc': k.color }">
+                <div class="kpi__icono">
+                    <component :is="k.icono" />
+                </div>
+                <div class="kpi__txt">
+                    <div class="kpi__valor">{{ k.valor }}</div>
+                    <div class="kpi__etq">{{ k.label }}</div>
+                </div>
+            </div>
+        </div>
 
         <DataTableInertia :paginador="usuarios" :columns="columns" :orden="orden" :cargando="cargando" @cambio="onCambioTabla">
             <template #filtro="{ column }">
@@ -203,6 +228,74 @@ const reactivar = (usuario) => router.put(route('usuarios.restore', usuario.id),
 </template>
 
 <style scoped>
+/* ==========================================================
+   KPIs con colores sólidos
+   ========================================================== */
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 11px;
+    margin-bottom: 14px;
+}
+
+.kpi {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 14px;
+    background: #fff;
+    border: 1px solid var(--sigam-borde);
+    border-radius: 13px;
+    box-shadow: 0 1px 3px rgba(15, 37, 71, 0.06);
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--acc);
+}
+
+.kpi__icono {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    color: #fff;
+    background: var(--acc);
+    flex-shrink: 0;
+}
+
+.kpi__valor {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--sigam-navy);
+    line-height: 1.1;
+}
+
+.kpi__etq {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 700;
+    color: var(--sigam-tenue);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 767px) {
+    .kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 .leyenda-roles__intro {
     margin: -4px 0 14px;
     font-size: 12.5px;

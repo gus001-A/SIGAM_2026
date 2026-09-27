@@ -447,4 +447,101 @@ onBeforeUnmount(() => {
 .tabla-inertia .ant-table-pagination.ant-pagination {
     align-items: center;
 }
+
+/* ==========================================================
+   Paginación — estilo iOS moderno (mismo look en toda la app)
+   ========================================================== */
+.tabla-inertia .ant-pagination-options-quick-jumper {
+    display: none !important;
+}
+
+.tabla-inertia .ant-pagination-item,
+.tabla-inertia .ant-pagination-prev,
+.tabla-inertia .ant-pagination-next,
+.tabla-inertia .ant-pagination-jump-prev,
+.tabla-inertia .ant-pagination-jump-next {
+    min-width: 34px;
+    height: 34px;
+    line-height: 32px;
+    border-radius: 10px !important;
+    border: 1px solid transparent !important;
+    background: #f3f6fa;
+    margin: 0 !important;
+    transition: all 0.18s cubic-bezier(0.34, 1.3, 0.4, 1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tabla-inertia .ant-pagination-item a,
+.tabla-inertia .ant-pagination-prev .ant-pagination-item-link,
+.tabla-inertia .ant-pagination-next .ant-pagination-item-link {
+    color: var(--sigam-navy) !important;
+    font-weight: 700;
+    font-size: 13px;
+    transition: color 0.15s ease;
+}
+
+.tabla-inertia .ant-pagination-item:hover,
+.tabla-inertia .ant-pagination-prev:hover,
+.tabla-inertia .ant-pagination-next:hover,
+.tabla-inertia .ant-pagination-jump-prev:hover,
+.tabla-inertia .ant-pagination-jump-next:hover {
+    background: #e6f2fb !important;
+    border-color: #cfe3f2 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px -4px rgba(13, 132, 201, 0.35);
+}
+
+.tabla-inertia .ant-pagination-item:hover a,
+.tabla-inertia .ant-pagination-prev:hover .ant-pagination-item-link,
+.tabla-inertia .ant-pagination-next:hover .ant-pagination-item-link {
+    color: #0f6fb0 !important;
+}
+
+.tabla-inertia .ant-pagination-item-active {
+    background: linear-gradient(180deg, #0d84c9 0%, #0a6fae 100%) !important;
+    border-color: #0d84c9 !important;
+    box-shadow: 0 4px 10px -4px rgba(13, 132, 201, 0.55);
+}
+
+.tabla-inertia .ant-pagination-item-active a {
+    color: #fff !important;
+    font-weight: 800 !important;
+}
+
+.tabla-inertia .ant-pagination-item-active:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px -4px rgba(13, 132, 201, 0.65);
+}
+
+.tabla-inertia .ant-pagination-disabled,
+.tabla-inertia .ant-pagination-disabled:hover {
+    background: #f3f6fa !important;
+    border-color: transparent !important;
+    transform: none !important;
+    box-shadow: none !important;
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.tabla-inertia .ant-pagination-disabled .ant-pagination-item-link {
+    color: var(--sigam-tenue) !important;
+}
+
+.tabla-inertia .ant-pagination-prev .anticon,
+.tabla-inertia .ant-pagination-next .anticon,
+.tabla-inertia .ant-pagination-jump-prev .anticon,
+.tabla-inertia .ant-pagination-jump-next .anticon {
+    font-size: 12px;
+    color: inherit;
+}
+
+@media (max-width: 640px) {
+    .tabla-inertia .ant-pagination {
+        justify-content: center;
+        padding: 12px;
+        gap: 4px;
+    }
+}
 </style>

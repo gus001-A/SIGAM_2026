@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inventario;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventario\GuardarSucursalRequest;
+use App\Models\Equipo;
 use App\Models\Sucursal;
 use App\Models\Usuario;
 use App\Support\Auditoria;
@@ -35,6 +36,10 @@ class SucursalController extends Controller
 
         $texto = fn (string $clave): ?string => filled($request->query($clave)) ? trim((string) $request->query($clave)) : null;
 
+        // Filtro de estado: 'activo' | 'inactivo' | null (= todos)
+        $estado = $request->query('estado');
+        $estado = in_array($estado, ['activo', 'inactivo'], true) ? $estado : null;
+
         $sucursales = Sucursal::query()
             ->withCount(['equipos', 'ubicaciones', 'usuarios'])
             ->withSum('equipos as valor_activos', 'valor_adquisicion')
@@ -44,10 +49,18 @@ class SucursalController extends Controller
             ->when($texto('nombre'), fn (Builder $q, $v) => $q->where('nombre', 'like', "%{$v}%"))
             ->when($texto('direccion'), fn (Builder $q, $v) => $q->where('direccion', 'like', "%{$v}%"))
             ->when($request->integer('responsable_id'), fn (Builder $q, $v) => $q->where('responsable_id', $v))
-            // Las sucursales dadas de baja quedan con SoftDeletes; se listan al filtrar por "inactivo".
+            // Filtro de estado: activo = no trashed; inactivo = only trashed; sin filtro = withTrashed (ambos)
             ->when(
-                $request->query('estado') === 'inactivo',
+                $estado === 'inactivo',
                 fn (Builder $q) => $q->onlyTrashed(),
+            )
+            ->when(
+                $estado === 'activo',
+                fn (Builder $q) => $q->whereNull('deleted_at'),
+            )
+            ->when(
+                $estado === null,
+                fn (Builder $q) => $q->withTrashed(),
             )
             ->when($request->filled('registrado_por'), fn (Builder $q) => $q->whereIn(
                 'id',
@@ -77,6 +90,12 @@ class SucursalController extends Controller
 
         return Inertia::render('Inventario/Sucursales/Index', [
             'sucursales' => $sucursales,
+            'kpis' => [
+                'total' => Sucursal::withTrashed()->count(),
+                'activas' => Sucursal::count(),
+                'inactivas' => Sucursal::onlyTrashed()->count(),
+                'valor_total' => (float) Equipo::sum('valor_adquisicion'),
+            ],
             'filtros' => $request->only(['codigo', 'nombre', 'direccion', 'responsable_id', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => ['responsables' => $this->responsables()],
@@ -87,9 +106,9 @@ class SucursalController extends Controller
     {
         $this->authorize('sucursales.crear');
 
+        // Ya no se envían responsables: el form no los usa.
         return Inertia::render('Inventario/Sucursales/Form', [
             'sucursal' => null,
-            'responsables' => $this->responsables(),
         ]);
     }
 
@@ -97,6 +116,9 @@ class SucursalController extends Controller
     {
         $datos = $request->validated();
         $datos['codigo'] = ($datos['codigo'] ?? null) ?: Folios::codigoSucursal($datos['nombre']);
+
+        // Estado por defecto al crear (el form ya no lo envía).
+        $datos['estado'] = $datos['estado'] ?? 'activo';
 
         $sucursal = Sucursal::create($datos);
 
@@ -151,9 +173,9 @@ class SucursalController extends Controller
     {
         $this->authorize('sucursales.editar');
 
+        // Ya no se envían responsables: el form no los usa.
         return Inertia::render('Inventario/Sucursales/Form', [
             'sucursal' => $sucursal,
-            'responsables' => $this->responsables(),
         ]);
     }
 
@@ -162,6 +184,7 @@ class SucursalController extends Controller
         $datos = $request->validated();
         $datos['codigo'] = ($datos['codigo'] ?? null) ?: Folios::codigoSucursal($datos['nombre'], $sucursal->id);
 
+        // No tocamos 'estado' ni 'responsable_id': se conservan los actuales.
         $sucursal->update($datos);
 
         return redirect()
@@ -174,6 +197,7 @@ class SucursalController extends Controller
     {
         $this->authorize('sucursales.desactivar');
 
+        // No se borra físicamente: queda inactiva y con soft delete.
         $sucursal->update(['estado' => 'inactivo']);
         $sucursal->delete();
 
@@ -187,8 +211,15 @@ class SucursalController extends Controller
         $this->authorize('sucursales.editar');
 
         $registro = Sucursal::withTrashed()->findOrFail($sucursal);
-        $registro->restore();
-        $registro->update(['estado' => 'activo']);
+
+        // Restaurar el soft delete (si aplica)
+        if ($registro->trashed()) {
+            $registro->restore();
+        }
+
+        // Volver a estado activo explícitamente
+        $registro->estado = 'activo';
+        $registro->save();
 
         return back()->with('exito', 'Sucursal reactivada.');
     }

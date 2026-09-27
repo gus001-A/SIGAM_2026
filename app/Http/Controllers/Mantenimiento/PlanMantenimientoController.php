@@ -51,6 +51,18 @@ class PlanMantenimientoController extends Controller
         $texto = fn (string $clave): ?string => filled($request->query($clave)) ? trim((string) $request->query($clave)) : null;
         $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
 
+        // Alcance de sucursal (sin los demás filtros) para los KPIs — se
+        // quedan estables al filtrar.
+        $visibles = fn (Builder $q) => $q->when($sucursalId, fn (Builder $w, $v) => $w->where('sucursal_id', $v));
+
+        $kpis = [
+            'total' => PlanMantenimiento::query()->tap($visibles)->count(),
+            'activos' => PlanMantenimiento::query()->tap($visibles)->where('estado', 'activo')->count(),
+            'vencidos' => PlanMantenimiento::query()->tap($visibles)
+                ->where('estado', 'activo')->whereDate('proxima_fecha', '<', today())->count(),
+            'inactivos' => PlanMantenimiento::query()->tap($visibles)->where('estado', 'inactivo')->count(),
+        ];
+
         $planes = PlanMantenimiento::query()
             ->with(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'tipo:id,nombre', 'tecnico:id,nombre'])
             ->withCount('ocurrencias')
@@ -96,6 +108,7 @@ class PlanMantenimientoController extends Controller
 
         return Inertia::render('Mantenimiento/Planes/Index', [
             'planes' => $planes,
+            'kpis' => $kpis,
             'sucursalId' => $sucursalId,
             'filtros' => $request->only(['equipo', 'nombre', 'tipo_mantenimiento_id', 'tecnico_id', 'frecuencia', 'vencidos', 'desde', 'hasta', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],

@@ -43,12 +43,32 @@ class SolicitudMantenimientoController extends Controller
         $texto = fn (string $c): ?string => filled($request->query($c)) ? trim((string) $request->query($c)) : null;
         $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
 
+        // Alcance visible del usuario + sucursal (sin los demás filtros) para
+        // los KPIs — se quedan estables al filtrar.
+        $visibles = fn (Builder $q) => $q
+            ->when(
+                ! $usuario->hasAnyRole(['superadministrador', 'supervisor', 'auditor']),
+                fn (Builder $w) => $w->where('solicitado_por', $usuario->id),
+            )
+            ->when($sucursalId, fn (Builder $w, $v) => $w->where('sucursal_id', $v));
+
+        $kpis = [
+            'total' => SolicitudMantenimiento::query()->tap($visibles)->count(),
+            'pendientes' => SolicitudMantenimiento::query()->tap($visibles)
+                ->whereHas('estado', fn (Builder $q) => $q->where('clave', 'solicitado'))->count(),
+            'autorizadas' => SolicitudMantenimiento::query()->tap($visibles)
+                ->whereHas('estado', fn (Builder $q) => $q->where('clave', 'autorizado'))->count(),
+            'canceladas' => SolicitudMantenimiento::query()->tap($visibles)
+                ->whereHas('estado', fn (Builder $q) => $q->where('clave', 'cancelado'))->count(),
+        ];
+
         $solicitudes = SolicitudMantenimiento::query()
             ->with([
                 'equipo:id,codigo_activo,descripcion',
                 'ubicacion:id,nombre',
                 'sucursal:id,nombre',
                 'solicitante:id,nombre',
+                'revisadoPor:id,nombre',
                 'prioridad:id,nombre,color',
                 'estado:id,nombre,clave',
             ])
@@ -89,12 +109,16 @@ class SolicitudMantenimientoController extends Controller
             'solicitante' => $s->solicitante?->nombre,
             'solicitado_at' => $s->solicitado_at,
             'fecha_requerida' => $s->fecha_requerida,
+            // Revisión (autorizada / rechazada)
+            'revisado_por' => $s->revisadoPor?->nombre,
+            'revisado_at' => $s->revisado_at,
             'creado_por' => $creadores[$s->id]['usuario'] ?? null,
             'creado_en' => $creadores[$s->id]['fecha'] ?? null,
         ]);
 
         return Inertia::render('Mantenimiento/Solicitudes/Index', [
             'solicitudes' => $solicitudes,
+            'kpis' => $kpis,
             'sucursalId' => $sucursalId,
             'filtros' => $request->only(['folio', 'equipo', 'solicitante', 'prioridad_id', 'estado_id', 'desde', 'hasta', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
@@ -164,7 +188,35 @@ class SolicitudMantenimientoController extends Controller
         ]);
 
         return Inertia::render('Mantenimiento/Solicitudes/Show', [
-            'solicitud' => $solicitud,
+            'solicitud' => [
+                'id' => $solicitud->id,
+                'folio' => $solicitud->folio,
+                'descripcion' => $solicitud->descripcion,
+                'fecha_requerida' => $solicitud->fecha_requerida,
+                'motivo_rechazo' => $solicitud->motivo_rechazo,
+                'prioridad_id' => $solicitud->prioridad_id,
+
+                // Objetivo
+                'equipo' => $solicitud->equipo,
+                'ubicacion' => $solicitud->ubicacion,
+                'sucursal' => $solicitud->sucursal,
+
+                // Solicitud (creación)
+                'solicitante' => $solicitud->solicitante,
+                'solicitado_at' => $solicitud->solicitado_at,
+
+                // Revisión (autorización / rechazo)
+                'revisadoPor' => $solicitud->revisadoPor,
+                'revisado_at' => $solicitud->revisado_at,
+
+                // Catálogos
+                'prioridad' => $solicitud->prioridad,
+                'estado' => $solicitud->estado,
+
+                // Órdenes generadas y documentos
+                'mantenimientos' => $solicitud->mantenimientos,
+                'documentos' => $solicitud->documentos,
+            ],
             'sello' => $solicitud->selloAuditoria(),
             'puedeConvertir' => $solicitud->mantenimientos->isEmpty()
                 && $solicitud->estado->clave !== 'cancelado'

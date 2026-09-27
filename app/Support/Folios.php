@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Material;
 use App\Models\Sucursal;
 use App\Models\Ubicacion;
 use Illuminate\Support\Facades\DB;
@@ -85,6 +86,27 @@ class Folios
             $existe = Ubicacion::withTrashed()
                 ->where('sucursal_id', $sucursalId)
                 ->where('codigo', $candidato)
+                ->when($excluirId, fn ($q, $v) => $q->whereKeyNot($v))
+                ->exists();
+            $n++;
+        } while ($existe);
+
+        return $candidato;
+    }
+
+    /**
+     * Código automático de material/refacción: 4 letras (del nombre) +
+     * consecutivo, p. ej. "ACEI-01". El campo sigue siendo editable — esto
+     * solo aplica cuando se deja en blanco.
+     */
+    public static function codigoMaterial(string $nombre, ?int $excluirId = null): string
+    {
+        $prefijo = self::prefijoLetras($nombre);
+        $n = 1;
+
+        do {
+            $candidato = sprintf('%s-%02d', $prefijo, $n);
+            $existe = Material::where('codigo', $candidato)
                 ->when($excluirId, fn ($q, $v) => $q->whereKeyNot($v))
                 ->exists();
             $n++;

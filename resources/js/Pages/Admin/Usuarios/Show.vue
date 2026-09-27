@@ -15,6 +15,7 @@ import {
     StarOutlined,
     TeamOutlined,
     UndoOutlined,
+    UserOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import FichaEncabezado from '@/Components/FichaEncabezado.vue';
@@ -35,20 +36,36 @@ const inactivo = computed(() => props.usuario.estado !== 'activo');
 const esYo = computed(() => props.usuario.id === yo.value?.id);
 
 const iniciales = computed(() =>
-    props.usuario.nombre_completo.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase(),
+    props.usuario.nombre_completo
+        .split(' ')
+        .map((p) => p[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase(),
 );
 
 const dato = (v) => v || 'No especificado';
 const fechaHora = (v) =>
     v ? new Date(v).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'No especificado';
 
-const filas = computed(() => [
+// --- Mini-cards: cuenta -------------------------------------------------
+const filasCuenta = computed(() => [
     { icono: MailOutlined, label: 'Correo', valor: props.usuario.email, color: '#0d84c9' },
     { icono: PhoneOutlined, label: 'Teléfono', valor: dato(props.usuario.telefono), color: '#1f9e86' },
-    { icono: ApartmentOutlined, label: 'Sucursal', valor: dato(props.usuario.sucursal?.nombre), color: '#6b4bc9' },
     { icono: ClockCircleOutlined, label: 'Último acceso', valor: fechaHora(props.usuario.ultimo_acceso_at), color: '#e08a1e' },
     { icono: CalendarOutlined, label: 'Fecha de alta', valor: fechaHora(props.usuario.created_at), color: '#173a5f' },
 ]);
+
+const sucursalesCount = computed(() => props.usuario.sucursales?.length ?? 0);
+const rolesCount = computed(() => props.usuario.roles?.length ?? 0);
+const especialidadesCount = computed(
+    () =>
+        (props.usuario.especialidades_equipo?.length ?? 0) +
+        (props.usuario.especialidades_mantenimiento?.length ?? 0),
+);
+const actividadCount = computed(() => props.actividad?.length ?? 0);
+
+const modalActividad = ref(false);
 
 const irA = (n, p) => router.visit(route(n, p));
 
@@ -85,168 +102,436 @@ const onMenuAccion = ({ key }) => {
     <Head :title="usuario.nombre_completo" />
 
     <AppLayout>
-        <FichaEncabezado
-            :titulo="usuario.nombre_completo"
-            :subtitulo="usuario.email"
-            :iniciales="iniciales"
-            :icono="TeamOutlined"
-            volver="usuarios.index"
-            :sello="sello"
-        >
-            <template #tags>
-                <a-tag :color="inactivo ? 'default' : 'green'">{{ inactivo ? 'Inactivo' : 'Activo' }}</a-tag>
-                <a-tag :color="usuario.email_verified_at ? 'green' : 'orange'">
-                    <SafetyCertificateOutlined /> {{ usuario.email_verified_at ? 'Correo verificado' : 'Sin verificar' }}
-                </a-tag>
-            </template>
-            <template #acciones>
-                <a-button v-if="inactivo && puede('usuarios.editar')" @click="reactivar">
-                    <template #icon><UndoOutlined /></template>
-                    Reactivar
-                </a-button>
-                <a-button v-if="!inactivo && puede('usuarios.editar')" type="primary" @click="irA('usuarios.edit', usuario.id)">
-                    <template #icon><EditOutlined /></template>
-                    Editar
-                </a-button>
-                <a-button v-if="!inactivo && puede('usuarios.editar')" @click="restablecer">
-                    <template #icon><KeyOutlined /></template>
-                    Restablecer contraseña
-                </a-button>
-                <a-dropdown v-if="!inactivo && puede('usuarios.editar') && menuAcciones.length">
-                    <a-button type="text"><template #icon><EllipsisOutlined /></template></a-button>
-                    <template #overlay>
-                        <a-menu :items="menuAcciones" @click="onMenuAccion" />
-                    </template>
-                </a-dropdown>
-            </template>
-        </FichaEncabezado>
+        <div class="ficha-compacta">
+            <FichaEncabezado
+                :titulo="usuario.nombre_completo"
+                :subtitulo="usuario.email"
+                :iniciales="iniciales"
+                :icono="TeamOutlined"
+                volver="usuarios.index"
+                :sello="sello"
+            >
+                <template #tags>
+                    <a-tag :color="inactivo ? 'default' : 'green'" class="estado-tag">
+                        <component :is="inactivo ? ClockCircleOutlined : SafetyCertificateOutlined" />
+                        {{ inactivo ? 'Inactivo' : 'Activo' }}
+                    </a-tag>
+                    <a-tag :color="usuario.email_verified_at ? 'green' : 'orange'" class="email-tag">
+                        <SafetyCertificateOutlined />
+                        {{ usuario.email_verified_at ? 'Correo verificado' : 'Sin verificar' }}
+                    </a-tag>
+                    <a-tag v-if="esYo" color="blue" class="yo-tag">
+                        <UserOutlined /> Tú
+                    </a-tag>
+                </template>
+                <template #acciones>
+                    <a-button v-if="inactivo && puede('usuarios.editar')" type="primary" @click="reactivar">
+                        <template #icon><UndoOutlined /></template>
+                        Reactivar
+                    </a-button>
+                    <a-button
+                        v-if="!inactivo && puede('usuarios.editar')"
+                        type="primary"
+                        @click="irA('usuarios.edit', usuario.id)"
+                    >
+                        <template #icon><EditOutlined /></template>
+                        Editar
+                    </a-button>
+                    <a-button v-if="!inactivo && puede('usuarios.editar')" @click="restablecer">
+                        <template #icon><KeyOutlined /></template>
+                        Restablecer contraseña
+                    </a-button>
+                    <a-dropdown v-if="!inactivo && puede('usuarios.editar') && menuAcciones.length">
+                        <a-button type="text"><template #icon><EllipsisOutlined /></template></a-button>
+                        <template #overlay>
+                            <a-menu :items="menuAcciones" @click="onMenuAccion" />
+                        </template>
+                    </a-dropdown>
+                </template>
+            </FichaEncabezado>
 
-        <a-row :gutter="16">
-            <a-col :xs="24" :md="10">
-                <a-card size="small" class="mb-4 tarjeta">
-                    <template #title><span class="tt"><MailOutlined /> Información de la cuenta</span></template>
-                    <ul class="datos">
-                        <li v-for="f in filas" :key="f.label">
-                            <span class="datos__ic" :style="{ color: f.color, background: f.color + '18' }">
-                                <component :is="f.icono" />
-                            </span>
-                            <span class="datos__t">
-                                <span class="datos__l">{{ f.label }}</span>
-                                <span class="datos__v">{{ f.valor }}</span>
-                            </span>
-                        </li>
-                    </ul>
-                </a-card>
-
-                <a-card size="small" class="tarjeta">
-                    <template #title><span class="tt"><SafetyCertificateOutlined /> Roles asignados</span></template>
-                    <div v-if="usuario.roles.length" class="roles-usuario">
-                        <div
-                            v-for="r in usuario.roles"
-                            :key="r"
-                            class="roles-usuario__card"
-                            :style="{ '--rol-color': colorHexRol(r) }"
-                        >
-                            <span class="roles-usuario__titulo">{{ etiquetaRol(r) }}</span>
-                            <span class="roles-usuario__desc">{{ descripcionRol(r) }}</span>
+            <!-- Grid principal -->
+            <div class="grid-ficha">
+                <!-- COLUMNA IZQUIERDA -->
+                <div class="col-izq">
+                    <!-- Cuenta -->
+                    <div class="card">
+                        <div class="card__head">
+                            <div class="card__ico" style="--c: #0d84c9"><MailOutlined /></div>
+                            <div class="card__meta">
+                                <div class="card__titulo">Información de la cuenta</div>
+                                <div class="card__sub">Datos de contacto y accesos</div>
+                            </div>
+                        </div>
+                        <div class="card__body">
+                            <div class="mini-grid mini-grid--2">
+                                <div v-for="d in filasCuenta" :key="d.label" class="mini" :style="{ '--c': d.color }">
+                                    <span class="mini__ic"><component :is="d.icono" /></span>
+                                    <span class="mini__t">
+                                        <span class="mini__l">{{ d.label }}</span>
+                                        <span class="mini__v">{{ d.valor }}</span>
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <span v-else class="vacio">Sin roles asignados</span>
-                </a-card>
 
-                <a-card v-if="usuario.roles.includes('tecnico')" size="small" class="tarjeta">
-                    <template #title><span class="tt"><StarOutlined /> Especialidades</span></template>
-                    <p class="especialidades-ayuda">En qué es bueno — se usa para sugerirlo al delegar una orden.</p>
-                    <div class="especialidades-grupo">
-                        <span class="especialidades-l">Tipos de equipo</span>
-                        <a-space wrap>
-                            <a-tag v-for="e in usuario.especialidades_equipo" :key="e" color="blue">{{ e }}</a-tag>
-                            <span v-if="!usuario.especialidades_equipo?.length" class="vacio">Ninguna registrada</span>
-                        </a-space>
-                    </div>
-                    <div class="especialidades-grupo">
-                        <span class="especialidades-l">Tipos de mantenimiento</span>
-                        <a-space wrap>
-                            <a-tag v-for="e in usuario.especialidades_mantenimiento" :key="e" color="purple">{{ e }}</a-tag>
-                            <span v-if="!usuario.especialidades_mantenimiento?.length" class="vacio">Ninguna registrada</span>
-                        </a-space>
-                    </div>
-                </a-card>
-            </a-col>
-
-            <a-col :xs="24" :md="14">
-                <a-card size="small" class="tarjeta">
-                    <template #title><span class="tt"><ClockCircleOutlined /> Actividad reciente</span></template>
-                    <a-timeline v-if="actividad.length" class="mt-2">
-                        <a-timeline-item v-for="a in actividad" :key="a.id" color="#1f9e86">
-                            <div class="act">
-                                <span><b>{{ a.accion }}</b> <span class="vacio">· {{ a.modulo }}</span></span>
-                                <span class="act__f">{{ fechaHora(a.created_at) }}</span>
+                    <!-- Sucursales -->
+                    <div class="card">
+                        <div class="card__head">
+                            <div class="card__ico" style="--c: #1f9e86"><ApartmentOutlined /></div>
+                            <div class="card__meta">
+                                <div class="card__titulo">
+                                    Sucursales asignadas
+                                    <span v-if="sucursalesCount" class="badge badge--green">{{ sucursalesCount }}</span>
+                                </div>
+                                <div class="card__sub">Sedes a las que pertenece el usuario</div>
                             </div>
-                        </a-timeline-item>
-                    </a-timeline>
-                    <a-empty v-else description="Sin actividad registrada" class="py-4" />
-                </a-card>
-            </a-col>
-        </a-row>
+                        </div>
+                        <div class="card__body">
+                            <div v-if="usuario.sucursales?.length" class="mini-grid mini-grid--2">
+                                <div
+                                    v-for="s in usuario.sucursales"
+                                    :key="s.id"
+                                    class="mini"
+                                    style="--c: #1f9e86"
+                                >
+                                    <span class="mini__ic"><ApartmentOutlined /></span>
+                                    <span class="mini__t">
+                                        <span class="mini__l">Sucursal</span>
+                                        <span class="mini__v">{{ s.nombre }}</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div v-else class="vacio-box">
+                                <ApartmentOutlined />
+                                <span>Sin sucursales asignadas</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Roles -->
+                    <div class="card">
+                        <div class="card__head">
+                            <div class="card__ico" style="--c: #6b4bc9"><SafetyCertificateOutlined /></div>
+                            <div class="card__meta">
+                                <div class="card__titulo">
+                                    Roles asignados
+                                    <span v-if="rolesCount" class="badge badge--purple">{{ rolesCount }}</span>
+                                </div>
+                                <div class="card__sub">Permisos y responsabilidades</div>
+                            </div>
+                        </div>
+                        <div class="card__body">
+                            <div v-if="usuario.roles.length" class="roles-usuario">
+                                <div
+                                    v-for="r in usuario.roles"
+                                    :key="r"
+                                    class="roles-usuario__card"
+                                    :style="{ '--rol-color': colorHexRol(r) }"
+                                >
+                                    <span class="roles-usuario__titulo">{{ etiquetaRol(r) }}</span>
+                                    <span class="roles-usuario__desc">{{ descripcionRol(r) }}</span>
+                                </div>
+                            </div>
+                            <div v-else class="vacio-box">
+                                <SafetyCertificateOutlined />
+                                <span>Sin roles asignados</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLUMNA DERECHA -->
+                <div class="col-der">
+                    <!-- Especialidades (solo técnico) -->
+                    <div v-if="usuario.roles.includes('tecnico')" class="card">
+                        <div class="card__head">
+                            <div class="card__ico" style="--c: #e08a1e"><StarOutlined /></div>
+                            <div class="card__meta">
+                                <div class="card__titulo">
+                                    Especialidades
+                                    <span v-if="especialidadesCount" class="badge badge--orange">{{ especialidadesCount }}</span>
+                                </div>
+                                <div class="card__sub">Se usa para sugerirlo al delegar órdenes</div>
+                            </div>
+                        </div>
+                        <div class="card__body">
+                            <div class="esp-grupo">
+                                <div class="esp-grupo__l">
+                                    <span class="esp-dot" style="background: #0d84c9"></span>
+                                    Tipos de equipo
+                                </div>
+                                <a-space v-if="usuario.especialidades_equipo?.length" wrap>
+                                    <a-tag v-for="e in usuario.especialidades_equipo" :key="e" color="blue">{{ e }}</a-tag>
+                                </a-space>
+                                <span v-else class="vacio">Ninguna registrada</span>
+                            </div>
+                            <div class="esp-grupo">
+                                <div class="esp-grupo__l">
+                                    <span class="esp-dot" style="background: #6b4bc9"></span>
+                                    Tipos de mantenimiento
+                                </div>
+                                <a-space v-if="usuario.especialidades_mantenimiento?.length" wrap>
+                                    <a-tag v-for="e in usuario.especialidades_mantenimiento" :key="e" color="purple">{{ e }}</a-tag>
+                                </a-space>
+                                <span v-else class="vacio">Ninguna registrada</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actividad reciente (últimos 5) -->
+                    <div class="card">
+                        <div class="card__head">
+                            <div class="card__ico" style="--c: #173a5f"><ClockCircleOutlined /></div>
+                            <div class="card__meta">
+                                <div class="card__titulo">
+                                    Actividad reciente
+                                    <span v-if="actividadCount" class="badge badge--navy">{{ actividadCount }}</span>
+                                </div>
+                                <div class="card__sub">Últimos movimientos registrados</div>
+                            </div>
+                            <a-button
+                                v-if="actividad.length > 5"
+                                class="card__extra"
+                                size="small"
+                                type="text"
+                                @click="modalActividad = true"
+                            >
+                                Ver todo
+                            </a-button>
+                        </div>
+                        <div class="card__body">
+                            <div v-if="actividad.length" class="actividad">
+                                <div v-for="a in actividad.slice(0, 5)" :key="a.id" class="actividad__it">
+                                    <span class="actividad__dot"></span>
+                                    <div class="actividad__txt">
+                                        <div class="actividad__accion">
+                                            <strong>{{ a.accion }}</strong>
+                                            <span class="actividad__modulo">{{ a.modulo }}</span>
+                                        </div>
+                                        <div class="actividad__fecha">{{ fechaHora(a.created_at) }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-else class="vacio-box">
+                                <ClockCircleOutlined />
+                                <span>Sin actividad registrada</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: Actividad completa -->
+        <a-modal
+            v-model:open="modalActividad"
+            :title="`Actividad reciente (${actividadCount})`"
+            :footer="null"
+            :width="640"
+        >
+            <a-timeline v-if="actividad.length" class="mt-2">
+                <a-timeline-item v-for="a in actividad" :key="a.id" color="#1f9e86">
+                    <div class="act-modal">
+                        <div>
+                            <strong>{{ a.accion }}</strong>
+                            <span class="actividad__modulo"> · {{ a.modulo }}</span>
+                        </div>
+                        <div class="actividad__fecha">{{ fechaHora(a.created_at) }}</div>
+                    </div>
+                </a-timeline-item>
+            </a-timeline>
+            <a-empty v-else description="Sin actividad registrada" />
+        </a-modal>
 
         <ConfirmarDialog ref="confirmar" />
     </AppLayout>
 </template>
 
 <style scoped>
-.tt {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-.tt .anticon {
-    color: var(--sigam-teal);
-}
-.datos {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+/* ==========================================================
+   Layout base
+   ========================================================== */
+.ficha-compacta {
     display: flex;
     flex-direction: column;
+    gap: 13px;
+    min-height: 0;
 }
-.datos li {
+
+/* ---------- Tags del header ---------- */
+.estado-tag,
+.email-tag,
+.yo-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 20px;
+    border: none;
+    box-shadow: 0 1px 3px rgba(15, 37, 71, 0.06);
+}
+.estado-tag .anticon,
+.email-tag .anticon,
+.yo-tag .anticon {
+    font-size: 12px;
+}
+
+/* ---------- Grid 2 columnas ---------- */
+.grid-ficha {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 14px;
+    align-items: start;
+}
+.col-izq,
+.col-der {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    min-width: 0;
+}
+
+/* ---------- Cards ---------- */
+.card {
+    background: #fff;
+    border: 1px solid var(--sigam-borde-suave);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--sigam-sombra-sm);
+    transition: box-shadow 0.18s ease;
+}
+.card:hover {
+    box-shadow: var(--sigam-sombra-md);
+}
+.card__head {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 0;
+    gap: 11px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--sigam-borde-suave);
+    background: linear-gradient(120deg, var(--sigam-navy-050), #fff 70%);
 }
-.datos li:last-child {
-    border-bottom: none;
-}
-.datos__ic {
+.card__ico {
     width: 34px;
     height: 34px;
-    flex: none;
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 15px;
+    color: var(--c);
+    background: color-mix(in srgb, var(--c) 14%, #fff);
+    flex-shrink: 0;
 }
-.datos__t {
+.card__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1;
+}
+.card__titulo {
+    font-weight: 800;
+    font-size: 13.5px;
+    color: var(--sigam-navy);
+    letter-spacing: -0.1px;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.card__sub {
+    font-size: 11px;
+    color: var(--sigam-tenue);
+}
+.card__extra {
+    flex-shrink: 0;
+}
+.card__body {
+    padding: 13px 16px;
+}
+
+/* ---------- Badges ---------- */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #efe9fb;
+    color: #6b4bc9;
+    font-size: 10.5px;
+    font-weight: 800;
+}
+.badge--green { background: #e4f4ec; color: #16806c; }
+.badge--orange { background: #fdf3e6; color: #a86717; }
+.badge--navy { background: var(--sigam-navy-050); color: var(--sigam-navy); }
+.badge--purple { background: #efe9fb; color: #6b4bc9; }
+
+/* ---------- Mini-cards ---------- */
+.mini-grid {
+    display: grid;
+    gap: 9px;
+}
+.mini-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.mini {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 11px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--c) 6%, #fff);
+    border: 1px solid color-mix(in srgb, var(--c) 18%, transparent);
+    transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.mini:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px color-mix(in srgb, var(--c) 20%, transparent);
+}
+.mini__ic {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: #fff;
+    background: var(--c);
+}
+.mini__t {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    gap: 0;
 }
-.datos__l {
-    font-size: 11.5px;
+.mini__l {
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     font-weight: 700;
     color: var(--sigam-tenue);
+    line-height: 1.1;
 }
-.datos__v {
-    font-size: 13.5px;
+.mini__v {
+    font-size: 12.5px;
+    font-weight: 700;
     color: var(--sigam-texto);
-    font-weight: 500;
+    word-break: break-word;
+    line-height: 1.25;
 }
+
+/* ---------- Roles ---------- */
 .roles-usuario {
     display: flex;
     flex-direction: column;
@@ -256,7 +541,7 @@ const onMenuAccion = ({ key }) => {
     display: flex;
     flex-direction: column;
     gap: 3px;
-    padding: 10px 12px;
+    padding: 10px 13px;
     border-radius: 11px;
     background: color-mix(in srgb, var(--rol-color) 6%, #fff);
     border: 1px solid color-mix(in srgb, var(--rol-color) 20%, #fff);
@@ -266,45 +551,134 @@ const onMenuAccion = ({ key }) => {
     font-size: 13px;
     font-weight: 800;
     color: var(--rol-color);
+    letter-spacing: -0.1px;
 }
 .roles-usuario__desc {
-    font-size: 12.5px;
-    color: var(--sigam-texto);
-    line-height: 1.5;
-}
-.vacio {
-    color: var(--sigam-tenue);
-    font-size: 12.5px;
-}
-.especialidades-ayuda {
-    margin: -4px 0 12px;
     font-size: 12px;
-    color: var(--sigam-tenue);
+    color: var(--sigam-texto);
+    line-height: 1.45;
 }
-.especialidades-grupo {
+
+/* ---------- Especialidades ---------- */
+.esp-grupo {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-bottom: 12px;
+    gap: 8px;
+    margin-bottom: 14px;
 }
-.especialidades-grupo:last-child {
+.esp-grupo:last-child {
     margin-bottom: 0;
 }
-.especialidades-l {
-    font-size: 11.5px;
+.esp-grupo__l {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
     color: var(--sigam-tenue);
 }
-.act {
+.esp-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+/* ---------- Actividad (card) ---------- */
+.actividad {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+.actividad__it {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 9px 0;
+    border-bottom: 1px dashed var(--sigam-borde-suave);
+}
+.actividad__it:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+.actividad__it:first-child {
+    padding-top: 0;
+}
+.actividad__dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1f9e86 0%, #16806c 100%);
+    box-shadow: 0 0 0 3px rgba(31, 158, 134, 0.15);
+    margin-top: 5px;
+    flex-shrink: 0;
+}
+.actividad__txt {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+.actividad__accion {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.actividad__accion strong {
+    font-size: 12.5px;
+    color: var(--sigam-navy);
+    font-weight: 700;
+}
+.actividad__modulo {
+    font-size: 11px;
+    color: var(--sigam-tenue);
+    font-weight: 500;
+}
+.actividad__fecha {
+    font-size: 11px;
+    color: var(--sigam-tenue);
+}
+
+/* ---------- Modal actividad ---------- */
+.act-modal {
     display: flex;
     justify-content: space-between;
     gap: 12px;
+    align-items: flex-start;
 }
-.act__f {
-    font-size: 11.5px;
-    white-space: nowrap;
+
+/* ---------- Vacio ---------- */
+.vacio-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 22px 12px;
+    border-radius: 11px;
+    border: 1px dashed var(--sigam-borde);
+    background: var(--sigam-navy-050);
     color: var(--sigam-tenue);
+    font-size: 12px;
+}
+.vacio-box .anticon {
+    font-size: 20px;
+    opacity: 0.5;
+}
+.vacio {
+    color: var(--sigam-tenue);
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1199px) {
+    .grid-ficha { grid-template-columns: 1fr; }
+}
+@media (max-width: 575px) {
+    .mini-grid--2 { grid-template-columns: 1fr; }
 }
 </style>

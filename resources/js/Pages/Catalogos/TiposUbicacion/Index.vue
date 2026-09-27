@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3';
 import CatalogoTabla from '@/Components/CatalogoTabla.vue';
 
 defineProps({
+    kpis: Object,
     titulo: String,
     registros: Object,
     filtros: Object,
@@ -27,6 +28,7 @@ const campos = [
     <CatalogoTabla
         :titulo="titulo"
         :registros="registros"
+        :kpis="kpis"
         :filtros="filtros"
         :orden="orden"
         ruta-base="catalogos.tipos_ubicacion"

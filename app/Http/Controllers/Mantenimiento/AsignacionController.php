@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Mantenimiento;
 use App\Http\Controllers\Controller;
 use App\Models\AsignacionMantenimiento;
 use App\Models\Mantenimiento;
+use App\Models\Usuario;
 use App\Support\CicloMantenimiento;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,10 @@ class AsignacionController extends Controller
     {
         $this->authorize('mantenimientos.asignar');
 
+        if (in_array($mantenimiento->estado?->clave, ['cerrado', 'cancelado'], true)) {
+            return back()->with('error', 'No se puede asignar un técnico a una orden cerrada o cancelada.');
+        }
+
         $datos = $request->validate([
             'tecnico_id' => [
                 'required', 'integer', Rule::exists('usuarios', 'id'),
@@ -31,17 +36,28 @@ class AsignacionController extends Controller
             'notas' => ['nullable', 'string', 'max:255'],
         ]);
 
-        DB::transaction(function () use ($mantenimiento, $datos, $request): void {
+        $tecnico = Usuario::findOrFail($datos['tecnico_id']);
+
+        DB::transaction(function () use ($mantenimiento, $datos, $tecnico, $request): void {
+            // Si se marca como principal, desmarcar cualquier otro principal activo.
             if ($datos['es_principal'] ?? false) {
                 $mantenimiento->asignaciones()->whereNull('desasignado_at')->update(['es_principal' => false]);
             }
 
             $mantenimiento->asignaciones()->create([
-                'tecnico_id' => $datos['tecnico_id'],
+                'tecnico_id' => $tecnico->id,
                 'asignado_por' => $request->user()->id,
                 'es_principal' => $datos['es_principal'] ?? false,
                 'notas' => $datos['notas'] ?? null,
                 'asignado_at' => now(),
+            ]);
+
+            // 👇 Registro en la bitácora (esto faltaba y por eso no aparecía nada)
+            $mantenimiento->observaciones()->create([
+                'tipo' => 'comentario',
+                'cuerpo' => "Se asignó al técnico {$tecnico->nombre}"
+                    .(! empty($datos['es_principal']) ? ' como responsable principal.' : '.'),
+                'usuario_id' => $request->user()->id,
             ]);
 
             // autorizado → asignado al colocar el primer técnico.
@@ -58,16 +74,31 @@ class AsignacionController extends Controller
             }
         });
 
-        return back()->with('exito', 'Técnico asignado.');
+        return back()->with('exito', "Técnico {$tecnico->nombre} asignado.");
     }
 
-    public function destroy(Mantenimiento $mantenimiento, AsignacionMantenimiento $asignacion): RedirectResponse
+    public function destroy(Request $request, Mantenimiento $mantenimiento, AsignacionMantenimiento $asignacion): RedirectResponse
     {
         $this->authorize('mantenimientos.asignar');
 
-        abort_unless($asignacion->mantenimiento_id === $mantenimiento->id, 404);
+        abort_unless((int) $asignacion->mantenimiento_id === (int) $mantenimiento->id, 404);
 
-        $asignacion->update(['desasignado_at' => now()]);
+        if ($asignacion->desasignado_at) {
+            return back()->with('error', 'Esta asignación ya había sido retirada.');
+        }
+
+        $tecnicoNombre = $asignacion->tecnico?->nombre ?? 'técnico';
+
+        DB::transaction(function () use ($mantenimiento, $asignacion, $request, $tecnicoNombre): void {
+            $asignacion->update(['desasignado_at' => now()]);
+
+            // 👇 Registro en la bitácora también al retirar
+            $mantenimiento->observaciones()->create([
+                'tipo' => 'comentario',
+                'cuerpo' => "Se retiró al técnico {$tecnicoNombre}.",
+                'usuario_id' => $request->user()->id,
+            ]);
+        });
 
         return back()->with('exito', 'Técnico retirado de la orden.');
     }

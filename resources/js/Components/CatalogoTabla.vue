@@ -2,11 +2,13 @@
 import { computed, reactive, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import {
+    CheckCircleOutlined,
     CheckOutlined,
     EditOutlined,
     FilterOutlined,
     PlusOutlined,
     StopOutlined,
+    UnorderedListOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTableInertia from '@/Components/DataTableInertia.vue';
@@ -23,6 +25,7 @@ const props = defineProps({
     titulo: { type: String, required: true },
     descripcion: { type: String, default: 'Catálogo configurable usado en los formularios del sistema.' },
     registros: { type: Object, required: true },
+    kpis: { type: Object, default: () => ({}) },
     filtros: { type: Object, default: () => ({}) },
     orden: { type: Object, default: () => ({}) },
     rutaBase: { type: String, required: true },
@@ -139,6 +142,12 @@ const activar = (registro) =>
 const est = (campo) => (form.errors[campo] ? 'error' : undefined);
 const moneda = (v) =>
     v == null ? '—' : new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v);
+
+const tarjetas = computed(() => [
+    { label: 'Total', valor: props.kpis.total ?? 0, icono: UnorderedListOutlined, color: '#0d84c9' },
+    { label: 'Activos', valor: props.kpis.activos ?? 0, icono: CheckCircleOutlined, color: '#1f9e86' },
+    { label: 'Inactivos', valor: props.kpis.inactivos ?? 0, icono: StopOutlined, color: '#d64545' },
+]);
 </script>
 
 <template>
@@ -165,6 +174,19 @@ const moneda = (v) =>
             >
                 {{ c.label }}
             </button>
+        </div>
+
+        <!-- KPIs con colores sólidos -->
+        <div class="kpis">
+            <div v-for="k in tarjetas" :key="k.label" class="kpi" :style="{ '--acc': k.color }">
+                <div class="kpi__icono">
+                    <component :is="k.icono" />
+                </div>
+                <div class="kpi__txt">
+                    <div class="kpi__valor">{{ k.valor }}</div>
+                    <div class="kpi__etq">{{ k.label }}</div>
+                </div>
+            </div>
         </div>
 
         <DataTableInertia :paginador="registros" :columns="columns" :orden="orden" :cargando="cargando" @cambio="onCambioTabla">
@@ -312,6 +334,74 @@ const moneda = (v) =>
 </template>
 
 <style scoped>
+/* ==========================================================
+   KPIs con colores sólidos
+   ========================================================== */
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 11px;
+    margin-bottom: 14px;
+}
+
+.kpi {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 14px;
+    background: #fff;
+    border: 1px solid var(--sigam-borde);
+    border-radius: 13px;
+    box-shadow: 0 1px 3px rgba(15, 37, 71, 0.06);
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--acc);
+}
+
+.kpi__icono {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    color: #fff;
+    background: var(--acc);
+    flex-shrink: 0;
+}
+
+.kpi__valor {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--sigam-navy);
+    line-height: 1.1;
+}
+
+.kpi__etq {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 700;
+    color: var(--sigam-tenue);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+    .kpis {
+        grid-template-columns: 1fr;
+    }
+}
+
 .cat-nav {
     display: flex;
     flex-wrap: wrap;

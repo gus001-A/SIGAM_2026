@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3';
 import CatalogoTabla from '@/Components/CatalogoTabla.vue';
 
 defineProps({
+    kpis: Object,
     titulo: String,
     registros: Object,
     filtros: Object,
@@ -36,6 +37,7 @@ const campos = [
         :titulo="titulo"
         descripcion="Criticidad de las áreas hospitalarias y cada cuántos días deben limpiarse."
         :registros="registros"
+        :kpis="kpis"
         :filtros="filtros"
         :orden="orden"
         ruta-base="catalogos.tipos_area"

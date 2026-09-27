@@ -241,7 +241,8 @@ class ReporteController extends Controller
         $hasta = Carbon::parse($request->query('hasta', now()->toDateString()))->endOfDay();
 
         $ordenes = Mantenimiento::query()
-            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'tipo:id,nombre', 'estado:id,nombre', 'prioridad:id,nombre', 'tecnicos:id,nombre'])
+            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'tipo:id,nombre', 'estado:id,nombre', 'prioridad:id,nombre',
+                'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at')])
             ->whereBetween('created_at', [$desde, $hasta])
             ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
             ->when($request->integer('tipo_mant_id'), fn (Builder $q, $v) => $q->where('tipo_id', $v))
@@ -286,7 +287,8 @@ class ReporteController extends Controller
     private function urgencias(): array
     {
         $ordenes = Mantenimiento::query()
-            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'estado:id,nombre', 'prioridad:id,nombre', 'tecnicos:id,nombre'])
+            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'estado:id,nombre', 'prioridad:id,nombre',
+                'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at')])
             ->whereHas('prioridad', fn (Builder $q) => $q->whereIn('clave', ['urgente', 'critica']))
             ->whereHas('estado', fn (Builder $q) => $q->where('es_abierto', true))
             ->orderBy('programado_inicio')
@@ -437,7 +439,8 @@ class ReporteController extends Controller
         $hasta = Carbon::parse($request->query('hasta', now()->toDateString()))->endOfDay();
 
         $ordenes = Mantenimiento::query()
-            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'estado:id,nombre', 'tecnicos:id,nombre'])
+            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'estado:id,nombre',
+                'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at')])
             ->whereHas('tipo', fn (Builder $q) => $q->where('categoria', 'correctivo'))
             ->whereBetween('created_at', [$desde, $hasta])
             ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))

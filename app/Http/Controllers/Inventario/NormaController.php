@@ -71,6 +71,12 @@ class NormaController extends Controller
 
         return Inertia::render('Normas/Index', [
             'normas' => $normas,
+            'kpis' => [
+                'total' => Norma::withTrashed()->count(),
+                'vigentes' => Norma::count(),
+                'inactivas' => Norma::onlyTrashed()->count(),
+                'por_revisar' => Norma::whereDate('fecha_revision', '<', now())->count(),
+            ],
             'filtros' => $request->only(['codigo', 'nombre', 'version', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
         ]);
