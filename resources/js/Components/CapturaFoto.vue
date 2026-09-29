@@ -44,6 +44,12 @@ const iniciarCamara = async (deviceId) => {
             audio: false,
         };
         stream.value = await navigator.mediaDevices.getUserMedia(constraints);
+
+        // El <video> solo existe en el DOM cuando `cargando` es false (ver
+        // template): hay que apagar el spinner ANTES de esperar el siguiente
+        // tick, si no `video.value` sigue siendo null y el stream nunca se
+        // conecta — la cámara queda "prendida" pero el visor se ve en negro.
+        cargando.value = false;
         await nextTick();
         if (video.value) {
             video.value.srcObject = stream.value;
