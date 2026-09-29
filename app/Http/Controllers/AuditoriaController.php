@@ -51,8 +51,18 @@ class AuditoriaController extends Controller
                 'created_at' => $r->created_at,
             ]);
 
+        $hoy = now()->startOfDay();
+
         return Inertia::render('Auditoria/Index', [
             'registros' => $registros,
+            'kpis' => [
+                'total' => RegistroAuditoria::count(),
+                'hoy' => RegistroAuditoria::where('created_at', '>=', $hoy)->count(),
+                'usuarios_hoy' => RegistroAuditoria::where('created_at', '>=', $hoy)
+                    ->whereNotNull('usuario_id')->distinct('usuario_id')->count('usuario_id'),
+                'criticas_hoy' => RegistroAuditoria::where('created_at', '>=', $hoy)
+                    ->whereIn('accion', ['eliminar', 'desactivar'])->count(),
+            ],
             'filtros' => $request->only(['usuario_id', 'sucursal_id', 'modulo', 'accion', 'ip', 'registro', 'desde', 'hasta']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => [

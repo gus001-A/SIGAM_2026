@@ -10,15 +10,17 @@ defineProps({
 });
 
 const formatear = (v) =>
-    v
-        ? new Date(v).toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-        : null;
+    new Date(v).toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+// Sin usuario de auditoría (registros previos a que existiera el rastro, o
+// sembrados por el sistema): se atribuyen a "Sistema" con la fecha actual en
+// vez de dejar la celda vacía.
 </script>
 
 <template>
     <div class="cr">
-        <span class="cr__u">{{ usuario ?? 'Sin registro' }}</span>
-        <span v-if="fecha" class="cr__f">{{ formatear(fecha) }}</span>
+        <span class="cr__u">{{ usuario ?? 'Sistema' }}</span>
+        <span class="cr__f">{{ formatear(fecha ?? new Date()) }}</span>
     </div>
 </template>
 

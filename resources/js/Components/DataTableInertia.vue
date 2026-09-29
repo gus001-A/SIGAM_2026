@@ -16,6 +16,7 @@ const props = defineProps({
     orden: { type: Object, default: () => ({ campo: 'id', dir: 'asc' }) },
     cargando: { type: Boolean, default: false },
     rowKey: { type: String, default: 'id' },
+    // Aceptamos la prop por compatibilidad pero ya no es obligatoria
     hayFiltros: { type: Boolean, default: false },
     expandable: { type: Object, default: undefined },
 });
@@ -49,6 +50,46 @@ const tieneFiltros = computed(
     () => !!slots.filtro && props.columns.some((c) => c.filtro),
 );
 
+/**
+ * Detecta si hay algún filtro aplicado mirando la URL.
+ * Así funciona aunque el padre no pase `hayFiltros`.
+ */
+const filtrosAplicadosEnUrl = ref(false);
+
+const revisarUrl = () => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    // Excluimos los parámetros de paginación/orden para no contar como "filtro"
+    const ignorar = new Set(['page', 'orden', 'dir']);
+    let hay = false;
+    for (const [k, v] of params.entries()) {
+        if (ignorar.has(k)) continue;
+        if (v !== '' && v !== null && v !== undefined) {
+            hay = true;
+            break;
+        }
+    }
+    filtrosAplicadosEnUrl.value = hay;
+};
+
+/**
+ * Estado efectivo de "hay filtros":
+ * - Si el padre pasa explícitamente `hayFiltros`, se respeta.
+ * - Si no, caemos a la detección por URL.
+ */
+const hayFiltrosEfectivo = computed(() => {
+    if (props.hayFiltros) return true;
+    return filtrosAplicadosEnUrl.value;
+});
+
+const onClickLimpiar = () => {
+    if (!hayFiltrosEfectivo.value) return;
+    emit('limpiar');
+    // Actualizamos el estado local inmediatamente para que el botón
+    // vuelva a quedar inactivo mientras el router hace su trabajo.
+    filtrosAplicadosEnUrl.value = false;
+};
+
 const paginacion = computed(() => ({
     current: props.paginador.current_page,
     pageSize: props.paginador.per_page,
@@ -60,10 +101,7 @@ const paginacion = computed(() => ({
 
 const onChange = (pag, filtros, sorter) => emit('cambio', pag, filtros, sorter);
 
-// --- Alto dinámico: el cuerpo de la tabla se ajusta al espacio disponible,
-// pero SIEMPRE se ven al menos 8 filas aunque el contenedor sea angosto
-// (antes el mínimo era 140px = ~2 filas, y páginas con mucho contenido
-// arriba de la tabla —KPIs, tarjetas— dejaban la tabla ilegible).
+// --- Alto dinámico del cuerpo de la tabla ---
 const ALTO_FILA = 52;
 const FILAS_MINIMAS = 8;
 const contenedor = ref(null);
@@ -83,9 +121,12 @@ const recalcular = () => {
 
 onMounted(() => {
     recalcular();
+    revisarUrl();
     ro = new ResizeObserver(recalcular);
     if (contenedor.value) ro.observe(contenedor.value);
     window.addEventListener('resize', recalcular);
+    // Cada vez que Inertia navega, revisamos la URL (por si cambió el filtro)
+    document.addEventListener('inertia:success', revisarUrl);
     requestAnimationFrame(recalcular);
     setTimeout(recalcular, 120);
 });
@@ -93,24 +134,15 @@ onMounted(() => {
 onBeforeUnmount(() => {
     ro?.disconnect();
     window.removeEventListener('resize', recalcular);
+    document.removeEventListener('inertia:success', revisarUrl);
 });
 </script>
 
 <template>
     <div ref="contenedor" class="dti">
-        <a-table
-            :columns="columnasConOrden"
-            :data-source="paginador.data"
-            :pagination="paginacion"
-            :loading="cargando"
-            :row-key="rowKey"
-            :expandable="expandable"
-            size="middle"
-            :scroll="{ x: 'max-content', y: scrollY }"
-            :show-sorter-tooltip="false"
-            class="tabla-inertia"
-            @change="onChange"
-        >
+        <a-table :columns="columnasConOrden" :data-source="paginador.data" :pagination="paginacion" :loading="cargando"
+            :row-key="rowKey" :expandable="expandable" size="middle" :scroll="{ x: 'max-content', y: scrollY }"
+            :show-sorter-tooltip="false" class="tabla-inertia" @change="onChange">
             <template v-for="(_, name) in $slots" #[name]="slotData">
                 <slot v-if="name !== 'filtro'" :name="name" v-bind="slotData ?? {}" />
             </template>
@@ -118,23 +150,14 @@ onBeforeUnmount(() => {
             <template v-if="tieneFiltros" #summary>
                 <a-table-summary fixed="bottom">
                     <a-table-summary-row class="dti-filtros">
-                        <a-table-summary-cell
-                            v-for="(col, i) in columnasConOrden"
-                            :key="col.key ?? col.dataIndex ?? i"
-                            :index="i"
-                        >
+                        <a-table-summary-cell v-for="(col, i) in columnasConOrden" :key="col.key ?? col.dataIndex ?? i"
+                            :index="i">
                             <div class="dti-filtros__cel" @click.stop>
-                                <a-tooltip
-                                    v-if="CLAVES_ACCION.includes(col.key)"
-                                    title="Limpiar filtros"
-                                >
-                                    <button
-                                        type="button"
-                                        class="dti-filtros__limpiar"
-                                        :class="{ 'is-activo': hayFiltros }"
-                                        :disabled="!hayFiltros"
-                                        @click="emit('limpiar')"
-                                    >
+                                <a-tooltip v-if="CLAVES_ACCION.includes(col.key)"
+                                    :title="hayFiltrosEfectivo ? 'Limpiar filtros' : 'No hay filtros aplicados'">
+                                    <button type="button" class="dti-filtros__limpiar"
+                                        :class="{ 'is-activo': hayFiltrosEfectivo }" :disabled="!hayFiltrosEfectivo"
+                                        @click="onClickLimpiar">
                                         <ClearOutlined />
                                     </button>
                                 </a-tooltip>
@@ -158,6 +181,7 @@ onBeforeUnmount(() => {
     min-height: 0;
     animation: sigam-fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
 .dti :deep(.ant-table-pagination) {
     margin: 14px 2px 2px;
 }
@@ -172,12 +196,13 @@ onBeforeUnmount(() => {
     background: #fff;
     box-shadow: var(--sigam-sombra-sm);
 }
+
 .tabla-inertia .ant-table-container {
     border-radius: 14px;
 }
 
 /* --- Encabezado --- */
-.tabla-inertia .ant-table-thead > tr > th {
+.tabla-inertia .ant-table-thead>tr>th {
     background: var(--sigam-navy-050);
     border-bottom: 1px solid var(--sigam-borde);
     color: #3c5064;
@@ -188,34 +213,40 @@ onBeforeUnmount(() => {
     padding: 12px 13px !important;
     white-space: nowrap;
 }
-.tabla-inertia .ant-table-thead > tr > th::before {
+
+.tabla-inertia .ant-table-thead>tr>th::before {
     display: none !important;
 }
+
 .tabla-inertia .ant-table-column-sorter {
     color: #9aa7b4;
     margin-inline-start: 5px;
 }
+
 .tabla-inertia .ant-table-column-sorter-up.active,
 .tabla-inertia .ant-table-column-sorter-down.active {
     color: var(--sigam-navy);
 }
+
 .tabla-inertia .ant-table-header {
     box-shadow: 0 4px 10px -8px rgba(17, 34, 51, 0.3);
     position: relative;
     z-index: 3;
 }
 
-/* --- Fila de filtros al pie (estilo SAINS) --- */
+/* --- Fila de filtros al pie --- */
 .tabla-inertia .ant-table-summary {
     background: #eef3f9;
 }
-.tabla-inertia .dti-filtros > .ant-table-cell {
+
+.tabla-inertia .dti-filtros>.ant-table-cell {
     background: #eef3f9 !important;
     border-top: 2px solid var(--sigam-navy-100) !important;
     border-bottom: none !important;
     padding: 8px 9px !important;
     vertical-align: middle;
 }
+
 .tabla-inertia .dti-filtros__cel .ant-input,
 .tabla-inertia .dti-filtros__cel .ant-input-affix-wrapper,
 .tabla-inertia .dti-filtros__cel .ant-select,
@@ -228,16 +259,18 @@ onBeforeUnmount(() => {
     background: #fff !important;
     box-shadow: 0 1px 2px rgba(17, 34, 51, 0.06);
 }
+
 .tabla-inertia .dti-filtros__cel .th__rango {
     display: flex;
     gap: 5px;
 }
+
 .tabla-inertia .dti-filtros__cel .th__rango .ant-input {
     width: 100%;
 }
 
-/* --- Cuerpo: filas uniformes --- */
-.tabla-inertia .ant-table-tbody > tr > td {
+/* --- Cuerpo --- */
+.tabla-inertia .ant-table-tbody>tr>td {
     padding: 0 14px;
     height: 52px;
     border-bottom: 1px solid var(--sigam-borde-suave);
@@ -245,53 +278,82 @@ onBeforeUnmount(() => {
     color: var(--sigam-texto);
     vertical-align: middle;
 }
-.tabla-inertia .ant-table-tbody > tr:last-child > td {
+
+.tabla-inertia .ant-table-tbody>tr:last-child>td {
     border-bottom: none;
 }
-.tabla-inertia .ant-table-tbody > tr.ant-table-row {
+
+.tabla-inertia .ant-table-tbody>tr.ant-table-row {
     transition: background 0.12s ease;
     animation: sigam-fade-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.tabla-inertia .ant-table-tbody > tr.ant-table-row:nth-child(1) { animation-delay: 0.02s; }
-.tabla-inertia .ant-table-tbody > tr.ant-table-row:nth-child(2) { animation-delay: 0.04s; }
-.tabla-inertia .ant-table-tbody > tr.ant-table-row:nth-child(3) { animation-delay: 0.06s; }
-.tabla-inertia .ant-table-tbody > tr.ant-table-row:nth-child(4) { animation-delay: 0.08s; }
-.tabla-inertia .ant-table-tbody > tr.ant-table-row:nth-child(5) { animation-delay: 0.1s; }
-.tabla-inertia .ant-table-tbody > tr.ant-table-row:nth-child(n + 6) { animation-delay: 0.12s; }
-.tabla-inertia .ant-table-tbody > tr.ant-table-row:nth-child(even) > td {
+
+.tabla-inertia .ant-table-tbody>tr.ant-table-row:nth-child(1) {
+    animation-delay: 0.02s;
+}
+
+.tabla-inertia .ant-table-tbody>tr.ant-table-row:nth-child(2) {
+    animation-delay: 0.04s;
+}
+
+.tabla-inertia .ant-table-tbody>tr.ant-table-row:nth-child(3) {
+    animation-delay: 0.06s;
+}
+
+.tabla-inertia .ant-table-tbody>tr.ant-table-row:nth-child(4) {
+    animation-delay: 0.08s;
+}
+
+.tabla-inertia .ant-table-tbody>tr.ant-table-row:nth-child(5) {
+    animation-delay: 0.1s;
+}
+
+.tabla-inertia .ant-table-tbody>tr.ant-table-row:nth-child(n + 6) {
+    animation-delay: 0.12s;
+}
+
+.tabla-inertia .ant-table-tbody>tr.ant-table-row:nth-child(even)>td {
     background: #fafbfd;
 }
-.tabla-inertia .ant-table-tbody > tr.ant-table-row:hover > td {
+
+.tabla-inertia .ant-table-tbody>tr.ant-table-row:hover>td {
     background: var(--sigam-navy-050);
 }
-.tabla-inertia .ant-table-tbody > tr > td a:not(.ant-btn):not(.acc) {
+
+.tabla-inertia .ant-table-tbody>tr>td a:not(.ant-btn):not(.acc) {
     color: var(--sigam-navy);
     font-weight: 600;
     transition: color 0.14s ease;
 }
-.tabla-inertia .ant-table-tbody > tr > td a:not(.ant-btn):not(.acc):hover {
+
+.tabla-inertia .ant-table-tbody>tr>td a:not(.ant-btn):not(.acc):hover {
     color: var(--sigam-teal-700);
     text-decoration: underline;
 }
+
 .tabla-inertia .ant-table-tbody .ant-tag {
     margin-inline-end: 4px;
 }
 
-/* --- Columna de acciones: botones uniformes, color por ícono --- */
+/* --- Columna de acciones --- */
 .tabla-inertia th.col-acciones,
 .tabla-inertia td.col-acciones {
     text-align: center;
 }
+
 .tabla-inertia td.col-acciones {
     background: #fff;
 }
-.tabla-inertia .ant-table-tbody > tr.ant-table-row:nth-child(even) > td.col-acciones {
+
+.tabla-inertia .ant-table-tbody>tr.ant-table-row:nth-child(even)>td.col-acciones {
     background: #fafbfd;
 }
+
 .tabla-inertia .ant-table-row:hover td.col-acciones,
 .tabla-inertia .ant-table-row:hover .ant-table-cell-fix-right {
     background: var(--sigam-navy-050);
 }
+
 .tabla-inertia td.col-acciones .ant-space,
 .tabla-inertia td.col-acciones .acc-grupo {
     display: inline-flex;
@@ -299,9 +361,11 @@ onBeforeUnmount(() => {
     justify-content: center;
     gap: 6px !important;
 }
+
 .tabla-inertia td.col-acciones .ant-space-item {
     display: inline-flex;
 }
+
 .tabla-inertia td.col-acciones .ant-btn {
     width: 30px;
     height: 30px;
@@ -315,61 +379,72 @@ onBeforeUnmount(() => {
     transition: transform 0.13s cubic-bezier(0.16, 1, 0.3, 1),
         color 0.13s ease, background 0.13s ease, border-color 0.13s ease;
 }
+
 .tabla-inertia td.col-acciones .ant-btn .anticon {
     font-size: 14px;
 }
+
 .tabla-inertia td.col-acciones .ant-btn:hover {
     transform: translateY(-1px);
     color: #fff;
 }
+
 .tabla-inertia td.col-acciones .ant-btn:active {
     transform: translateY(0);
 }
 
-/* Color en reposo (tinte) + relleno al hover, según el ícono */
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-eye) {
     background: #e8f3fb;
     color: #0d6ca6;
 }
+
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-eye):hover {
     background: #0d84c9;
 }
+
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-qrcode) {
     background: #efecfb;
     color: #6b4bc9;
 }
+
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-qrcode):hover {
     background: #6b4bc9;
 }
+
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-edit) {
     background: #e7eefb;
     color: #23508c;
 }
+
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-edit):hover {
     background: var(--sigam-navy);
 }
+
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-delete),
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-stop),
 .tabla-inertia td.col-acciones .ant-btn.ant-btn-dangerous {
     background: #fbeaea;
     color: #c23b3b;
 }
+
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-delete):hover,
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-stop):hover,
 .tabla-inertia td.col-acciones .ant-btn.ant-btn-dangerous:hover {
     background: #dc2626;
 }
+
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-undo),
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-check) {
     background: #e4f4ee;
     color: var(--sigam-teal-700);
 }
+
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-undo):hover,
 .tabla-inertia td.col-acciones .ant-btn:has(.anticon-check):hover {
     background: var(--sigam-teal);
 }
 
-/* Botón "limpiar filtros" en la fila de filtros */
+/* --- Escobita / limpiar filtros --- */
 .dti-filtros__limpiar {
     width: 30px;
     height: 30px;
@@ -383,26 +458,27 @@ onBeforeUnmount(() => {
     cursor: not-allowed;
     transition: all 0.14s ease;
 }
+
 .dti-filtros__limpiar.is-activo {
     color: #c23b3b;
     border-color: #f0c9c9;
     background: #fdf0f0;
     cursor: pointer;
 }
+
 .dti-filtros__limpiar.is-activo:hover {
     background: #d64545;
     color: #fff;
     border-color: #d64545;
     transform: translateY(-1px);
 }
+
 .tabla-inertia .ant-table-cell-fix-right {
     background: #fff;
 }
-/* En escritorio la tabla suele caber completa: se quita la sombra de
-   "hay más columnas" para no ensuciar la columna de acciones fija.
-   En pantallas angostas SÍ hace falta — es la única pista de que se
-   puede deslizar para ver el resto de las columnas. */
+
 @media (min-width: 900px) {
+
     .tabla-inertia .ant-table-cell-fix-right-first::after,
     .tabla-inertia .ant-table-cell-fix-left-last::after,
     .tabla-inertia .ant-table-ping-right .ant-table-cell-fix-right-first::after,
@@ -410,46 +486,47 @@ onBeforeUnmount(() => {
         box-shadow: none !important;
     }
 }
-/* Scroll horizontal más fluido al tacto */
+
 .tabla-inertia .ant-table-content,
 .tabla-inertia .ant-table-body {
     -webkit-overflow-scrolling: touch;
 }
 
-/* --- Scroll interno --- */
 .tabla-inertia .ant-table-body {
     scrollbar-width: thin;
 }
+
 .tabla-inertia .ant-table-body::-webkit-scrollbar {
     width: 10px;
     height: 10px;
 }
+
 .tabla-inertia .ant-table-body::-webkit-scrollbar-thumb {
     background: #cdd7e1;
     border: 3px solid transparent;
     border-radius: 999px;
     background-clip: content-box;
 }
+
 .tabla-inertia .ant-table-body::-webkit-scrollbar-thumb:hover {
     background: #b3c0cd;
     background-clip: content-box;
 }
 
-/* --- Estado vacío / paginación --- */
 .tabla-inertia .ant-empty {
     padding: 30px 0;
 }
+
 .tabla-inertia .ant-pagination-total-text {
-    color: var(--sigam-tenue);
-    font-size: 12.5px;
-    margin-inline-end: auto;
+    display: none !important;
 }
+
 .tabla-inertia .ant-table-pagination.ant-pagination {
     align-items: center;
 }
 
 /* ==========================================================
-   Paginación — estilo iOS moderno (mismo look en toda la app)
+   Paginación — estilo iOS moderno
    ========================================================== */
 .tabla-inertia .ant-pagination-options-quick-jumper {
     display: none !important;

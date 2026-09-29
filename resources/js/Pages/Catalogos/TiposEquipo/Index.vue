@@ -12,7 +12,6 @@ defineProps({
 
 const columnas = [
     { key: 'nombre', title: 'Tipo de equipo', filtro: 'texto', sorter: true, width: 260 },
-    { key: 'clave', title: 'Clave', tipo: 'tag', width: 180 },
     { key: 'descripcion', title: 'Descripción', filtro: 'texto', width: 300 },
     { key: 'equipos_count', title: 'Equipos', tipo: 'count', align: 'right', width: 110 },
 ];

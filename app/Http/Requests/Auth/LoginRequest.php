@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\Usuario;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -42,13 +44,24 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        // El correo ya no es único (puede haber varios usuarios con el mismo
+        // correo), así que no podemos usar Auth::attempt() tal cual: su
+        // proveedor por defecto solo revisa la PRIMERA fila que coincida con
+        // el correo. Probamos la contraseña contra cada usuario que comparta
+        // ese correo hasta encontrar el que corresponde.
+        $usuario = Usuario::where('email', $this->string('email'))
+            ->get()
+            ->first(fn (Usuario $u) => Hash::check((string) $this->string('password'), $u->getAuthPassword()));
+
+        if (! $usuario) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
             ]);
         }
+
+        Auth::login($usuario, $this->boolean('remember'));
 
         RateLimiter::clear($this->throttleKey());
     }

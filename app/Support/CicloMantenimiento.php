@@ -24,7 +24,7 @@ class CicloMantenimiento
         'en_proceso' => ['en_espera_refaccion', 'fuera_de_servicio', 'realizado', 'reprogramado'],
         'en_espera_refaccion' => ['en_proceso', 'reprogramado', 'cancelado'],
         'fuera_de_servicio' => ['en_proceso', 'reprogramado'],
-        'realizado' => ['supervisado', 'en_proceso'],
+        'realizado' => ['supervisado'],
         'supervisado' => ['cerrado', 'en_proceso'],
         'reprogramado' => ['asignado', 'en_proceso', 'cancelado'],
         'cerrado' => [],
@@ -49,6 +49,16 @@ class CicloMantenimiento
     public static function permite(string $desde, string $hacia): bool
     {
         return in_array($hacia, self::siguientes($desde), true);
+    }
+
+    /**
+     * Una vez que la orden se marcó como realizada (o avanzó más allá), ya no
+     * se puede asignar técnicos ni agregar/quitar materiales: el trabajo ya
+     * se dio por hecho y solo queda supervisar/cerrar (o reabrir a en_proceso).
+     */
+    public static function permiteGestionEjecucion(string $clave): bool
+    {
+        return ! in_array($clave, ['realizado', 'supervisado', 'cerrado', 'cancelado'], true);
     }
 
     /**

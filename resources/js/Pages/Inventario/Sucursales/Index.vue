@@ -135,7 +135,7 @@ const reactivar = (sucursal) =>
 
         <div class="tabla-sucursales" :class="{ 'tabla-sucursales--sin-paginacion': totalPaginas <= 1 }">
             <DataTableInertia :paginador="sucursales" :columns="columns" :orden="orden" :cargando="cargando"
-                @cambio="onCambioTabla">
+                @cambio="onCambioTabla" @limpiar="limpiar">
                 <template #filtro="{ column }">
                     <a-input v-if="column.filtro === 'texto'" v-model:value="filtros[column.filtroClave]" size="small"
                         allow-clear placeholder="Filtrar" @update:value="filtrar()" />

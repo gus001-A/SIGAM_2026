@@ -20,7 +20,7 @@ class NotificacionController extends Controller
 
     public function index(Request $request): Response
     {
-        $base = $request->user()->notificaciones();
+        $base = $request->user()->notificaciones()->visibles();
 
         $notificaciones = (clone $base)
             ->when($request->query('ver') === 'no_leidas', fn (Builder $q) => $q->noLeidas())
@@ -50,7 +50,7 @@ class NotificacionController extends Controller
     /** Contador + últimas notificaciones para el panel flotante de la campana. */
     public function noLeidas(Request $request): JsonResponse
     {
-        $base = $request->user()->notificaciones();
+        $base = $request->user()->notificaciones()->visibles();
 
         return response()->json([
             'total' => (clone $base)->noLeidas()->count(),

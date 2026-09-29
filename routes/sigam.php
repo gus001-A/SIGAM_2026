@@ -30,6 +30,7 @@ use App\Http\Controllers\Mantenimiento\PlanMantenimientoController;
 use App\Http\Controllers\Mantenimiento\SolicitudMantenimientoController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\Tareas\MaterialTareaController;
 use App\Http\Controllers\Tareas\TareaController;
 use App\Http\Controllers\Tareas\TareaResponsableController;
 use Illuminate\Support\Facades\Route;
@@ -42,7 +43,7 @@ use Illuminate\Support\Facades\Route;
 | $this->authorize('<modulo>.<accion>') contra los permisos de spatie.
 */
 
-Route::middleware(['auth', 'verified'])->group(function (): void {
+Route::middleware(['auth'])->group(function (): void {
 
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -125,6 +126,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('tareas/{tarea}/transicion', [TareaController::class, 'transicion'])->name('tareas.transicion');
     Route::post('tareas/{tarea}/responsables', [TareaResponsableController::class, 'store'])->name('tareas.responsables.store');
     Route::delete('tareas/{tarea}/responsables/{responsable}', [TareaResponsableController::class, 'destroy'])->name('tareas.responsables.destroy');
+    Route::post('tareas/{tarea}/materiales', [MaterialTareaController::class, 'store'])->name('tareas.materiales.store');
+    Route::delete('tareas/{tarea}/materiales/{material}', [MaterialTareaController::class, 'destroy'])->name('tareas.materiales.destroy');
 
     // --- Documentos --------------------------------------------------
     Route::post('documentos', [DocumentoController::class, 'store'])->name('documentos.store');

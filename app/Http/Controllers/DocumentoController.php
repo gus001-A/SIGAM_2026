@@ -42,10 +42,9 @@ class DocumentoController extends Controller
             'relacionable_tipo' => ['required', Rule::in(array_keys(self::RELACIONABLES))],
             'relacionable_id' => ['required', 'integer'],
             'titulo' => ['nullable', 'string', 'max:255'],
-            'categoria' => ['nullable', 'string', 'max:60'],
+            'descripcion' => ['nullable', 'string', 'max:255'],
             'rol' => ['nullable', 'string', 'max:40'],
             'visibilidad' => ['required', Rule::in(['privado', 'publico'])],
-            'vence_at' => ['nullable', 'date'],
         ]);
 
         $modelo = self::RELACIONABLES[$datos['relacionable_tipo']];
@@ -60,12 +59,11 @@ class DocumentoController extends Controller
             'ruta' => $ruta,
             'nombre_original' => $archivo->getClientOriginalName(),
             'titulo' => $datos['titulo'] ?? null,
-            'categoria' => $datos['categoria'] ?? null,
+            'descripcion' => $datos['descripcion'] ?? null,
             'tipo_mime' => $archivo->getClientMimeType(),
             'tamano' => $archivo->getSize(),
             'checksum' => hash_file('sha256', $archivo->getRealPath()),
             'visibilidad' => $datos['visibilidad'],
-            'vence_at' => $datos['vence_at'] ?? null,
             'subido_por' => $request->user()->id,
         ]);
 

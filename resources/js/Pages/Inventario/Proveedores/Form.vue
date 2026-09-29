@@ -220,8 +220,8 @@ const cancelar = () =>
                             extra="Opcional — contrato, ficha técnica u otro documento del proveedor. Puedes subir varios."
                             :validate-status="est('documentos')" :help="form.errors.documentos">
                             <a-upload-dragger :file-list="listaDocumentos" :multiple="true" :max-count="5"
-                                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" :before-upload="antesDeSubirDocumento"
-                                @remove="quitarDocumento">
+                                list-type="picture" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                                :before-upload="antesDeSubirDocumento" @remove="quitarDocumento">
                                 <p class="ant-upload-drag-icon">
                                     <InboxOutlined />
                                 </p>

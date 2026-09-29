@@ -45,13 +45,12 @@ class TareaResponsableController extends Controller
         ]);
 
         if ($datos['usuario_id'] !== $request->user()->id) {
-            Notificaciones::crear(
-                $datos['usuario_id'],
-                'tarea_asignada',
-                "Nueva tarea: {$tarea->titulo}",
-                'Se te asignó una tarea con fecha límite '.$tarea->fecha_limite->format('d/m/Y').'.',
-                ['ref' => "tarea:{$tarea->id}", 'url' => route('tareas.show', $tarea->id)],
-            );
+            $titulo = "Nueva tarea: {$tarea->titulo}";
+            $cuerpo = 'Se te asignó una tarea con fecha límite '.$tarea->fecha_limite->format('d/m/Y').'.';
+            $url = route('tareas.show', $tarea->id);
+
+            Notificaciones::crear($datos['usuario_id'], 'tarea_asignada', $titulo, $cuerpo, ['ref' => "tarea:{$tarea->id}", 'url' => $url]);
+            Notificaciones::correo($datos['usuario_id'], $titulo, $cuerpo, $url);
         }
 
         return back()->with('exito', 'Responsable asignado.');

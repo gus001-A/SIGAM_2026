@@ -339,6 +339,10 @@ class MantenimientoController extends Controller
             return back()->with('error', "Transición no permitida: {$origen} → {$destino}.");
         }
 
+        if ($destino === 'realizado' && blank($mantenimiento->diagnostico)) {
+            return back()->with('error', 'No se puede marcar como realizada: falta capturar el diagnóstico.');
+        }
+
         if (in_array($destino, ['supervisado', 'cerrado'], true)) {
             $this->authorize('mantenimientos.supervisar');
         }

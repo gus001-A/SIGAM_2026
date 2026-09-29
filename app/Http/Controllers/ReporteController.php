@@ -77,6 +77,35 @@ class ReporteController extends Controller
         'cumplimiento_tareas' => ['desde', 'hasta'],
     ];
 
+    /**
+     * Estados de mantenimiento no tienen un color propio en la base de datos
+     * (a diferencia de EstadoEquipo y Prioridad) — se usa el mismo mapeo por
+     * clave que ya pinta los tags de estado en Órdenes/Solicitudes.
+     */
+    private const COLOR_ESTADO_MANTENIMIENTO = [
+        'solicitado' => '#64748b',
+        'autorizado' => '#0ea5e9',
+        'asignado' => '#0d84c9',
+        'en_proceso' => '#e08a1e',
+        'en_espera_refaccion' => '#a86717',
+        'fuera_de_servicio' => '#d64545',
+        'realizado' => '#16a34a',
+        'supervisado' => '#7c3aed',
+        'cerrado' => '#1f9e86',
+        'reprogramado' => '#6b4bc9',
+        'cancelado' => '#991b1b',
+    ];
+
+    /**
+     * Celda "con color": en vez de texto plano, la vista la pinta como tag
+     * de color (igual que Estado/Prioridad en el resto del sistema); las
+     * exportaciones (Excel/PDF) la aplanan de vuelta a solo texto.
+     */
+    private function celda(?string $texto, ?string $color = null): array
+    {
+        return ['__color' => true, 'texto' => $texto ?? '—', 'color' => $color];
+    }
+
     public function index(): Response
     {
         $this->authorize('reportes.ver');
@@ -164,7 +193,11 @@ class ReporteController extends Controller
         $writer->addRow(Row::fromValues($columnas));
         foreach ($filas as $fila) {
             $writer->addRow(Row::fromValues(array_map(
-                fn ($v) => is_scalar($v) || $v === null ? $v : (string) $v,
+                fn ($v) => match (true) {
+                    is_array($v) && ($v['__color'] ?? false) => $v['texto'],
+                    is_scalar($v) || $v === null => $v,
+                    default => (string) $v,
+                },
                 $fila,
             )));
         }
@@ -218,7 +251,7 @@ class ReporteController extends Controller
     private function inventarioGeneral(Request $request): array
     {
         $equipos = Equipo::query()
-            ->with(['tipo:id,nombre', 'marca:id,nombre', 'sucursal:id,nombre', 'ubicacion:id,nombre', 'estado:id,nombre'])
+            ->with(['tipo:id,nombre', 'marca:id,nombre', 'sucursal:id,nombre', 'ubicacion:id,nombre', 'estado:id,nombre,color'])
             ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
             ->when($request->integer('tipo_equipo_id'), fn (Builder $q, $v) => $q->where('tipo_id', $v))
             ->when($request->integer('estado_equipo_id'), fn (Builder $q, $v) => $q->where('estado_id', $v))
@@ -229,7 +262,7 @@ class ReporteController extends Controller
             'columnas' => ['Código', 'Descripción', 'Tipo', 'Marca', 'Serie', 'Sucursal', 'Ubicación', 'Estado', 'Valor'],
             'filas' => $equipos->map(fn (Equipo $e) => [
                 $e->codigo_activo, $e->descripcion, $e->tipo?->nombre, $e->marca?->nombre, $e->numero_serie,
-                $e->sucursal?->nombre, $e->ubicacion?->nombre, $e->estado?->nombre, $e->valor_adquisicion,
+                $e->sucursal?->nombre, $e->ubicacion?->nombre, $this->celda($e->estado?->nombre, $e->estado?->color), $e->valor_adquisicion,
             ]),
             'totales' => ['cantidad' => $equipos->count(), 'valor' => (float) $equipos->sum('valor_adquisicion')],
         ];
@@ -241,7 +274,7 @@ class ReporteController extends Controller
         $hasta = Carbon::parse($request->query('hasta', now()->toDateString()))->endOfDay();
 
         $ordenes = Mantenimiento::query()
-            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'tipo:id,nombre', 'estado:id,nombre', 'prioridad:id,nombre',
+            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'tipo:id,nombre', 'estado:id,nombre,clave', 'prioridad:id,nombre,color',
                 'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at')])
             ->whereBetween('created_at', [$desde, $hasta])
             ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
@@ -257,7 +290,8 @@ class ReporteController extends Controller
                 $m->tecnicos->pluck('nombre')->implode(', '),
                 optional($m->programado_inicio)->format('Y-m-d'),
                 optional($m->completado_at)->format('Y-m-d'),
-                $m->prioridad?->nombre, $m->estado?->nombre,
+                $this->celda($m->prioridad?->nombre, $m->prioridad?->color),
+                $this->celda($m->estado?->nombre, self::COLOR_ESTADO_MANTENIMIENTO[$m->estado?->clave] ?? null),
             ]),
             'totales' => ['ordenes' => $ordenes->count()],
         ];
@@ -287,7 +321,7 @@ class ReporteController extends Controller
     private function urgencias(): array
     {
         $ordenes = Mantenimiento::query()
-            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'estado:id,nombre', 'prioridad:id,nombre',
+            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'estado:id,nombre,clave', 'prioridad:id,nombre,color',
                 'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at')])
             ->whereHas('prioridad', fn (Builder $q) => $q->whereIn('clave', ['urgente', 'critica']))
             ->whereHas('estado', fn (Builder $q) => $q->where('es_abierto', true))
@@ -297,9 +331,11 @@ class ReporteController extends Controller
         return [
             'columnas' => ['Folio', 'Equipo / instalación', 'Prioridad', 'Programado', 'Técnico(s)', 'Estado'],
             'filas' => $ordenes->map(fn (Mantenimiento $m) => [
-                $m->folio, $m->equipo?->codigo_activo ?? $m->ubicacion?->nombre, $m->prioridad?->nombre,
+                $m->folio, $m->equipo?->codigo_activo ?? $m->ubicacion?->nombre,
+                $this->celda($m->prioridad?->nombre, $m->prioridad?->color),
                 optional($m->programado_inicio)->format('Y-m-d H:i'),
-                $m->tecnicos->pluck('nombre')->implode(', '), $m->estado?->nombre,
+                $m->tecnicos->pluck('nombre')->implode(', '),
+                $this->celda($m->estado?->nombre, self::COLOR_ESTADO_MANTENIMIENTO[$m->estado?->clave] ?? null),
             ]),
             'totales' => ['urgencias' => $ordenes->count()],
         ];
@@ -439,7 +475,7 @@ class ReporteController extends Controller
         $hasta = Carbon::parse($request->query('hasta', now()->toDateString()))->endOfDay();
 
         $ordenes = Mantenimiento::query()
-            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'estado:id,nombre',
+            ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'estado:id,nombre,clave',
                 'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at')])
             ->whereHas('tipo', fn (Builder $q) => $q->where('categoria', 'correctivo'))
             ->whereBetween('created_at', [$desde, $hasta])
@@ -454,7 +490,7 @@ class ReporteController extends Controller
                 optional($m->created_at)->format('Y-m-d'),
                 optional($m->completado_at)->format('Y-m-d'),
                 $m->tecnicos->pluck('nombre')->implode(', '),
-                $m->estado?->nombre,
+                $this->celda($m->estado?->nombre, self::COLOR_ESTADO_MANTENIMIENTO[$m->estado?->clave] ?? null),
             ]),
             'totales' => ['correctivos' => $ordenes->count()],
         ];

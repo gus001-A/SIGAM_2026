@@ -27,6 +27,7 @@ import { antdLocale, antTheme } from '@/theme';
 import { usePermisos } from '@/composables/usePermisos';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
 import PanelNotificaciones from '@/Components/PanelNotificaciones.vue';
+import { reproducirSonidoNotificacion } from '@/utils/sonidoNotificacion';
 
 const props = defineProps({
     titulo: { type: String, default: '' },
@@ -195,18 +196,29 @@ const iniciales = computed(() => {
 
 const noLeidas = ref(0);
 const notis = ref([]);
+let primeraCargaNotis = true;
 const cargarNoLeidas = async () => {
     try {
         const { data } = await window.axios.get(route('notificaciones.no_leidas'));
-        noLeidas.value = data.total ?? 0;
+        const nuevoTotal = data.total ?? 0;
+        if (!primeraCargaNotis && nuevoTotal > noLeidas.value) {
+            reproducirSonidoNotificacion();
+        }
+        noLeidas.value = nuevoTotal;
         notis.value = data.items ?? [];
+        primeraCargaNotis = false;
     } catch (e) {
         /* silencioso */
     }
 };
+let intervaloNotis = null;
 onMounted(() => {
     cargarNoLeidas();
     router.on('navigate', cargarNoLeidas);
+    intervaloNotis = setInterval(cargarNoLeidas, 30000);
+});
+onUnmounted(() => {
+    if (intervaloNotis) clearInterval(intervaloNotis);
 });
 
 const confirmar = ref(null);

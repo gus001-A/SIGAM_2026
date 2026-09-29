@@ -19,7 +19,9 @@ class HistorialEstadoTarea extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['tarea_id', 'estado_origen', 'estado_destino', 'cambiado_por', 'nota', 'cambiado_at'];
+    protected $fillable = [
+        'tarea_id', 'estado_origen', 'estado_destino', 'cambiado_por', 'nota', 'documento_evidencia_id', 'cambiado_at',
+    ];
 
     protected function camposMayusculas(): array
     {
@@ -39,5 +41,10 @@ class HistorialEstadoTarea extends Model
     public function cambiadoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'cambiado_por');
+    }
+
+    public function documentoEvidencia(): BelongsTo
+    {
+        return $this->belongsTo(Documento::class, 'documento_evidencia_id');
     }
 }

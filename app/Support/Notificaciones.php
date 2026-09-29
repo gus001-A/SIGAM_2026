@@ -2,8 +2,10 @@
 
 namespace App\Support;
 
+use App\Mail\AvisoAsignacionMail;
 use App\Models\Notificacion;
 use App\Models\Usuario;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Emisión de notificaciones in-app del dominio SIGAM (§12).
@@ -44,18 +46,45 @@ class Notificaciones
     }
 
     /**
+     * Aviso por correo de una asignación (tarea/orden). Deliberadamente
+     * separado de `crear()`: solo se llama junto a las notificaciones de
+     * "te asignaron X", no para cada tipo de notificación in-app.
+     */
+    public static function correo(Usuario|int $usuario, string $titulo, string $cuerpo, string $url): void
+    {
+        try {
+            $usuario = $usuario instanceof Usuario ? $usuario : Usuario::find($usuario);
+
+            if (! $usuario?->email) {
+                return;
+            }
+
+            Mail::to($usuario->email)->send(new AvisoAsignacionMail($titulo, $cuerpo, $url));
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
      * Notifica a todos los usuarios activos que tengan alguno de los roles dados.
+     * `$conCorreo` además envía el aviso por correo a cada uno (usa
+     * `$datos['url']` como enlace del botón del correo).
      *
      * @param  list<string>  $roles
      * @param  array<string, mixed>  $datos
      */
-    public static function paraRoles(array $roles, string $tipo, string $titulo, ?string $cuerpo = null, array $datos = [], ?int $exceptoUsuarioId = null): void
+    public static function paraRoles(array $roles, string $tipo, string $titulo, ?string $cuerpo = null, array $datos = [], ?int $exceptoUsuarioId = null, bool $conCorreo = false): void
     {
         Usuario::query()
             ->where('estado', 'activo')
             ->when($exceptoUsuarioId, fn ($q) => $q->whereKeyNot($exceptoUsuarioId))
             ->role($roles)
-            ->pluck('id')
-            ->each(fn ($id) => self::crear($id, $tipo, $titulo, $cuerpo, $datos));
+            ->get(['id', 'email'])
+            ->each(function (Usuario $usuario) use ($tipo, $titulo, $cuerpo, $datos, $conCorreo): void {
+                self::crear($usuario, $tipo, $titulo, $cuerpo, $datos);
+                if ($conCorreo) {
+                    self::correo($usuario, $titulo, $cuerpo ?? '', $datos['url'] ?? '');
+                }
+            });
     }
 }

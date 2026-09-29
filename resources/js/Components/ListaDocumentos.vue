@@ -106,6 +106,7 @@ const vacio = computed(() => props.documentos.length === 0);
                 </button>
                 <div class="doc__meta">
                     <div class="doc__nombre" :title="d.titulo || d.nombre_original">{{ d.titulo || d.nombre_original }}</div>
+                    <div v-if="d.descripcion" class="doc__desc" :title="d.descripcion">{{ d.descripcion }}</div>
                     <div class="doc__sub">
                         <a-tag v-if="d.categoria" :bordered="false" color="blue">{{ d.categoria }}</a-tag>
                         <span>{{ kb(d.tamano) }}</span>
@@ -251,6 +252,14 @@ const vacio = computed(() => props.documentos.length === 0);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.doc__desc {
+    font-size: 11px;
+    color: var(--sigam-tenue);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 1px;
 }
 .doc__sub {
     display: flex;

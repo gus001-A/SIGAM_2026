@@ -19,6 +19,19 @@ class Notificacion extends Model
 
     protected $fillable = ['usuario_id', 'tipo', 'titulo', 'cuerpo', 'datos', 'leida_at'];
 
+    /**
+     * Únicos tipos que deben mostrarse: tareas, órdenes de mantenimiento,
+     * planes preventivos y solicitudes. Cualquier otro tipo (por ejemplo,
+     * de una funcionalidad ya retirada) queda fuera aunque exista en la BD.
+     */
+    public const TIPOS_VISIBLES = [
+        'tarea_asignada', 'tarea_modificada', 'tarea_proxima', 'tarea_vencida',
+        'mantenimiento_asignado', 'mantenimiento_modificado', 'mantenimiento_reprogramado',
+        'mantenimiento_proximo', 'mantenimiento_vencido',
+        'plan_asignado', 'plan_modificado',
+        'solicitud_creada', 'solicitud_autorizada', 'solicitud_rechazada',
+    ];
+
     protected function camposMayusculas(): array
     {
         return ['titulo', 'cuerpo'];
@@ -40,6 +53,11 @@ class Notificacion extends Model
     public function scopeNoLeidas(Builder $query): Builder
     {
         return $query->whereNull('leida_at');
+    }
+
+    public function scopeVisibles(Builder $query): Builder
+    {
+        return $query->whereIn('tipo', self::TIPOS_VISIBLES);
     }
 
     public function marcarLeida(): bool

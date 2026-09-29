@@ -49,11 +49,37 @@ class PlanMantenimientoController extends Controller
         $dir = $request->query('dir') === 'desc' ? 'desc' : 'asc';
 
         $texto = fn (string $clave): ?string => filled($request->query($clave)) ? trim((string) $request->query($clave)) : null;
+
+        // Resuelve la sucursal: null = todas, int = una específica.
+        // SeleccionSucursal::resolver debe devolver null cuando el valor es
+        // nulo, '', 'todas' o 0; y (int) cuando es un ID válido.
         $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
 
-        // Alcance de sucursal (sin los demás filtros) para los KPIs — se
-        // quedan estables al filtrar.
-        $visibles = fn (Builder $q) => $q->when($sucursalId, fn (Builder $w, $v) => $w->where('sucursal_id', $v));
+        /**
+         * Filtro de sucursal robusto:
+         * - Si el plan tiene sucursal_id, se compara contra él.
+         * - Si no, cae al sucursal_id del equipo o de la ubicación asociada.
+         * Esto cubre planes históricos donde sucursal_id quedó en NULL.
+         */
+        $filtrarPorSucursal = function (Builder $q, int $sucursalId) {
+            $q->where(function (Builder $w) use ($sucursalId) {
+                $w->where('sucursal_id', $sucursalId)
+                    ->orWhere(function (Builder $w2) use ($sucursalId) {
+                        $w2->whereNull('sucursal_id')
+                            ->where(function (Builder $w3) use ($sucursalId) {
+                                $w3->whereHas('equipo', fn (Builder $e) => $e->where('sucursal_id', $sucursalId))
+                                    ->orWhereHas('ubicacion', fn (Builder $u) => $u->where('sucursal_id', $sucursalId));
+                            });
+                    });
+            });
+        };
+
+        // Alcance de sucursal para los KPIs — mismo criterio que el listado.
+        $visibles = function (Builder $q) use ($sucursalId, $filtrarPorSucursal) {
+            if ($sucursalId) {
+                $filtrarPorSucursal($q, $sucursalId);
+            }
+        };
 
         $kpis = [
             'total' => PlanMantenimiento::query()->tap($visibles)->count(),
@@ -64,14 +90,21 @@ class PlanMantenimientoController extends Controller
         ];
 
         $planes = PlanMantenimiento::query()
-            ->with(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'tipo:id,nombre', 'tecnico:id,nombre'])
+            ->with([
+                'equipo:id,codigo_activo,descripcion,sucursal_id',
+                'ubicacion:id,nombre,sucursal_id',
+                'sucursal:id,nombre',
+                'tipo:id,nombre',
+                'tecnico:id,nombre',
+            ])
             ->withCount('ocurrencias')
             // Filtros por columna
             ->when($texto('equipo'), fn (Builder $q, $v) => $q->where(fn (Builder $w) => $w
                 ->whereHas('equipo', fn (Builder $e) => $e->where('codigo_activo', 'like', "%{$v}%")->orWhere('descripcion', 'like', "%{$v}%"))
                 ->orWhereHas('ubicacion', fn (Builder $u) => $u->where('nombre', 'like', "%{$v}%"))))
             ->when($texto('nombre'), fn (Builder $q, $v) => $q->where('nombre', 'like', "%{$v}%"))
-            ->when($sucursalId, fn (Builder $q, $v) => $q->where('sucursal_id', $v))
+            // Filtro por sucursal (robusto)
+            ->when($sucursalId, fn (Builder $q, $v) => $filtrarPorSucursal($q, $v))
             ->when($request->integer('tipo_mantenimiento_id'), fn (Builder $q, $v) => $q->where('tipo_mantenimiento_id', $v))
             ->when($request->integer('tecnico_id'), fn (Builder $q, $v) => $q->where('tecnico_id', $v))
             ->when($request->query('frecuencia'), fn (Builder $q, $v) => $q->where('tipo_frecuencia', $v))
@@ -110,7 +143,18 @@ class PlanMantenimientoController extends Controller
             'planes' => $planes,
             'kpis' => $kpis,
             'sucursalId' => $sucursalId,
-            'filtros' => $request->only(['equipo', 'nombre', 'tipo_mantenimiento_id', 'tecnico_id', 'frecuencia', 'vencidos', 'desde', 'hasta', 'registrado_por']),
+            'filtros' => $request->only([
+                'equipo',
+                'nombre',
+                'tipo_mantenimiento_id',
+                'tecnico_id',
+                'frecuencia',
+                'vencidos',
+                'desde',
+                'hasta',
+                'registrado_por',
+                'sucursal_id',   // <- necesario para que el frontend preserve el filtro
+            ]),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => [
                 'sucursales' => Sucursal::activos()->orderBy('nombre')->get(['id', 'nombre']),
@@ -125,11 +169,14 @@ class PlanMantenimientoController extends Controller
     {
         $this->authorize('mantenimientos.crear');
 
+        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
+
         return Inertia::render('Mantenimiento/Planes/Form', [
             'plan' => null,
             'preseleccion' => ['equipo_id' => $request->integer('equipo_id') ?: null],
-            'catalogos' => $this->catalogos(),
+            'catalogos' => $this->catalogos($sucursalId),
             'frecuencias' => self::FRECUENCIAS,
+            'sucursalId' => $sucursalId,
         ]);
     }
 
@@ -149,7 +196,15 @@ class PlanMantenimientoController extends Controller
     {
         $this->authorize('mantenimientos.ver');
 
-        $plan->load(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'tipo:id,nombre', 'norma:id,codigo', 'formato:id,nombre', 'tecnico:id,nombre']);
+        $plan->load([
+            'equipo:id,codigo_activo,descripcion',
+            'ubicacion:id,nombre',
+            'sucursal:id,nombre',
+            'tipo:id,nombre',
+            'norma:id,codigo',
+            'formato:id,nombre',
+            'tecnico:id,nombre',
+        ]);
 
         return Inertia::render('Mantenimiento/Planes/Show', [
             'plan' => $plan,
@@ -161,14 +216,19 @@ class PlanMantenimientoController extends Controller
         ]);
     }
 
-    public function edit(PlanMantenimiento $plan): Response
+    public function edit(Request $request, PlanMantenimiento $plan): Response
     {
         $this->authorize('mantenimientos.editar');
 
+        // Si estás editando, la sucursal es la del plan (no la del query).
+        $sucursalId = $plan->sucursal_id
+            ?? SeleccionSucursal::resolver($request->query('sucursal_id'));
+
         return Inertia::render('Mantenimiento/Planes/Form', [
             'plan' => $plan,
-            'catalogos' => $this->catalogos(),
+            'catalogos' => $this->catalogos($sucursalId),
             'frecuencias' => self::FRECUENCIAS,
+            'sucursalId' => $sucursalId,
         ]);
     }
 
@@ -358,11 +418,20 @@ class PlanMantenimientoController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function catalogos(): array
+    private function catalogos(?int $sucursalId = null): array
     {
         return [
-            'equipos' => Equipo::orderBy('codigo_activo')->get(['id', 'codigo_activo', 'descripcion', 'sucursal_id']),
-            'ubicaciones' => Ubicacion::activos()->orderBy('ruta')->get(['id', 'nombre', 'profundidad', 'sucursal_id']),
+            'equipos' => Equipo::query()
+                ->when($sucursalId, fn ($q) => $q->where('sucursal_id', $sucursalId))
+                ->orderBy('codigo_activo')
+                ->get(['id', 'codigo_activo', 'descripcion', 'sucursal_id']),
+
+            'ubicaciones' => Ubicacion::query()
+                ->activos()
+                ->when($sucursalId, fn ($q) => $q->where('sucursal_id', $sucursalId))
+                ->orderBy('ruta')
+                ->get(['id', 'nombre', 'profundidad', 'sucursal_id']),
+
             'tipos' => TipoMantenimiento::activos()->where('categoria', 'preventivo')->orderBy('nombre')->get(['id', 'nombre']),
             'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre']),
             'normas' => Norma::activos()->orderBy('codigo')->get(['id', 'codigo', 'nombre']),

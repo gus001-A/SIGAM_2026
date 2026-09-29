@@ -51,7 +51,7 @@ const form = useForm({
 const reglas = reactive({
     nombre: [reglaRequerido('El nombre es obligatorio.')],
     email: [reglaRequerido('El correo es obligatorio.'), reglaCorreo()],
-    telefono: [reglaTelefono(10)],
+    telefono: [reglaRequerido('El teléfono es obligatorio.'), reglaTelefono(10)],
     password: editando.value ? [] : [reglaRequerido('Define una contraseña.')],
 });
 

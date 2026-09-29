@@ -1,12 +1,10 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import { InboxOutlined } from '@ant-design/icons-vue';
-import BotonTomarFoto from '@/Components/BotonTomarFoto.vue';
+import CampoEvidencia from '@/Components/CampoEvidencia.vue';
 
 const abierto = ref(false);
 const equipo = ref(null);
-const fileList = ref([]);
 
 const form = useForm({ motivo: '', evidencia: null, _method: 'delete' });
 
@@ -16,19 +14,7 @@ const abrir = (e) => {
     form.motivo = '';
     form.evidencia = null;
     form._method = 'delete';
-    fileList.value = [];
     abierto.value = true;
-};
-
-const antesDeSubir = (file) => {
-    fileList.value = [file];
-    form.evidencia = file;
-    return false;
-};
-
-const quitar = () => {
-    fileList.value = [];
-    form.evidencia = null;
 };
 
 const enviar = () => {
@@ -80,19 +66,7 @@ defineExpose({ abrir });
                 :validate-status="form.errors.evidencia ? 'error' : ''"
                 :help="form.errors.evidencia"
             >
-                <a-upload-dragger
-                    :file-list="fileList"
-                    :max-count="1"
-                    :before-upload="antesDeSubir"
-                    accept=".pdf,.jpg,.jpeg,.png,.webp"
-                    @remove="quitar"
-                >
-                    <p class="ant-upload-drag-icon"><InboxOutlined /></p>
-                    <p class="ant-upload-text">Foto o reporte del estado del equipo</p>
-                    <p class="ant-upload-hint">PDF, JPG, PNG o WEBP · máx. 20 MB</p>
-                </a-upload-dragger>
-                <BotonTomarFoto block class="mt-2" texto="O tomar foto con la cámara"
-                    titulo="Evidencia de baja" @capturada="antesDeSubir" />
+                <CampoEvidencia v-model="form.evidencia" texto="Foto o reporte del estado del equipo" />
             </a-form-item>
         </a-form>
     </a-modal>

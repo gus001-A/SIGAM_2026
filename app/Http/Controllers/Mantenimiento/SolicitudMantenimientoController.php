@@ -15,6 +15,7 @@ use App\Models\Ubicacion;
 use App\Support\Auditoria;
 use App\Support\CicloMantenimiento;
 use App\Support\Folios;
+use App\Support\Notificaciones;
 use App\Support\SeleccionSucursal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -166,6 +167,20 @@ class SolicitudMantenimientoController extends Controller
             'solicitado_at' => now(),
         ]);
 
+        $objetivo = $solicitud->equipo
+            ? "el equipo {$solicitud->equipo->codigo_activo}"
+            : ($solicitud->ubicacion ? "la instalación {$solicitud->ubicacion->nombre}" : 'un elemento del inventario');
+
+        Notificaciones::paraRoles(
+            ['superadministrador', 'supervisor'],
+            'solicitud_creada',
+            "Nueva solicitud: {$solicitud->folio}",
+            "{$request->user()->nombre} solicitó mantenimiento para {$objetivo}.",
+            ['ref' => "solicitud:{$solicitud->id}", 'url' => route('solicitudes.show', $solicitud->id)],
+            $request->user()->id,
+            conCorreo: true,
+        );
+
         return redirect()->route('solicitudes.show', $solicitud)->with('exito', "Solicitud {$solicitud->folio} registrada.");
     }
 
@@ -294,6 +309,15 @@ class SolicitudMantenimientoController extends Controller
             return $mantenimiento;
         });
 
+        if ($solicitud->solicitado_por && $solicitud->solicitado_por !== $request->user()->id) {
+            $titulo = "Solicitud autorizada: {$solicitud->folio}";
+            $cuerpo = "Se generó la orden {$mantenimiento->folio} a partir de tu solicitud.";
+            $url = route('mantenimientos.show', $mantenimiento->id);
+
+            Notificaciones::crear($solicitud->solicitado_por, 'solicitud_autorizada', $titulo, $cuerpo, ['ref' => "solicitud-aut:{$solicitud->id}", 'url' => $url]);
+            Notificaciones::correo($solicitud->solicitado_por, $titulo, $cuerpo, $url);
+        }
+
         return redirect()->route('mantenimientos.show', $mantenimiento)
             ->with('exito', "Orden {$mantenimiento->folio} creada desde la solicitud.");
     }
@@ -310,6 +334,15 @@ class SolicitudMantenimientoController extends Controller
             'revisado_at' => now(),
             'motivo_rechazo' => $datos['motivo_rechazo'],
         ]);
+
+        if ($solicitud->solicitado_por && $solicitud->solicitado_por !== $request->user()->id) {
+            $titulo = "Solicitud rechazada: {$solicitud->folio}";
+            $cuerpo = "Motivo: {$datos['motivo_rechazo']}";
+            $url = route('solicitudes.show', $solicitud->id);
+
+            Notificaciones::crear($solicitud->solicitado_por, 'solicitud_rechazada', $titulo, $cuerpo, ['ref' => "solicitud-rec:{$solicitud->id}", 'url' => $url]);
+            Notificaciones::correo($solicitud->solicitado_por, $titulo, $cuerpo, $url);
+        }
 
         return back()->with('exito', 'Solicitud rechazada.');
     }

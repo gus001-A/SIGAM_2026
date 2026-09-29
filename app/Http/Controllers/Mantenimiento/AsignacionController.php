@@ -21,8 +21,8 @@ class AsignacionController extends Controller
     {
         $this->authorize('mantenimientos.asignar');
 
-        if (in_array($mantenimiento->estado?->clave, ['cerrado', 'cancelado'], true)) {
-            return back()->with('error', 'No se puede asignar un técnico a una orden cerrada o cancelada.');
+        if (! CicloMantenimiento::permiteGestionEjecucion($mantenimiento->estado?->clave ?? '')) {
+            return back()->with('error', 'No se puede asignar un técnico: la orden ya fue marcada como realizada.');
         }
 
         $datos = $request->validate([
@@ -85,6 +85,10 @@ class AsignacionController extends Controller
 
         if ($asignacion->desasignado_at) {
             return back()->with('error', 'Esta asignación ya había sido retirada.');
+        }
+
+        if (! CicloMantenimiento::permiteGestionEjecucion($mantenimiento->estado?->clave ?? '')) {
+            return back()->with('error', 'No se puede retirar un técnico: la orden ya fue marcada como realizada.');
         }
 
         $tecnicoNombre = $asignacion->tecnico?->nombre ?? 'técnico';

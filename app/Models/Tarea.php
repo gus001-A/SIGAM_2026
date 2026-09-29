@@ -74,4 +74,18 @@ class Tarea extends Model
     {
         return $this->hasMany(HistorialEstadoTarea::class)->orderBy('cambiado_at');
     }
+
+    public function materiales(): HasMany
+    {
+        return $this->hasMany(MaterialTarea::class);
+    }
+
+    /** El costo ya no se captura a mano: se recalcula a partir de los materiales. */
+    public function recalcularCosto(): void
+    {
+        $total = $this->materiales()->whereNotNull('costo_unitario')->get()
+            ->reduce(fn (?string $acc, MaterialTarea $m) => bcadd($acc ?? '0', $m->costo_total, 2), null);
+
+        $this->forceFill(['costo' => $total])->saveQuietly();
+    }
 }

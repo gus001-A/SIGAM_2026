@@ -135,7 +135,7 @@ const aplicarEstado = () => {
 
         <div class="tabla-proveedores" :class="{ 'tabla-proveedores--sin-paginacion': totalPaginas <= 1 }">
             <DataTableInertia :paginador="proveedores" :columns="columns" :orden="orden" :cargando="cargando"
-                @cambio="onCambioTabla">
+                @cambio="onCambioTabla" @limpiar="limpiar">
                 <template #filtro="{ column }">
                     <a-input v-if="column.filtro === 'texto'" v-model:value="filtros[column.filtroClave]" size="small"
                         allow-clear placeholder="Filtrar" @update:value="filtrar()" />

@@ -87,7 +87,7 @@ class CalendarioController extends Controller
         // Las tareas administrativas también se muestran en el calendario por su
         // fecha límite (Propuesta técnica — anexo "TAREAS"). El técnico y el
         // usuario básico solo ven las que tienen asignadas, igual que en el
-        // listado de Tareas.
+        // listado de Tareas.q
         $tareas = Tarea::query()
             ->with([
                 'prioridad:id,nombre,color',

@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Tareas;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tareas\GuardarTareaRequest;
+use App\Models\HistorialEstadoTarea;
+use App\Models\Material;
 use App\Models\Prioridad;
 use App\Models\Tarea;
 use App\Models\Usuario;
 use App\Support\Auditoria;
 use App\Support\CicloTarea;
+use App\Support\Documentos;
 use App\Support\Notificaciones;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -56,6 +59,8 @@ class TareaController extends Controller
                 ->whereIn('estado', self::ESTADOS_ACTIVOS)->whereDate('fecha_limite', '<', today())->count(),
             'pendientes' => Tarea::query()->tap($visibles)->where('estado', 'pendiente')->count(),
             'en_proceso' => Tarea::query()->tap($visibles)->where('estado', 'en_proceso')->count(),
+            'realizadas' => Tarea::query()->tap($visibles)->where('estado', 'realizada')->count(),
+            'canceladas' => Tarea::query()->tap($visibles)->where('estado', 'cancelada')->count(),
         ];
 
         $tareas = Tarea::query()
@@ -150,13 +155,12 @@ class TareaController extends Controller
                 if ($usuarioId === $request->user()->id) {
                     continue;
                 }
-                Notificaciones::crear(
-                    $usuarioId,
-                    'tarea_asignada',
-                    "Nueva tarea: {$tarea->titulo}",
-                    'Se te asignó una tarea con fecha límite '.$tarea->fecha_limite->format('d/m/Y').'.',
-                    ['ref' => "tarea:{$tarea->id}", 'url' => route('tareas.show', $tarea->id)],
-                );
+                $titulo = "Nueva tarea: {$tarea->titulo}";
+                $cuerpo = 'Se te asignó una tarea con fecha límite '.$tarea->fecha_limite->format('d/m/Y').'.';
+                $url = route('tareas.show', $tarea->id);
+
+                Notificaciones::crear($usuarioId, 'tarea_asignada', $titulo, $cuerpo, ['ref' => "tarea:{$tarea->id}", 'url' => $url]);
+                Notificaciones::correo($usuarioId, $titulo, $cuerpo, $url);
             }
 
             return $tarea;
@@ -171,13 +175,20 @@ class TareaController extends Controller
         $this->verificarPertenencia($tarea);
 
         $tarea->load([
-            'asignaciones.usuario:id,nombre,apellidos',
+            'asignaciones.usuario:id,nombre,apellidos,telefono',
             'asignaciones.asignadoPor:id,nombre',
             'historialEstados.cambiadoPor:id,nombre,apellidos',
+            'historialEstados.documentoEvidencia',
             'prioridad:id,nombre,color',
             'creadoPor:id,nombre',
-            'documentos',
+            'materiales.material:id,nombre',
         ]);
+
+        // El documento expone su URL de previsualización segura (no es una
+        // relación, así que hay que llamar al método explícitamente).
+        $tarea->historialEstados->each(function (HistorialEstadoTarea $hh): void {
+            $hh->documentoEvidencia?->setAttribute('url', $hh->documentoEvidencia->url());
+        });
 
         return Inertia::render('Tareas/Show', [
             'tarea' => $tarea,
@@ -186,6 +197,7 @@ class TareaController extends Controller
             'catalogos' => [
                 'usuarios' => Usuario::where('estado', 'activo')->orderBy('nombre')->get(['id', 'nombre', 'apellidos']),
                 'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre']),
+                'materiales' => Material::activos()->orderBy('nombre')->get(['id', 'nombre', 'unidad', 'costo_referencia']),
             ],
         ]);
     }
@@ -232,11 +244,13 @@ class TareaController extends Controller
             return back()->with('error', "Transición no permitida: {$origen} → {$destino}.");
         }
 
-        $reglas = ['nota' => ['nullable', 'string', 'max:1000']];
+        $reglas = [
+            'nota' => ['nullable', 'string', 'max:1000'],
+            'evidencia' => ['required', 'file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp'],
+        ];
         if ($destino === 'realizada') {
             $this->authorize('tareas.cerrar');
             $reglas['nota'] = ['required', 'string', 'max:1000'];
-            $reglas['costo'] = ['nullable', 'numeric', 'min:0'];
         }
         if ($destino === 'cancelada') {
             $reglas['nota'] = ['required', 'string', 'max:1000'];
@@ -247,17 +261,25 @@ class TareaController extends Controller
             $tarea->estado = $destino;
             match ($destino) {
                 'en_proceso' => $tarea->fill(['iniciada_at' => now(), 'nota_avance' => $datos['nota'] ?? null]),
-                'realizada' => $tarea->fill(['realizada_at' => now(), 'nota_cierre' => $datos['nota'], 'costo' => $datos['costo'] ?? null]),
+                'realizada' => $tarea->fill(['realizada_at' => now(), 'nota_cierre' => $datos['nota']]),
                 'cancelada' => $tarea->fill(['cancelada_at' => now(), 'nota_cancelacion' => $datos['nota']]),
                 default => null,
             };
             $tarea->save();
+
+            $documento = Documentos::adjuntarEvidencia(
+                $tarea,
+                $request->file('evidencia'),
+                $request->user()->id,
+                'Evidencia: '.CicloTarea::etiqueta($destino),
+            );
 
             $tarea->historialEstados()->create([
                 'estado_origen' => $origen,
                 'estado_destino' => $destino,
                 'cambiado_por' => $request->user()->id,
                 'nota' => $datos['nota'] ?? null,
+                'documento_evidencia_id' => $documento->id,
                 'cambiado_at' => now(),
             ]);
         });

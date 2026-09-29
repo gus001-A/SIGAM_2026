@@ -10,17 +10,12 @@ import {
     InboxOutlined,
     PictureOutlined,
 } from '@ant-design/icons-vue';
-import CampoFechaHora from '@/Components/CampoFechaHora.vue';
 import BotonTomarFoto from '@/Components/BotonTomarFoto.vue';
 
 const props = defineProps({
     relacionableTipo: { type: String, required: true },
     relacionableId: { type: [Number, String], required: true },
     roles: { type: Array, default: () => [] },
-    categorias: {
-        type: Array,
-        default: () => ['manual', 'factura', 'garantia', 'certificado', 'foto', 'evidencia', 'otro'],
-    },
 });
 
 // =========================================================
@@ -35,9 +30,8 @@ const formPdf = useForm({
     relacionable_tipo: props.relacionableTipo,
     relacionable_id: props.relacionableId,
     titulo: '',
-    categoria: undefined,
+    descripcion: '',
     rol: undefined,
-    vence_at: '',
 });
 
 const abrirPdf = () => {
@@ -97,9 +91,8 @@ const formImg = useForm({
     relacionable_tipo: props.relacionableTipo,
     relacionable_id: props.relacionableId,
     titulo: '',
-    categoria: undefined,
+    descripcion: '',
     rol: undefined,
-    vence_at: '',
 });
 
 const abrirImagen = () => {
@@ -188,24 +181,13 @@ defineExpose({ abrirPdf, abrirImagen });
                 <a-input v-model:value="formPdf.titulo" placeholder="Nombre descriptivo" />
             </a-form-item>
 
-            <a-row :gutter="12">
-                <a-col :span="12">
-                    <a-form-item label="Categoría">
-                        <a-select v-model:value="formPdf.categoria"
-                            :options="categorias.map((c) => ({ value: c, label: c }))" allow-clear
-                            placeholder="Sin categoría" />
-                    </a-form-item>
-                </a-col>
-                <a-col v-if="roles.length" :span="12">
-                    <a-form-item label="Evidencia de">
-                        <a-select v-model:value="formPdf.rol" :options="roles.map((r) => ({ value: r, label: r }))"
-                            allow-clear placeholder="Sin especificar" />
-                    </a-form-item>
-                </a-col>
-            </a-row>
+            <a-form-item label="Descripción (opcional)">
+                <a-textarea v-model:value="formPdf.descripcion" :rows="2" placeholder="Breve descripción del archivo" />
+            </a-form-item>
 
-            <a-form-item label="Vence (opcional)">
-                <CampoFechaHora v-model="formPdf.vence_at" solo-fecha />
+            <a-form-item v-if="roles.length" label="Evidencia de">
+                <a-select v-model:value="formPdf.rol" :options="roles.map((r) => ({ value: r, label: r.toUpperCase() }))"
+                    allow-clear placeholder="Sin especificar" />
             </a-form-item>
         </a-form>
     </a-modal>
@@ -255,24 +237,13 @@ defineExpose({ abrirPdf, abrirImagen });
                 <a-input v-model:value="formImg.titulo" placeholder="Nombre descriptivo" />
             </a-form-item>
 
-            <a-row :gutter="12">
-                <a-col :span="12">
-                    <a-form-item label="Categoría">
-                        <a-select v-model:value="formImg.categoria"
-                            :options="categorias.map((c) => ({ value: c, label: c }))" allow-clear
-                            placeholder="Sin categoría" />
-                    </a-form-item>
-                </a-col>
-                <a-col v-if="roles.length" :span="12">
-                    <a-form-item label="Evidencia de">
-                        <a-select v-model:value="formImg.rol" :options="roles.map((r) => ({ value: r, label: r }))"
-                            allow-clear placeholder="Sin especificar" />
-                    </a-form-item>
-                </a-col>
-            </a-row>
+            <a-form-item label="Descripción (opcional)">
+                <a-textarea v-model:value="formImg.descripcion" :rows="2" placeholder="Breve descripción del archivo" />
+            </a-form-item>
 
-            <a-form-item label="Vence (opcional)">
-                <CampoFechaHora v-model="formImg.vence_at" solo-fecha />
+            <a-form-item v-if="roles.length" label="Evidencia de">
+                <a-select v-model:value="formImg.rol" :options="roles.map((r) => ({ value: r, label: r.toUpperCase() }))"
+                    allow-clear placeholder="Sin especificar" />
             </a-form-item>
         </a-form>
     </a-modal>

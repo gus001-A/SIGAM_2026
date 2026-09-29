@@ -19,12 +19,11 @@
             background: #173a5f; color: #fff; font-size: 8.5px; text-transform: uppercase;
             letter-spacing: .04em; padding: 6px 7px; text-align: left;
         }
-        td { padding: 5px 7px; border-bottom: 1px solid #e9eef4; font-size: 9px; }
-        tr:nth-child(even) td { background: #f6f8fb; }
+        td { padding: 5px 7px; border-bottom: 1px solid #e9eef4; font-size: 9px; background: #fff; }
         .totales { margin-top: 12px; font-size: 9px; }
         .totales span {
-            display: inline-block; background: #eaf0f6; color: #173a5f; font-weight: bold;
-            padding: 4px 9px; border-radius: 5px; margin-right: 6px;
+            display: inline-block; background: #fff; color: #173a5f; font-weight: bold;
+            padding: 4px 9px; border: 1px solid #173a5f; border-radius: 5px; margin-right: 6px;
         }
         .vacio { color: #9aa7b4; padding: 20px 0; text-align: center; }
     </style>
@@ -56,8 +55,17 @@
                 <tr>@foreach ($columnas as $c)<th>{{ $c }}</th>@endforeach</tr>
             </thead>
             <tbody>
+                @php
+                    $textoCelda = function ($celda) {
+                        if (is_array($celda)) {
+                            return $celda['texto'] ?? '—';
+                        }
+
+                        return is_bool($celda) ? ($celda ? 'Sí' : 'No') : ($celda ?? '—');
+                    };
+                @endphp
                 @foreach ($filas as $fila)
-                    <tr>@foreach ($fila as $celda)<td>{{ is_bool($celda) ? ($celda ? 'Sí' : 'No') : ($celda ?? '—') }}</td>@endforeach</tr>
+                    <tr>@foreach ($fila as $celda)<td>{{ $textoCelda($celda) }}</td>@endforeach</tr>
                 @endforeach
             </tbody>
         </table>

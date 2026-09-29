@@ -6,6 +6,7 @@ import {
     ContactsOutlined,
     DeleteOutlined,
     EditOutlined,
+    EllipsisOutlined,
     EnvironmentOutlined,
     FileImageOutlined,
     FilePdfOutlined,
@@ -18,6 +19,7 @@ import {
     TagOutlined,
     ToolOutlined,
     UserOutlined,
+    UndoOutlined,
 } from '@ant-design/icons-vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
@@ -110,31 +112,50 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
 
                 <template #acciones>
                     <template v-if="!inactivo">
-                        <a-button v-if="puede('proveedores.editar')" type="primary" class="btn-editar"
-                            @click="irA('proveedores.edit', proveedor.id)">
-                            <template #icon>
+                        <!-- Botón Editar -->
+                        <button
+                            v-if="puede('proveedores.editar')"
+                            type="button"
+                            class="btn-hero btn-hero--primary"
+                            style="--hc: #0d84c9; --hc2: #0a6ba6"
+                            @click="irA('proveedores.edit', proveedor.id)"
+                        >
+                            <span class="btn-hero__ic">
                                 <EditOutlined />
-                            </template>
-                            Editar
-                        </a-button>
+                            </span>
+                            <span class="btn-hero__txt">
+                                <span class="btn-hero__l">Editar</span>
+                                <span class="btn-hero__s">Proveedor</span>
+                            </span>
+                        </button>
+
+                        <!-- Dropdown de acciones -->
                         <a-dropdown v-if="puede('proveedores.desactivar')">
-                            <a-button type="text" class="btn-mas">
-                                <template #icon>
-                                    <DeleteOutlined />
-                                </template>
-                            </a-button>
+                            <button type="button" class="btn-more">
+                                <EllipsisOutlined />
+                            </button>
                             <template #overlay>
                                 <a-menu :items="menuAcciones" @click="onMenuAccion" />
                             </template>
                         </a-dropdown>
                     </template>
                     <template v-else>
-                        <a-button v-if="puede('proveedores.editar')" type="primary" class="btn-editar" @click="reactivar">
-                            <template #icon>
-                                <CarOutlined />
-                            </template>
-                            Reactivar
-                        </a-button>
+                        <!-- Botón Reactivar -->
+                        <button
+                            v-if="puede('proveedores.editar')"
+                            type="button"
+                            class="btn-hero btn-hero--primary"
+                            style="--hc: #1f9e86; --hc2: #16806c"
+                            @click="reactivar"
+                        >
+                            <span class="btn-hero__ic">
+                                <UndoOutlined />
+                            </span>
+                            <span class="btn-hero__txt">
+                                <span class="btn-hero__l">Reactivar</span>
+                                <span class="btn-hero__s">Proveedor</span>
+                            </span>
+                        </button>
                     </template>
                 </template>
             </FichaEncabezado>
@@ -158,7 +179,8 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
                         </div>
                         <div class="card__body">
                             <div class="mini-grid mini-grid--2">
-                                <div v-for="d in datosGenerales" :key="d.label" class="mini" :style="{ '--c': d.color }">
+                                <div v-for="d in datosGenerales" :key="d.label" class="mini"
+                                    :style="{ '--c': d.color }">
                                     <span class="mini__ic">
                                         <component :is="d.icono" />
                                     </span>
@@ -210,7 +232,8 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
                         </div>
                         <div class="card__body">
                             <div class="mini-grid mini-grid--full">
-                                <div v-for="d in datosUbicacion" :key="d.label" class="mini" :style="{ '--c': d.color }">
+                                <div v-for="d in datosUbicacion" :key="d.label" class="mini"
+                                    :style="{ '--c': d.color }">
                                     <span class="mini__ic">
                                         <component :is="d.icono" />
                                     </span>
@@ -286,7 +309,8 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
                             <div class="card__meta">
                                 <div class="card__titulo">
                                     Documentos
-                                    <span v-if="proveedor.documentos?.length" class="badge">{{ proveedor.documentos.length
+                                    <span v-if="proveedor.documentos?.length" class="badge">{{
+                                        proveedor.documentos.length
                                         }}</span>
                                 </div>
                                 <div class="card__sub">Contratos, cotizaciones, facturas</div>
@@ -328,6 +352,153 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
 
 <style scoped>
 /* ==========================================================
+   BOTONES HERO (acciones del header)
+   ========================================================== */
+.btn-hero {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 42px;
+    padding: 0 14px 0 8px;
+    border-radius: 11px;
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease, background 0.16s ease;
+    flex-shrink: 0;
+}
+
+.btn-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.24) 50%, transparent 100%);
+    transform: translateX(-100%) skewX(-20deg);
+    transition: transform 0.6s ease;
+    pointer-events: none;
+}
+
+.btn-hero:hover:not(:disabled)::after {
+    transform: translateX(200%) skewX(-20deg);
+}
+
+.btn-hero:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+}
+
+.btn-hero:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    filter: grayscale(0.4);
+}
+
+.btn-hero__ic {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.24);
+    color: #fff;
+    transition: transform 0.2s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.btn-hero:hover:not(:disabled) .btn-hero__ic {
+    transform: scale(1.1) rotate(-6deg);
+}
+
+.btn-hero__txt {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.1;
+    text-align: left;
+    color: #fff;
+    position: relative;
+    z-index: 1;
+}
+
+.btn-hero__l {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.btn-hero__s {
+    font-size: 9.5px;
+    font-weight: 600;
+    opacity: 0.82;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.btn-hero--primary {
+    background: linear-gradient(135deg, var(--hc, #1f9e86) 0%, var(--hc2, #16806c) 100%);
+    box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--hc, #1f9e86) 65%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.btn-hero--primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--hc, #1f9e86) 75%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+.btn-hero--default {
+    background: linear-gradient(135deg, var(--hc, #0d84c9) 0%, var(--hc2, #0f6fb0) 100%);
+    box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--hc, #0d84c9) 55%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.btn-hero--default:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--hc, #0d84c9) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+.btn-hero--danger {
+    background: linear-gradient(135deg, #d64545 0%, #b91c1c 100%);
+    box-shadow: 0 6px 16px -6px rgba(214, 69, 69, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.btn-hero--danger:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow: 0 8px 20px -6px rgba(214, 69, 69, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+.btn-more {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    border: 1px solid var(--sigam-borde);
+    background: #fff;
+    color: var(--sigam-tenue);
+    cursor: pointer;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+    flex-shrink: 0;
+}
+
+.btn-more:hover {
+    background: #eef4fb;
+    border-color: #cfe4f5;
+    color: #0d84c9;
+    transform: translateY(-1px);
+}
+
+/* ==========================================================
    Layout
    ========================================================== */
 .ficha-proveedor {
@@ -364,29 +535,8 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
 }
 
 /* ==========================================================
-   Botones
+   Botones para subir PDF e Imagen
    ========================================================== */
-.btn-editar {
-    background: #0d84c9 !important;
-    border-color: #0d84c9 !important;
-    color: #fff !important;
-}
-
-.btn-editar:hover {
-    background: #0f6fb0 !important;
-    border-color: #0f6fb0 !important;
-}
-
-.btn-mas {
-    color: #6b4bc9;
-}
-
-.btn-mas:hover {
-    background: #efe9fb !important;
-    color: #563a9e !important;
-}
-
-/* Botones para subir PDF e Imagen */
 .btn-doc {
     border-radius: 10px;
     font-weight: 700;
@@ -732,7 +882,19 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
     }
 }
 
+@media (max-width: 767px) {
+    .btn-hero {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .btn-more {
+        width: 100%;
+    }
+}
+
 @media (max-width: 575px) {
+
     .mini-grid--2,
     .mini-grid--3 {
         grid-template-columns: 1fr;

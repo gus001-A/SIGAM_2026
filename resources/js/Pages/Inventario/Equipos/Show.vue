@@ -139,40 +139,79 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
                 </template>
                 <template #acciones>
                     <template v-if="dadoDeBaja">
-                        <a-button v-if="puede('equipos.editar')" type="primary" class="btn-editar" @click="reactivar">
-                            <template #icon>
+                        <!-- Botón Reactivar -->
+                        <button
+                            v-if="puede('equipos.editar')"
+                            type="button"
+                            class="btn-hero btn-hero--primary"
+                            style="--hc: #1f9e86; --hc2: #16806c"
+                            @click="reactivar"
+                        >
+                            <span class="btn-hero__ic">
                                 <UndoOutlined />
-                            </template>
-                            Reactivar
-                        </a-button>
+                            </span>
+                            <span class="btn-hero__txt">
+                                <span class="btn-hero__l">Reactivar</span>
+                                <span class="btn-hero__s">Equipo</span>
+                            </span>
+                        </button>
                     </template>
                     <template v-else>
-                        <a-button class="btn-secundario" @click="modalQr.abrir(equipo.id)">
-                            <template #icon>
+                        <!-- Botón QR -->
+                        <button
+                            type="button"
+                            class="btn-hero btn-hero--default"
+                            style="--hc: #6b4bc9; --hc2: #563a9e"
+                            @click="modalQr.abrir(equipo.id)"
+                        >
+                            <span class="btn-hero__ic">
                                 <QrcodeOutlined />
-                            </template>
-                            QR
-                        </a-button>
-                        <a-button v-if="puede('solicitudes.crear')" class="btn-secundario"
-                            @click="router.visit(route('solicitudes.create', { equipo_id: equipo.id }))">
-                            <template #icon>
+                            </span>
+                            <span class="btn-hero__txt">
+                                <span class="btn-hero__l">QR</span>
+                                <span class="btn-hero__s">Código</span>
+                            </span>
+                        </button>
+
+                        <!-- Botón Solicitar -->
+                        <button
+                            v-if="puede('solicitudes.crear')"
+                            type="button"
+                            class="btn-hero btn-hero--default"
+                            style="--hc: #e08a1e; --hc2: #a86717"
+                            @click="router.visit(route('solicitudes.create', { equipo_id: equipo.id }))"
+                        >
+                            <span class="btn-hero__ic">
                                 <FormOutlined />
-                            </template>
-                            Solicitar
-                        </a-button>
-                        <a-button v-if="puede('equipos.editar')" type="primary" class="btn-editar"
-                            @click="irA('equipos.edit', equipo.id)">
-                            <template #icon>
+                            </span>
+                            <span class="btn-hero__txt">
+                                <span class="btn-hero__l">Solicitar</span>
+                                <span class="btn-hero__s">Servicio</span>
+                            </span>
+                        </button>
+
+                        <!-- Botón Editar -->
+                        <button
+                            v-if="puede('equipos.editar')"
+                            type="button"
+                            class="btn-hero btn-hero--primary"
+                            style="--hc: #0d84c9; --hc2: #0a6ba6"
+                            @click="irA('equipos.edit', equipo.id)"
+                        >
+                            <span class="btn-hero__ic">
                                 <EditOutlined />
-                            </template>
-                            Editar
-                        </a-button>
+                            </span>
+                            <span class="btn-hero__txt">
+                                <span class="btn-hero__l">Editar</span>
+                                <span class="btn-hero__s">Equipo</span>
+                            </span>
+                        </button>
+
+                        <!-- Dropdown de acciones -->
                         <a-dropdown v-if="puede('equipos.desactivar')">
-                            <a-button type="text" class="btn-mas">
-                                <template #icon>
-                                    <EllipsisOutlined />
-                                </template>
-                            </a-button>
+                            <button type="button" class="btn-more">
+                                <EllipsisOutlined />
+                            </button>
                             <template #overlay>
                                 <a-menu :items="menuAcciones" @click="onMenuAccion" />
                             </template>
@@ -587,6 +626,153 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
 
 <style scoped>
 /* ==========================================================
+   BOTONES HERO (acciones del header)
+   ========================================================== */
+.btn-hero {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 42px;
+    padding: 0 14px 0 8px;
+    border-radius: 11px;
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease, background 0.16s ease;
+    flex-shrink: 0;
+}
+
+.btn-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.24) 50%, transparent 100%);
+    transform: translateX(-100%) skewX(-20deg);
+    transition: transform 0.6s ease;
+    pointer-events: none;
+}
+
+.btn-hero:hover:not(:disabled)::after {
+    transform: translateX(200%) skewX(-20deg);
+}
+
+.btn-hero:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+}
+
+.btn-hero:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    filter: grayscale(0.4);
+}
+
+.btn-hero__ic {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.24);
+    color: #fff;
+    transition: transform 0.2s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.btn-hero:hover:not(:disabled) .btn-hero__ic {
+    transform: scale(1.1) rotate(-6deg);
+}
+
+.btn-hero__txt {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.1;
+    text-align: left;
+    color: #fff;
+    position: relative;
+    z-index: 1;
+}
+
+.btn-hero__l {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.btn-hero__s {
+    font-size: 9.5px;
+    font-weight: 600;
+    opacity: 0.82;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.btn-hero--primary {
+    background: linear-gradient(135deg, var(--hc, #1f9e86) 0%, var(--hc2, #16806c) 100%);
+    box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--hc, #1f9e86) 65%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.btn-hero--primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--hc, #1f9e86) 75%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+.btn-hero--default {
+    background: linear-gradient(135deg, var(--hc, #0d84c9) 0%, var(--hc2, #0f6fb0) 100%);
+    box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--hc, #0d84c9) 55%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.btn-hero--default:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--hc, #0d84c9) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+.btn-hero--danger {
+    background: linear-gradient(135deg, #d64545 0%, #b91c1c 100%);
+    box-shadow: 0 6px 16px -6px rgba(214, 69, 69, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.btn-hero--danger:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow: 0 8px 20px -6px rgba(214, 69, 69, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+.btn-more {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    border: 1px solid var(--sigam-borde);
+    background: #fff;
+    color: var(--sigam-tenue);
+    cursor: pointer;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+    flex-shrink: 0;
+}
+
+.btn-more:hover {
+    background: #eef4fb;
+    border-color: #cfe4f5;
+    color: #0d84c9;
+    transform: translateY(-1px);
+}
+
+/* ==========================================================
    Layout compacto
    ========================================================== */
 .ficha-compacta {
@@ -594,46 +780,7 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
     flex-direction: column;
     gap: 14px;
     min-height: 0;
-    padding-bottom: 8px; /* 👈 espacio extra abajo */
-}
-
-/* ==========================================================
-   Botones
-   ========================================================== */
-.btn-editar {
-    background: #0d84c9 !important;
-    border-color: #0d84c9 !important;
-    color: #fff !important;
-    box-shadow: 0 3px 10px rgba(13, 132, 201, 0.32);
-}
-
-.btn-editar:hover {
-    background: #0f6fb0 !important;
-    border-color: #0f6fb0 !important;
-    box-shadow: 0 5px 14px rgba(13, 132, 201, 0.42) !important;
-    transform: translateY(-1px);
-}
-
-.btn-secundario {
-    background: #fff !important;
-    border: 1px solid #cfe3f2 !important;
-    color: #0d6fae !important;
-}
-
-.btn-secundario:hover {
-    background: #e6f2fb !important;
-    border-color: #0d84c9 !important;
-    color: #0f6fb0 !important;
-    transform: translateY(-1px);
-}
-
-.btn-mas {
-    color: #6b4bc9;
-}
-
-.btn-mas:hover {
-    background: #efe9fb !important;
-    color: #563a9e !important;
+    padding-bottom: 8px;
 }
 
 /* ==========================================================
@@ -726,9 +873,9 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
 .col-der {
     display: flex;
     flex-direction: column;
-    gap: 16px; /* 👈 más aire entre cards */
+    gap: 16px;
     min-width: 0;
-    padding-bottom: 4px; /* 👈 espacio extra al fondo de la columna */
+    padding-bottom: 4px;
 }
 
 /* ==========================================================
@@ -1145,7 +1292,6 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
     transform: translateY(-1px);
 }
 
-/* 👇 MÁS ESPACIO abajo para que no se vea encimado */
 .card__body--baja {
     padding: 16px 16px 22px;
     display: flex;
@@ -1153,7 +1299,6 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
     gap: 14px;
 }
 
-/* Meta en UNA SOLA LÍNEA */
 .baja-meta-line {
     display: flex;
     align-items: stretch;
@@ -1225,7 +1370,6 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
     line-height: 1.25;
 }
 
-/* Motivo */
 .baja-motivo {
     border-radius: 11px;
     background: #fff;
@@ -1253,7 +1397,6 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
     white-space: pre-line;
 }
 
-/* Evidencia */
 .baja-evidencia {
     display: flex;
     flex-direction: column;
@@ -1518,12 +1661,11 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
     .card__body--scroll {
         max-height: 260px;
         overflow-y: auto;
-        padding-right: 18px; /* 👈 deja aire antes del scrollbar */
+        padding-right: 18px;
         scrollbar-width: thin;
         scrollbar-color: rgba(15, 37, 71, 0.28) transparent;
     }
 
-    /* WebKit (Chrome, Safari, Edge) — scroll tipo iOS */
     .card__body--scroll::-webkit-scrollbar {
         width: 10px;
     }
@@ -1552,7 +1694,6 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
     }
 }
 
-/* Scroll iOS también fuera del media query (para modales, etc.) */
 *::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -1591,6 +1732,17 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
 @media (max-width: 991px) {
     .kpis {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .btn-hero {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .btn-more {
+        width: 100%;
     }
 }
 

@@ -1,9 +1,12 @@
 import {
     BellOutlined,
     CalendarOutlined,
+    CheckCircleOutlined,
     CheckSquareOutlined,
     ClockCircleOutlined,
+    CloseCircleOutlined,
     EditOutlined,
+    FileAddOutlined,
     SwapOutlined,
     ToolOutlined,
     UserAddOutlined,
@@ -11,8 +14,9 @@ import {
 
 /**
  * Ícono, etiqueta y color por tipo de notificación. Alcance deliberadamente
- * acotado a lo que le fue asignado a la persona (tarea, orden o plan): quién
- * se lo asignó, si se modificó, si se reprogramó o si está por vencer.
+ * acotado a lo que es relevante para el rol de quien la recibe: lo que le fue
+ * asignado a la persona (tarea, orden o plan), o —para supervisores y
+ * administradores— las solicitudes nuevas que deben revisar.
  */
 export const META_NOTIFICACION = {
     // Tareas
@@ -29,6 +33,10 @@ export const META_NOTIFICACION = {
     // Planes de mantenimiento
     plan_asignado: { label: 'Plan asignado', icon: UserAddOutlined, color: '#173a5f' },
     plan_modificado: { label: 'Plan modificado', icon: EditOutlined, color: '#0d84c9' },
+    // Solicitudes
+    solicitud_creada: { label: 'Solicitud nueva', icon: FileAddOutlined, color: '#6b4bc9' },
+    solicitud_autorizada: { label: 'Solicitud autorizada', icon: CheckCircleOutlined, color: '#1f9e86' },
+    solicitud_rechazada: { label: 'Solicitud rechazada', icon: CloseCircleOutlined, color: '#d64545' },
 };
 
 export const metaNotificacion = (tipo) =>

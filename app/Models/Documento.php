@@ -19,13 +19,13 @@ class Documento extends Model
     protected $table = 'documentos';
 
     protected $fillable = [
-        'disco', 'ruta', 'nombre_original', 'titulo', 'categoria',
+        'disco', 'ruta', 'nombre_original', 'titulo', 'descripcion', 'categoria',
         'tipo_mime', 'tamano', 'checksum', 'visibilidad', 'vence_at', 'subido_por',
     ];
 
     protected function camposMayusculas(): array
     {
-        return ['nombre_original', 'titulo'];
+        return ['nombre_original', 'titulo', 'descripcion'];
     }
 
     protected function casts(): array

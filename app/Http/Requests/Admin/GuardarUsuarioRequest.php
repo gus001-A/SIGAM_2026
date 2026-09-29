@@ -20,14 +20,14 @@ class GuardarUsuarioRequest extends FormRequest
      */
     public function rules(): array
     {
-        $id = $this->route('usuario')?->id;
         $creando = $this->routeIs('usuarios.store');
 
         return [
             'nombre' => ['required', 'string', 'max:255'],
             'apellidos' => ['nullable', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('usuarios', 'email')->ignore($id)],
-            'telefono' => ['nullable', 'digits:10'],
+            // El correo ya no es único: puede repetirse entre usuarios.
+            'email' => ['required', 'email', 'max:255'],
+            'telefono' => ['required', 'digits:10'],
 
             // Multi-sucursal: array de ids
             'sucursales' => ['nullable', 'array'],

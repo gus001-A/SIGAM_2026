@@ -67,13 +67,12 @@ class AppServiceProvider extends ServiceProvider
             if (! $orden || $asignacion->tecnico_id === Auth::id()) {
                 return;
             }
-            Notificaciones::crear(
-                $asignacion->tecnico_id,
-                'mantenimiento_asignado',
-                "Nueva orden asignada: {$orden->folio}",
-                'Se te asignó una orden de mantenimiento'.($this->objetivoOrden($orden) ? " para {$this->objetivoOrden($orden)}." : '.'),
-                ['ref' => "orden:{$orden->id}", 'url' => route('mantenimientos.show', $orden->id)],
-            );
+            $titulo = "Nueva orden asignada: {$orden->folio}";
+            $cuerpo = 'Se te asignó una orden de mantenimiento'.($this->objetivoOrden($orden) ? " para {$this->objetivoOrden($orden)}." : '.');
+            $url = route('mantenimientos.show', $orden->id);
+
+            Notificaciones::crear($asignacion->tecnico_id, 'mantenimiento_asignado', $titulo, $cuerpo, ['ref' => "orden:{$orden->id}", 'url' => $url]);
+            Notificaciones::correo($asignacion->tecnico_id, $titulo, $cuerpo, $url);
         });
 
         // Cambio de estado de la orden -> a los técnicos activos (menos quien lo hizo).
@@ -137,16 +136,13 @@ class AppServiceProvider extends ServiceProvider
             $destino = $plan->equipo
                 ? "el equipo {$plan->equipo->codigo_activo}"
                 : ($plan->ubicacion ? "la instalación {$plan->ubicacion->nombre}" : 'un elemento del inventario');
+            $titulo = 'Nuevo plan preventivo: '.($plan->nombre ?: $destino);
             $cuerpo = "Se te asignó un mantenimiento preventivo para {$destino}, próxima fecha: "
                 .(optional($plan->proxima_fecha)->format('d/m/Y') ?? 'sin definir').'.';
+            $url = route('planes.show', $plan->id);
 
-            Notificaciones::crear(
-                $plan->tecnico_id,
-                'plan_asignado',
-                'Nuevo plan preventivo: '.($plan->nombre ?: $destino),
-                $cuerpo,
-                ['ref' => "plan:{$plan->id}", 'url' => route('planes.show', $plan->id)],
-            );
+            Notificaciones::crear($plan->tecnico_id, 'plan_asignado', $titulo, $cuerpo, ['ref' => "plan:{$plan->id}", 'url' => $url]);
+            Notificaciones::correo($plan->tecnico_id, $titulo, $cuerpo, $url);
         });
 
         // Plan modificado (reasignación de técnico, cambio de frecuencia, etc.) -> al técnico actual.
