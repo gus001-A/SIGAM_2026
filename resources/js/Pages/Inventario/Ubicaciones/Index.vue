@@ -20,6 +20,7 @@ import { usePermisos } from '@/composables/usePermisos';
 const props = defineProps({
     sucursales: { type: Array, default: () => [] },
     sucursalSeleccionada: { type: [Number, String], default: null },
+    puedeVerTodas: { type: Boolean, default: false },
     kpis: { type: Object, default: () => ({}) },
     arbol: { type: Array, default: () => [] },
     tipos: { type: Array, default: () => [] },
@@ -48,7 +49,7 @@ const verOrdenes = (nodo) =>
 const modoTodas = computed(() => props.sucursalSeleccionada === 'todas');
 
 const opcionesSucursal = computed(() => [
-    { id: 'todas', nombre: 'Todas las sucursales' },
+    ...(props.puedeVerTodas ? [{ id: 'todas', nombre: 'Todas las sucursales' }] : []),
     ...props.sucursales,
 ]);
 

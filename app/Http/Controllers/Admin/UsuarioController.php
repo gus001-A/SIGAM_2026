@@ -88,7 +88,7 @@ class UsuarioController extends Controller
             'filtros' => $request->only(['nombre', 'email', 'sucursal_id', 'rol', 'estado', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => [
-                'sucursales' => Sucursal::orderBy('nombre')->get(['id', 'nombre']),
+                'sucursales' => $request->user()->sucursalesPermitidas(),
                 'roles' => Role::orderBy('name')->pluck('name'),
             ],
         ]);
@@ -138,6 +138,7 @@ class UsuarioController extends Controller
         ]);
 
         return Inertia::render('Admin/Usuarios/Show', [
+            'bitacora' => $usuario->bitacoraCambios(),
             'usuario' => [
                 'id' => $usuario->id,
                 'nombre' => $usuario->nombre,

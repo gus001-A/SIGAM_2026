@@ -34,7 +34,8 @@ class UsuariosTest extends TestCase
                 'nombre' => 'Laura',
                 'apellidos' => 'Méndez',
                 'email' => 'laura@sigam.test',
-                'sucursal_id' => $sucursal->id,
+                'telefono' => '5512345678',
+                'sucursales' => [$sucursal->id],
                 'estado' => 'activo',
                 'password' => 'Secreta-123',
                 'password_confirmation' => 'Secreta-123',
@@ -50,7 +51,7 @@ class UsuariosTest extends TestCase
     public function test_el_usuario_debe_tener_exactamente_un_rol(): void
     {
         $base = [
-            'nombre' => 'Ana', 'email' => 'ana@sigam.test', 'estado' => 'activo',
+            'nombre' => 'Ana', 'email' => 'ana@sigam.test', 'telefono' => '5512345678', 'estado' => 'activo',
             'password' => 'Secreta-123', 'password_confirmation' => 'Secreta-123',
         ];
 
@@ -72,17 +73,19 @@ class UsuariosTest extends TestCase
         $this->assertEqualsCanonicalizing(['tecnico'], Usuario::where('email', 'ana@sigam.test')->first()->getRoleNames()->all());
     }
 
-    public function test_email_duplicado_es_rechazado(): void
+    /** Por decisión del negocio el correo no es único: dos usuarios pueden compartirlo. */
+    public function test_email_repetido_se_permite(): void
     {
         Usuario::factory()->create(['email' => 'dup@sigam.test']);
 
         $this->actingAs($this->admin)
-            ->from(route('usuarios.create'))
             ->post(route('usuarios.store'), [
-                'nombre' => 'X', 'email' => 'dup@sigam.test', 'estado' => 'activo',
+                'nombre' => 'X', 'email' => 'dup@sigam.test', 'telefono' => '5512345678', 'estado' => 'activo', 'roles' => ['tecnico'],
                 'password' => 'Secreta-123', 'password_confirmation' => 'Secreta-123',
             ])
-            ->assertSessionHasErrors('email');
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(2, Usuario::where('email', 'dup@sigam.test')->count());
     }
 
     public function test_editar_sin_contrasena_conserva_la_actual(): void
@@ -93,6 +96,7 @@ class UsuariosTest extends TestCase
         $this->actingAs($this->admin)
             ->put(route('usuarios.update', $usuario), [
                 'nombre' => 'Nuevo Nombre',
+                'telefono' => '5512345678',
                 'email' => $usuario->email,
                 'estado' => 'activo',
                 'password' => '',

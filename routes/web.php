@@ -1,12 +1,17 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StorageProxyController;
 use Illuminate\Support\Facades\Route;
 
 /**
  * La raíz del sitio no tiene una página propia: manda directo al inicio de
  * sesión (o al dashboard si ya hay sesión activa).
  */
+Route::get('/storage/{ruta}', [StorageProxyController::class, 'servir'])
+    ->where('ruta', '.*')
+    ->name('storage.proxy');
+
 Route::get('/', fn () => redirect()->route(auth()->check() ? 'dashboard' : 'login'));
 
 Route::middleware('auth')->group(function () {

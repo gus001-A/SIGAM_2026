@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { ArrowLeftOutlined, HistoryOutlined } from '@ant-design/icons-vue';
+import BitacoraModal from '@/Components/BitacoraModal.vue';
 
 /**
  * Encabezado reutilizable para las páginas de ficha (Show).
@@ -35,6 +36,7 @@ const textoSello = computed(() => {
     const partes = [];
     if (props.sello.creado_por) partes.push(`Creado por ${props.sello.creado_por} · ${fechaHora(props.sello.creado_en)}`);
     if (props.sello.modificado_por) partes.push(`Última edición: ${props.sello.modificado_por} · ${fechaHora(props.sello.modificado_en)}`);
+    if (props.sello.eliminado_por) partes.push(`Dado de baja: ${props.sello.eliminado_por} · ${fechaHora(props.sello.eliminado_en)}`);
     return partes.join('  ·  ');
 });
 </script>
@@ -66,6 +68,8 @@ const textoSello = computed(() => {
                 <HistoryOutlined />
                 <span>{{ textoSello }}</span>
             </div>
+            <BitacoraModal />
+
         </div>
 
         <div v-if="$slots.acciones" class="fe__acciones">

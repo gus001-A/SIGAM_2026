@@ -35,7 +35,6 @@ const { filtros, orden, cargando, filtrar, aplicar, limpiar, hayFiltros, onCambi
         codigo: props.filtros.codigo ?? '',
         nombre: props.filtros.nombre ?? '',
         direccion: props.filtros.direccion ?? '',
-        responsable_id: props.filtros.responsable_id ?? undefined,
         estado: props.filtros.estado ?? undefined,
         registrado_por: props.filtros.registrado_por ?? '',
     },
@@ -48,7 +47,6 @@ const opcionesEstado = [
 ];
 
 const opcionesFiltro = {
-    responsable_id: computed(() => props.catalogos.responsables ?? []),
     estado: computed(() => opcionesEstado),
 };
 
@@ -57,7 +55,6 @@ const columns = [
     { title: 'Sucursal', key: 'nombre', dataIndex: 'nombre', sorter: true, filtro: 'texto', filtroClave: 'nombre', width: 220 },
     { title: 'Dirección', key: 'direccion', filtro: 'texto', filtroClave: 'direccion', width: 240 },
     { title: 'Contacto', key: 'contacto', width: 200 },
-    { title: 'Responsable', key: 'responsable', filtro: 'select', filtroClave: 'responsable_id', width: 190 },
     { title: 'Equipos', key: 'equipos_count', dataIndex: 'equipos_count', sorter: true, align: 'right', width: 100 },
     { title: 'Valor activos', key: 'valor_activos', dataIndex: 'valor_activos', sorter: true, align: 'right', width: 150 },
     { title: 'Estado', key: 'estado', filtro: 'select', filtroClave: 'estado', width: 130 },
@@ -168,14 +165,6 @@ const reactivar = (sucursal) =>
                             </div>
                             <div v-if="record.correo" class="contacto__mail">{{ record.correo }}</div>
                         </div>
-                        <span v-else class="texto-suave">—</span>
-                    </template>
-
-                    <template v-else-if="column.key === 'responsable'">
-                        <span v-if="record.responsable" class="responsable">
-                            <span class="responsable__av">{{ record.responsable.charAt(0) }}</span>
-                            {{ record.responsable }}
-                        </span>
                         <span v-else class="texto-suave">—</span>
                     </template>
 
@@ -421,8 +410,10 @@ const reactivar = (sucursal) =>
 }
 
 .link-codigo:hover {
-    color: #0f6fb0;
+    color: #0d84c9;
     text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
 }
 
 .link-sucursal {
@@ -434,6 +425,8 @@ const reactivar = (sucursal) =>
 .link-sucursal:hover {
     color: #0d84c9;
     text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
 }
 
 .sucursal-meta {
@@ -478,30 +471,6 @@ const reactivar = (sucursal) =>
     font-size: 11px;
     color: var(--sigam-tenue);
     margin-top: 1px;
-}
-
-/* Responsable con avatar (color sólido) */
-.responsable {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    color: var(--sigam-navy);
-    font-size: 12.5px;
-}
-
-.responsable__av {
-    width: 24px;
-    height: 24px;
-    flex: none;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: 800;
-    color: #fff;
-    background: #1f9e86;
 }
 
 /* Tag equipos (color sólido) */

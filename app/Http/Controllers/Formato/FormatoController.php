@@ -109,6 +109,7 @@ class FormatoController extends Controller
         $this->authorize('formatos.ver');
 
         return Inertia::render('Formatos/Show', [
+            'bitacora' => $formato->bitacoraCambios(),
             'formato' => $formato->load('campos')->loadCount('respuestas'),
             'sello' => $formato->selloAuditoria(),
         ]);

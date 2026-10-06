@@ -25,6 +25,7 @@ const props = defineProps({
     eventos: { type: Array, default: () => [] },
     rango: { type: Object, required: true },
     sucursalId: { type: [Number, String], default: null },
+    puedeVerTodas: { type: Boolean, default: false },
     filtros: { type: Object, default: () => ({}) },
     catalogos: { type: Object, default: () => ({}) },
 });
@@ -110,7 +111,7 @@ const hoy = dayjs().format('YYYY-MM-DD');
 
 const opciones = (l, label = 'nombre') => (l ?? []).map((o) => ({ label: o[label], value: o.id }));
 const opcionesSucursal = computed(() => [
-    { value: 'todas', label: 'Todas las sucursales' },
+    ...(props.puedeVerTodas ? [{ value: 'todas', label: 'Todas las sucursales' }] : []),
     ...opciones(props.catalogos.sucursales),
 ]);
 

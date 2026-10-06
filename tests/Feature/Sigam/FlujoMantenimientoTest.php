@@ -68,7 +68,8 @@ class FlujoMantenimientoTest extends TestCase
         // 4. El técnico inicia y documenta.
         $this->actingAs($tecnico)->post(route('mantenimientos.transicion', $orden), [
             'estado' => 'en_proceso',
-            'evidencia' => UploadedFile::fake()->image('inicio.jpg'),
+            'nota' => 'Inicio el trabajo.',
+            'evidencias' => [UploadedFile::fake()->image('inicio.jpg')],
         ])->assertRedirect();
         $this->actingAs($tecnico)->patch(route('mantenimientos.update', $orden), [
             'diagnostico' => 'Capacitor dañado.',
@@ -76,7 +77,8 @@ class FlujoMantenimientoTest extends TestCase
         ])->assertRedirect();
         $this->actingAs($tecnico)->post(route('mantenimientos.transicion', $orden), [
             'estado' => 'realizado',
-            'evidencia' => UploadedFile::fake()->image('realizado.jpg'),
+            'nota' => 'Capacitor reemplazado y probado.',
+            'evidencias' => [UploadedFile::fake()->image('realizado.jpg')],
         ])->assertRedirect();
 
         // 5. No se puede cerrar sin pasar por supervisión.
@@ -85,11 +87,13 @@ class FlujoMantenimientoTest extends TestCase
         // 6. El supervisor supervisa y cierra.
         $this->actingAs($supervisor)->post(route('mantenimientos.transicion', $orden), [
             'estado' => 'supervisado',
-            'evidencia' => UploadedFile::fake()->image('supervisado.jpg'),
+            'nota' => 'Trabajo verificado en sitio.',
+            'evidencias' => [UploadedFile::fake()->image('supervisado.jpg')],
         ])->assertRedirect();
         $this->actingAs($supervisor)->post(route('mantenimientos.transicion', $orden), [
             'estado' => 'cerrado',
-            'evidencia' => UploadedFile::fake()->image('cerrado.jpg'),
+            'nota' => 'Orden cerrada conforme.',
+            'evidencias' => [UploadedFile::fake()->image('cerrado.jpg')],
         ])->assertRedirect();
 
         $orden->refresh();
@@ -121,10 +125,66 @@ class FlujoMantenimientoTest extends TestCase
         $this->actingAs($admin)
             ->post(route('mantenimientos.transicion', $orden), [
                 'estado' => 'cerrado',
-                'evidencia' => UploadedFile::fake()->image('cierre.jpg'),
+                'nota' => 'Intento de cierre.',
+                'evidencias' => [UploadedFile::fake()->image('cierre.jpg')],
             ])
             ->assertRedirect();
 
         $this->assertSame('supervisado', $orden->refresh()->estado->clave);
+    }
+
+    public function test_cerrar_orden_no_exige_foto(): void
+    {
+        $sucursal = Sucursal::create(['codigo' => 'S3', 'nombre' => 'Sucursal 3', 'estado' => 'activo']);
+        $equipo = Equipo::create(['codigo_activo' => 'EQ-3', 'descripcion' => 'Motor', 'sucursal_id' => $sucursal->id]);
+        $admin = Usuario::factory()->create();
+        $admin->assignRole('superadministrador');
+
+        $orden = Mantenimiento::create([
+            'folio' => 'MTO-TEST-2',
+            'equipo_id' => $equipo->id,
+            'sucursal_id' => $sucursal->id,
+            'tipo_id' => TipoMantenimiento::where('clave', 'correctivo')->value('id'),
+            'prioridad_id' => Prioridad::where('clave', 'normal')->value('id'),
+            'estado_id' => CicloMantenimiento::estado('supervisado')->id,
+            'diagnostico' => 'Falla identificada.',
+            'descripcion_trabajo' => 'Reparación realizada.',
+            'completado_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('mantenimientos.transicion', $orden), ['estado' => 'cerrado', 'nota' => 'Cerrada sin foto.'])
+            ->assertRedirect();
+
+        $this->assertSame('cerrado', $orden->refresh()->estado->clave);
+    }
+
+    public function test_dias_de_retraso_de_una_orden_completada_fuera_de_fecha(): void
+    {
+        $sucursal = Sucursal::create(['codigo' => 'S4', 'nombre' => 'Sucursal 4', 'estado' => 'activo']);
+        $equipo = Equipo::create(['codigo_activo' => 'EQ-4', 'descripcion' => 'Compresor', 'sucursal_id' => $sucursal->id]);
+        $admin = Usuario::factory()->create();
+        $admin->assignRole('superadministrador');
+
+        $orden = Mantenimiento::create([
+            'folio' => 'MTO-TEST-3',
+            'equipo_id' => $equipo->id,
+            'sucursal_id' => $sucursal->id,
+            'tipo_id' => TipoMantenimiento::where('clave', 'correctivo')->value('id'),
+            'prioridad_id' => Prioridad::where('clave', 'normal')->value('id'),
+            'estado_id' => CicloMantenimiento::estado('en_proceso')->id,
+            'programado_inicio' => now()->subDays(5),
+            'programado_fin' => now()->subDays(4),
+        ]);
+
+        $this->assertNull($orden->diasRetraso());
+
+        $orden->forceFill(['completado_at' => now()])->save();
+
+        $this->assertSame(4, $orden->refresh()->diasRetraso());
+
+        $this->actingAs($admin)
+            ->get(route('mantenimientos.show', $orden))
+            ->assertInertia(fn ($p) => $p->where('retrasoDias', 4));
     }
 }

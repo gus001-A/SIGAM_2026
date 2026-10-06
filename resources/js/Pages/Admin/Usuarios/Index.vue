@@ -657,6 +657,14 @@ const reactivar = (usuario) => router.put(route('usuarios.restore', usuario.id),
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 180px;
+    display: inline-block;
+}
+
+.usuario:hover .usuario__nombre {
+    color: #0d84c9;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
 }
 
 .usuario__tel {
@@ -678,8 +686,10 @@ const reactivar = (usuario) => router.put(route('usuarios.restore', usuario.id),
 }
 
 .email:hover {
-    color: #0f6fb0;
+    color: #0d84c9;
     text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
 }
 
 .sucursal {

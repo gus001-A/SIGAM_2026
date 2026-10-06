@@ -53,7 +53,7 @@ class PlanMantenimientoController extends Controller
         // Resuelve la sucursal: null = todas, int = una específica.
         // SeleccionSucursal::resolver debe devolver null cuando el valor es
         // nulo, '', 'todas' o 0; y (int) cuando es un ID válido.
-        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
+        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'), $request->user());
 
         /**
          * Filtro de sucursal robusto:
@@ -143,6 +143,7 @@ class PlanMantenimientoController extends Controller
             'planes' => $planes,
             'kpis' => $kpis,
             'sucursalId' => $sucursalId,
+            'puedeVerTodas' => $request->user()->puedeVerTodasLasSucursales(),
             'filtros' => $request->only([
                 'equipo',
                 'nombre',
@@ -157,7 +158,7 @@ class PlanMantenimientoController extends Controller
             ]),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => [
-                'sucursales' => Sucursal::activos()->orderBy('nombre')->get(['id', 'nombre']),
+                'sucursales' => $request->user()->sucursalesPermitidas(),
                 'tipos' => TipoMantenimiento::activos()->where('categoria', 'preventivo')->orderBy('nombre')->get(['id', 'nombre']),
                 'tecnicos' => Usuario::role('tecnico')->where('estado', 'activo')->orderBy('nombre')->get(['id', 'nombre']),
                 'frecuencias' => self::FRECUENCIAS,
@@ -169,7 +170,7 @@ class PlanMantenimientoController extends Controller
     {
         $this->authorize('mantenimientos.crear');
 
-        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
+        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'), $request->user());
 
         return Inertia::render('Mantenimiento/Planes/Form', [
             'plan' => null,
@@ -209,6 +210,7 @@ class PlanMantenimientoController extends Controller
         return Inertia::render('Mantenimiento/Planes/Show', [
             'plan' => $plan,
             'sello' => $plan->selloAuditoria(),
+            'bitacora' => $plan->bitacoraCambios(),
             'ocurrencias' => $plan->ocurrencias()
                 ->with('mantenimiento:id,folio,estado_id')
                 ->orderBy('fecha_programada')
@@ -222,7 +224,7 @@ class PlanMantenimientoController extends Controller
 
         // Si estás editando, la sucursal es la del plan (no la del query).
         $sucursalId = $plan->sucursal_id
-            ?? SeleccionSucursal::resolver($request->query('sucursal_id'));
+            ?? SeleccionSucursal::resolver($request->query('sucursal_id'), $request->user());
 
         return Inertia::render('Mantenimiento/Planes/Form', [
             'plan' => $plan,

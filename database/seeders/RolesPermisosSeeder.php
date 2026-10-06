@@ -69,7 +69,6 @@ class RolesPermisosSeeder extends Seeder
                 $this->modulo('tareas'),
                 $this->modulo('documentos'),
                 $this->modulo('reportes'),
-                ['auditoria.ver'],
             ),
 
             'tecnico' => [

@@ -32,6 +32,7 @@ import { useTablaInertia } from '@/composables/useTablaInertia';
 const props = defineProps({
     resumen: { type: Array, default: () => [] },
     sucursalId: { type: [Number, String], default: null },
+    puedeVerTodas: { type: Boolean, default: false },
     kpis: { type: Object, default: null },
     equipos: { type: Object, default: null },
     filtros: { type: Object, default: () => ({}) },
@@ -63,10 +64,10 @@ const totalGeneral = computed(() => ({
 }));
 
 const opcionesSucursal = computed(() => [
-    {
+    ...(props.puedeVerTodas ? [{
         value: 'todas',
         label: `Todas las sucursales — ${totalGeneral.value.equipos} equipo(s) · ${moneda(totalGeneral.value.valor)}`,
-    },
+    }] : []),
     ...props.resumen.map((r) => ({
         value: r.id,
         label: `${r.nombre} — ${r.equipos_count} equipo(s) · ${moneda(r.valor_total)}`,
@@ -677,6 +678,8 @@ const reactivar = (equipo) => modalRestaurar.value.abrir(equipo);
 .link-equipo:hover {
     color: #0d84c9;
     text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
 }
 
 .link-equipo--baja {

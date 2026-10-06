@@ -621,7 +621,7 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
         <ModalQr ref="modalQr" />
         <ModalBajaEquipo ref="modalBaja" />
         <ModalRestaurarEquipo ref="modalRestaurar" :estados="estados" />
-    </AppLayout>
+        </AppLayout>
 </template>
 
 <style scoped>

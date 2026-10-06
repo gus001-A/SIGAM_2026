@@ -540,7 +540,7 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
         </a-modal>
 
         <ConfirmarDialog ref="confirmar" />
-    </AppLayout>
+        </AppLayout>
 </template>
 
 <style scoped>

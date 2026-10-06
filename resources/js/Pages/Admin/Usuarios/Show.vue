@@ -378,7 +378,7 @@ const onMenuAccion = ({ key }) => {
         </a-modal>
 
         <ConfirmarDialog ref="confirmar" />
-    </AppLayout>
+        </AppLayout>
 </template>
 
 <style scoped>

@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
+import { useForm } from '@inertiajs/vue3';
 import {
     CalendarOutlined,
     CheckCircleOutlined,
@@ -11,7 +12,7 @@ import {
 } from '@ant-design/icons-vue';
 import CampoFechaHora from '@/Components/CampoFechaHora.vue';
 import SelectObjetivoMantenimiento from '@/Components/SelectObjetivoMantenimiento.vue';
-import { hoyISO, reglaDespuesDe, reglaNoPasada } from '@/utils/restricciones';
+import { hoyISO } from '@/utils/restricciones';
 
 const props = defineProps({
     equipos: { type: Array, default: () => [] },
@@ -21,39 +22,24 @@ const props = defineProps({
 
 const visible = ref(false);
 
-const form = ref({
-    equipoId: undefined,
-    ubicacionId: undefined,
+const form = useForm({
+    equipo_id: undefined,
+    ubicacion_id: undefined,
     tipo_id: undefined,
     prioridad_id: undefined,
     programado_inicio: '',
     programado_fin: '',
-    descripcion: '',
+    problema_reportado: '',
 });
 
-const errores = ref({});
+const est = (c) => (form.errors[c] ? 'error' : '');
 
-const reglas = {
-    tipo_id: [{ required: true, message: 'Selecciona el tipo.' }],
-    prioridad_id: [{ required: true, message: 'Selecciona la prioridad.' }],
-    programado_inicio: [reglaNoPasada()],
-    programado_fin: [
-        reglaDespuesDe(
-            () => form.value.programado_inicio,
-            'El fin debe ser posterior al inicio.',
-            true,
-        ),
-    ],
-};
-
-const est = (c) => (errores.value[c] ? 'error' : '');
-
-const esInstalacion = computed(() => !!form.value.ubicacionId);
+const esInstalacion = computed(() => !!form.ubicacion_id);
 
 /* Preview del inicio */
 const previewInicio = computed(() => {
-    if (!form.value.programado_inicio) return null;
-    const inicio = new Date(form.value.programado_inicio);
+    if (!form.programado_inicio) return null;
+    const inicio = new Date(form.programado_inicio);
     const ahora = new Date();
     const diffMs = inicio - ahora;
     const diffHrs = diffMs / 3600000;
@@ -70,9 +56,9 @@ const previewInicio = computed(() => {
 
 /* Duración entre inicio y fin */
 const duracion = computed(() => {
-    if (!form.value.programado_inicio || !form.value.programado_fin) return null;
-    const inicio = new Date(form.value.programado_inicio);
-    const fin = new Date(form.value.programado_fin);
+    if (!form.programado_inicio || !form.programado_fin) return null;
+    const inicio = new Date(form.programado_inicio);
+    const fin = new Date(form.programado_fin);
     const diffMs = fin - inicio;
     if (diffMs <= 0) return { texto: 'Rango inválido', color: '#d64545' };
 
@@ -85,41 +71,30 @@ const duracion = computed(() => {
 });
 
 const abrir = () => {
+    form.reset();
+    form.clearErrors();
     visible.value = true;
 };
 
 const cerrar = () => {
     visible.value = false;
+    form.reset();
+    form.clearErrors();
 };
 
 const guardar = () => {
-    // aquí tu lógica de envío
-    console.log('Guardar', form.value);
-    cerrar();
+    form.post(route('mantenimientos.store'), {
+        preserveScroll: true,
+        onSuccess: () => cerrar(),
+    });
 };
-
-// Limpiar al cerrar
-watch(visible, (v) => {
-    if (!v) {
-        form.value = {
-            equipoId: undefined,
-            ubicacionId: undefined,
-            tipo_id: undefined,
-            prioridad_id: undefined,
-            programado_inicio: '',
-            programado_fin: '',
-            descripcion: '',
-        };
-        errores.value = {};
-    }
-});
 
 defineExpose({ abrir, cerrar });
 </script>
 
 <template>
     <a-modal v-model:open="visible" :footer="null" :closable="false" :width="860" centered class="modal-orden"
-        :mask-closable="true">
+        :mask-closable="!form.processing">
         <div class="modal-orden__wrap">
             <!-- ==========================================================
                  Encabezado
@@ -134,7 +109,8 @@ defineExpose({ abrir, cerrar });
                         Se registrará como <strong>Autorizada</strong> con el tipo y la prioridad indicados.
                     </p>
                 </div>
-                <button type="button" class="modal-head__close" title="Cerrar" @click="cerrar">
+                <button type="button" class="modal-head__close" :disabled="form.processing" title="Cerrar"
+                    @click="cerrar">
                     ✕
                 </button>
             </header>
@@ -150,10 +126,10 @@ defineExpose({ abrir, cerrar });
                     <label class="label">
                         <ToolOutlined /> Equipo o instalación
                     </label>
-                    <SelectObjetivoMantenimiento v-model:equipo-id="form.equipoId"
-                        v-model:ubicacion-id="form.ubicacionId" :equipos="equipos" :ubicaciones="ubicaciones" />
-                    <p v-if="errores.equipo_id" class="error-msg">
-                        {{ errores.equipo_id }}
+                    <SelectObjetivoMantenimiento v-model:equipo-id="form.equipo_id"
+                        v-model:ubicacion-id="form.ubicacion_id" :equipos="equipos" :ubicaciones="ubicaciones" />
+                    <p v-if="form.errors.equipo_id" class="error-msg">
+                        {{ form.errors.equipo_id }}
                     </p>
                 </div>
 
@@ -164,10 +140,13 @@ defineExpose({ abrir, cerrar });
                     <label class="label">
                         <FileTextOutlined /> Descripción / motivo
                     </label>
-                    <a-textarea v-model:value="form.descripcion" :rows="3" :placeholder="esInstalacion
+                    <a-textarea v-model:value="form.problema_reportado" :rows="3" :placeholder="esInstalacion
                             ? 'Describe la necesidad del servicio (p. ej. revisión eléctrica, pintura, plomería)'
                             : '¿Qué falla presenta el equipo?'
                         " show-count :maxlength="1000" />
+                    <p v-if="form.errors.problema_reportado" class="error-msg">
+                        {{ form.errors.problema_reportado }}
+                    </p>
                 </div>
 
                 <!-- ================================================
@@ -181,7 +160,7 @@ defineExpose({ abrir, cerrar });
                         <a-select v-model:value="form.tipo_id"
                             :options="(catalogos.tipos || []).map(t => ({ value: t.id, label: t.nombre }))"
                             placeholder="Selecciona tipo" size="large" allow-clear :status="est('tipo_id')" />
-                        <p v-if="errores.tipo_id" class="error-msg">{{ errores.tipo_id }}</p>
+                        <p v-if="form.errors.tipo_id" class="error-msg">{{ form.errors.tipo_id }}</p>
                     </div>
 
                     <div class="row">
@@ -191,7 +170,7 @@ defineExpose({ abrir, cerrar });
                         <a-select v-model:value="form.prioridad_id"
                             :options="(catalogos.prioridades || []).map(p => ({ value: p.id, label: p.nombre }))"
                             placeholder="Selecciona prioridad" size="large" allow-clear :status="est('prioridad_id')" />
-                        <p v-if="errores.prioridad_id" class="error-msg">{{ errores.prioridad_id }}</p>
+                        <p v-if="form.errors.prioridad_id" class="error-msg">{{ form.errors.prioridad_id }}</p>
                     </div>
                 </div>
 
@@ -205,8 +184,8 @@ defineExpose({ abrir, cerrar });
                     <div class="rango">
                         <div class="rango__campo">
                             <CampoFechaHora v-model="form.programado_inicio" :min-fecha="hoyISO()" />
-                            <p v-if="errores.programado_inicio" class="error-msg">
-                                {{ errores.programado_inicio }}
+                            <p v-if="form.errors.programado_inicio" class="error-msg">
+                                {{ form.errors.programado_inicio }}
                             </p>
                         </div>
 
@@ -217,8 +196,8 @@ defineExpose({ abrir, cerrar });
                                     ? form.programado_inicio.slice(0, 10)
                                     : hoyISO()
                                 " />
-                            <p v-if="errores.programado_fin" class="error-msg">
-                                {{ errores.programado_fin }}
+                            <p v-if="form.errors.programado_fin" class="error-msg">
+                                {{ form.errors.programado_fin }}
                             </p>
                         </div>
                     </div>
@@ -246,10 +225,11 @@ defineExpose({ abrir, cerrar });
                  Footer
                  ========================================================== -->
             <footer class="modal-footer">
-                <a-button size="large" @click="cerrar">
+                <a-button size="large" :disabled="form.processing" @click="cerrar">
                     Cancelar
                 </a-button>
-                <a-button type="primary" size="large" class="btn-submit" @click="guardar">
+                <a-button type="primary" size="large" class="btn-submit" :loading="form.processing"
+                    :disabled="form.processing" @click="guardar">
                     <template #icon>
                         <PlusOutlined />
                     </template>

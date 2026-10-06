@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\CategoriaTarea;
 use App\Models\EstadoEquipo;
 use App\Models\EstadoMantenimiento;
 use App\Models\Prioridad;
@@ -29,6 +30,7 @@ class CatalogosSeeder extends Seeder
         $this->estadosMantenimiento();
         $this->tiposArea();
         $this->tiposLimpieza();
+        $this->categoriasTarea();
     }
 
     private function tiposUbicacion(): void
@@ -152,6 +154,17 @@ class CatalogosSeeder extends Seeder
             TipoLimpieza::firstOrCreate(
                 ['clave' => $clave],
                 ['nombre' => $nombre, 'frecuencia' => $frecuencia, 'estado' => 'activo'],
+            );
+        }
+    }
+
+    /** Categorías sugeridas para tareas generales (no ligadas a un proyecto). */
+    private function categoriasTarea(): void
+    {
+        foreach (['Administrativa', 'Limpieza', 'Capacitación', 'Documentación', 'Seguridad'] as $nombre) {
+            CategoriaTarea::firstOrCreate(
+                ['clave' => Str::slug($nombre, '_')],
+                ['nombre' => $nombre, 'estado' => 'activo'],
             );
         }
     }

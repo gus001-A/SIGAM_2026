@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons-vue';
 import SubirDocumento from '@/Components/SubirDocumento.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
+import ModalFicha from '@/Components/ModalFicha.vue';
 
 const props = defineProps({
     documentos: { type: Array, default: () => [] },
@@ -133,14 +134,15 @@ const vacio = computed(() => props.documentos.length === 0);
         />
         <ConfirmarDialog ref="confirmar" />
 
-        <a-modal
-            :open="!!previsualizando"
-            :footer="null"
-            :width="previsualizando && /pdf/.test(previsualizando.tipo_mime || '') ? 820 : 620"
-            centered
-            :title="previsualizando?.titulo || previsualizando?.nombre_original"
-            wrap-class-name="ldoc-prev"
-            @cancel="previsualizando = null"
+        <ModalFicha
+            :show="!!previsualizando"
+            :titulo="previsualizando?.titulo || previsualizando?.nombre_original"
+            :subtitulo="previsualizando?.titulo ? previsualizando?.nombre_original : ''"
+            :icono="previsualizando ? iconoDe(previsualizando) : null"
+            :color="previsualizando ? colorDe(previsualizando) : '#0d84c9'"
+            :max-width="previsualizando && esPdf(previsualizando) ? '3xl' : '2xl'"
+            sin-padding
+            @close="previsualizando = null"
         >
             <template v-if="previsualizando">
                 <img
@@ -155,24 +157,18 @@ const vacio = computed(() => props.documentos.length === 0);
                     class="ldoc-prev__pdf"
                     title="Previsualización"
                 />
-                <div class="ldoc-prev__pie">
-                    <a :href="urlDescargar(previsualizando)" target="_blank">
-                        <a-button type="primary" size="small">
-                            <template #icon><DownloadOutlined /></template>
-                            Descargar
-                        </a-button>
-                    </a>
-                </div>
             </template>
-        </a-modal>
+            <template #footer>
+                <a v-if="previsualizando" :href="urlDescargar(previsualizando)" target="_blank" class="ant-btn ant-btn-default">
+                    <DownloadOutlined /> Descargar
+                </a>
+                <a v-if="previsualizando" :href="urlVer(previsualizando)" target="_blank" class="ant-btn ant-btn-primary">
+                    Abrir en nueva pestaña
+                </a>
+            </template>
+        </ModalFicha>
     </div>
 </template>
-
-<style>
-.ldoc-prev .ant-modal-body {
-    padding: 0;
-}
-</style>
 
 <style scoped>
 .ldoc__top {
@@ -308,11 +304,5 @@ const vacio = computed(() => props.documentos.length === 0);
     width: 100%;
     height: 72vh;
     border: 0;
-}
-.ldoc-prev__pie {
-    padding: 12px 16px;
-    border-top: 1px solid var(--sigam-borde-suave);
-    background: #fbfcfe;
-    text-align: right;
 }
 </style>

@@ -150,7 +150,7 @@ class ReporteController extends Controller
     private function catalogos(): array
     {
         return [
-            'sucursales' => Sucursal::orderBy('nombre')->get(['id', 'nombre']),
+            'sucursales' => auth()->user()->sucursalesPermitidas(),
             'tipos_equipo' => TipoEquipo::orderBy('nombre')->get(['id', 'nombre']),
             'estados_equipo' => EstadoEquipo::orderBy('nombre')->get(['id', 'nombre']),
             'tipos_mant' => TipoMantenimiento::orderBy('nombre')->get(['id', 'nombre']),
@@ -231,6 +231,14 @@ class ReporteController extends Controller
      */
     private function construir(string $clave, Request $request): array
     {
+        // Un usuario acotado a sus propias sucursales no puede pedir el
+        // reporte de otra por la URL: si el id no está entre las suyas, se
+        // ignora el filtro (como si no lo hubiera mandado).
+        if ($request->filled('sucursal_id') && ! $request->user()->puedeVerTodasLasSucursales()
+            && ! in_array($request->integer('sucursal_id'), $request->user()->sucursalIdsPermitidos(), true)) {
+            $request->merge(['sucursal_id' => null]);
+        }
+
         return match ($clave) {
             'inventario_general' => $this->inventarioGeneral($request),
             'inventario_por_sucursal' => $this->inventarioPorSucursal($request),
@@ -252,7 +260,14 @@ class ReporteController extends Controller
     {
         $equipos = Equipo::query()
             ->with(['tipo:id,nombre', 'marca:id,nombre', 'sucursal:id,nombre', 'ubicacion:id,nombre', 'estado:id,nombre,color'])
-            ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
+            ->when(
+                $request->integer('sucursal_id'),
+                fn (Builder $q, $v) => $q->where('sucursal_id', $v),
+                fn (Builder $q) => $q->when(
+                    ! $request->user()->puedeVerTodasLasSucursales(),
+                    fn (Builder $qq) => $qq->whereIn('sucursal_id', $request->user()->sucursalIdsPermitidos()),
+                ),
+            )
             ->when($request->integer('tipo_equipo_id'), fn (Builder $q, $v) => $q->where('tipo_id', $v))
             ->when($request->integer('estado_equipo_id'), fn (Builder $q, $v) => $q->where('estado_id', $v))
             ->orderBy('codigo_activo')
@@ -277,7 +292,14 @@ class ReporteController extends Controller
             ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'tipo:id,nombre', 'estado:id,nombre,clave', 'prioridad:id,nombre,color',
                 'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at')])
             ->whereBetween('created_at', [$desde, $hasta])
-            ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
+            ->when(
+                $request->integer('sucursal_id'),
+                fn (Builder $q, $v) => $q->where('sucursal_id', $v),
+                fn (Builder $q) => $q->when(
+                    ! $request->user()->puedeVerTodasLasSucursales(),
+                    fn (Builder $qq) => $qq->whereIn('sucursal_id', $request->user()->sucursalIdsPermitidos()),
+                ),
+            )
             ->when($request->integer('tipo_mant_id'), fn (Builder $q, $v) => $q->where('tipo_id', $v))
             ->when($request->integer('estado_mant_id'), fn (Builder $q, $v) => $q->where('estado_id', $v))
             ->orderBy('created_at')
@@ -303,6 +325,10 @@ class ReporteController extends Controller
             ->with(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'tecnico:id,nombre'])
             ->where('estado', 'activo')
             ->whereDate('proxima_fecha', '<', today())
+            ->when(
+                ! auth()->user()->puedeVerTodasLasSucursales(),
+                fn (Builder $q) => $q->whereIn('sucursal_id', auth()->user()->sucursalIdsPermitidos()),
+            )
             ->orderBy('proxima_fecha')
             ->get();
 
@@ -325,6 +351,10 @@ class ReporteController extends Controller
                 'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at')])
             ->whereHas('prioridad', fn (Builder $q) => $q->whereIn('clave', ['urgente', 'critica']))
             ->whereHas('estado', fn (Builder $q) => $q->where('es_abierto', true))
+            ->when(
+                ! auth()->user()->puedeVerTodasLasSucursales(),
+                fn (Builder $q) => $q->whereIn('sucursal_id', auth()->user()->sucursalIdsPermitidos()),
+            )
             ->orderBy('programado_inicio')
             ->get();
 
@@ -347,6 +377,10 @@ class ReporteController extends Controller
             ->selectRaw('solicitado_por, count(*) as total')
             ->selectRaw('sum(case when estados_mantenimiento.es_abierto = 1 then 1 else 0 end) as abiertas')
             ->join('estados_mantenimiento', 'estados_mantenimiento.id', '=', 'solicitudes_mantenimiento.estado_id')
+            ->when(
+                ! $request->user()->puedeVerTodasLasSucursales(),
+                fn (Builder $q) => $q->whereIn('solicitudes_mantenimiento.sucursal_id', $request->user()->sucursalIdsPermitidos()),
+            )
             ->with('solicitante:id,nombre')
             ->groupBy('solicitado_por')
             ->get();
@@ -362,7 +396,14 @@ class ReporteController extends Controller
         $ordenes = Mantenimiento::query()
             ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre'])
             ->withSum('materiales as costo_materiales', 'costo_unitario')
-            ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
+            ->when(
+                $request->integer('sucursal_id'),
+                fn (Builder $q, $v) => $q->where('sucursal_id', $v),
+                fn (Builder $q) => $q->when(
+                    ! $request->user()->puedeVerTodasLasSucursales(),
+                    fn (Builder $qq) => $qq->whereIn('sucursal_id', $request->user()->sucursalIdsPermitidos()),
+                ),
+            )
             ->when($request->filled('desde'), fn (Builder $q) => $q->whereDate('created_at', '>=', $request->date('desde')))
             ->when($request->filled('hasta'), fn (Builder $q) => $q->whereDate('created_at', '<=', $request->date('hasta')))
             ->get();
@@ -424,6 +465,10 @@ class ReporteController extends Controller
         $filas = Sucursal::query()
             ->withCount('equipos')
             ->withSum('equipos as valor', 'valor_adquisicion')
+            ->when(
+                ! $request->user()->puedeVerTodasLasSucursales(),
+                fn (Builder $q) => $q->whereIn('id', $request->user()->sucursalIdsPermitidos()),
+            )
             ->when($request->integer('tipo_equipo_id'), fn (Builder $q, $v) => $q
                 ->whereHas('equipos', fn (Builder $e) => $e->where('tipo_id', $v)))
             ->orderBy('nombre')
@@ -451,7 +496,14 @@ class ReporteController extends Controller
             ->whereNotNull('proxima_fecha')
             ->whereDate('proxima_fecha', '>=', today())
             ->whereDate('proxima_fecha', '<=', $limite)
-            ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
+            ->when(
+                $request->integer('sucursal_id'),
+                fn (Builder $q, $v) => $q->where('sucursal_id', $v),
+                fn (Builder $q) => $q->when(
+                    ! $request->user()->puedeVerTodasLasSucursales(),
+                    fn (Builder $qq) => $qq->whereIn('sucursal_id', $request->user()->sucursalIdsPermitidos()),
+                ),
+            )
             ->orderBy('proxima_fecha')
             ->get();
 
@@ -479,7 +531,14 @@ class ReporteController extends Controller
                 'tecnicos' => fn ($q) => $q->select('usuarios.id', 'usuarios.nombre')->wherePivotNull('desasignado_at')])
             ->whereHas('tipo', fn (Builder $q) => $q->where('categoria', 'correctivo'))
             ->whereBetween('created_at', [$desde, $hasta])
-            ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('sucursal_id', $v))
+            ->when(
+                $request->integer('sucursal_id'),
+                fn (Builder $q, $v) => $q->where('sucursal_id', $v),
+                fn (Builder $q) => $q->when(
+                    ! $request->user()->puedeVerTodasLasSucursales(),
+                    fn (Builder $qq) => $qq->whereIn('sucursal_id', $request->user()->sucursalIdsPermitidos()),
+                ),
+            )
             ->orderBy('created_at')
             ->get();
 
@@ -504,10 +563,19 @@ class ReporteController extends Controller
         $tecnicos = Usuario::query()
             ->role('tecnico')
             ->withCount([
-                'mantenimientosAsignados as asignadas' => fn (Builder $q) => $q->whereBetween('mantenimientos.created_at', [$desde, $hasta]),
+                'mantenimientosAsignados as asignadas' => fn (Builder $q) => $q
+                    ->whereBetween('mantenimientos.created_at', [$desde, $hasta])
+                    ->when(
+                        ! $request->user()->puedeVerTodasLasSucursales(),
+                        fn (Builder $qq) => $qq->whereIn('mantenimientos.sucursal_id', $request->user()->sucursalIdsPermitidos()),
+                    ),
                 'mantenimientosAsignados as completadas' => fn (Builder $q) => $q
                     ->whereBetween('mantenimientos.created_at', [$desde, $hasta])
-                    ->whereNotNull('completado_at'),
+                    ->whereNotNull('completado_at')
+                    ->when(
+                        ! $request->user()->puedeVerTodasLasSucursales(),
+                        fn (Builder $qq) => $qq->whereIn('mantenimientos.sucursal_id', $request->user()->sucursalIdsPermitidos()),
+                    ),
             ])
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'apellidos']);
@@ -532,7 +600,14 @@ class ReporteController extends Controller
         $docs = Documento::query()
             ->join('documento_relacionado as dr', 'dr.documento_id', '=', 'documentos.id')
             ->join('equipos', fn ($j) => $j->on('equipos.id', '=', 'dr.relacionado_id')->where('dr.relacionado_type', Equipo::class))
-            ->when($request->integer('sucursal_id'), fn (Builder $q, $v) => $q->where('equipos.sucursal_id', $v))
+            ->when(
+                $request->integer('sucursal_id'),
+                fn (Builder $q, $v) => $q->where('equipos.sucursal_id', $v),
+                fn (Builder $q) => $q->when(
+                    ! $request->user()->puedeVerTodasLasSucursales(),
+                    fn (Builder $qq) => $qq->whereIn('equipos.sucursal_id', $request->user()->sucursalIdsPermitidos()),
+                ),
+            )
             ->orderBy('equipos.codigo_activo')
             ->get([
                 'equipos.codigo_activo', 'documentos.nombre_original', 'documentos.categoria',

@@ -6,6 +6,7 @@ use App\Models\Concerns\ConvierteMayusculas;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 /**
  * Historial de cambios de estado de una tarea. Espejo de
@@ -43,8 +44,9 @@ class HistorialEstadoTarea extends Model
         return $this->belongsTo(Usuario::class, 'cambiado_por');
     }
 
-    public function documentoEvidencia(): BelongsTo
+    public function evidencias(): MorphToMany
     {
-        return $this->belongsTo(Documento::class, 'documento_evidencia_id');
+        return $this->morphToMany(Documento::class, 'movimiento', 'evidencias_movimiento', 'movimiento_id', 'documento_id')
+            ->withTimestamps();
     }
 }

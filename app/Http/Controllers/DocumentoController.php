@@ -44,14 +44,15 @@ class DocumentoController extends Controller
             'titulo' => ['nullable', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string', 'max:255'],
             'rol' => ['nullable', 'string', 'max:40'],
-            'visibilidad' => ['required', Rule::in(['privado', 'publico'])],
         ]);
 
         $modelo = self::RELACIONABLES[$datos['relacionable_tipo']];
         $entidad = $modelo::findOrFail($datos['relacionable_id']);
 
         $archivo = $request->file('archivo');
-        $disco = $datos['visibilidad'] === 'publico' ? 'public' : 'local';
+
+        // Todos los documentos se guardan en el disco privado (local).
+        $disco = 'local';
         $ruta = $archivo->store('documentos/'.now()->format('Y/m'), $disco);
 
         $documento = Documento::create([
@@ -63,7 +64,6 @@ class DocumentoController extends Controller
             'tipo_mime' => $archivo->getClientMimeType(),
             'tamano' => $archivo->getSize(),
             'checksum' => hash_file('sha256', $archivo->getRealPath()),
-            'visibilidad' => $datos['visibilidad'],
             'subido_por' => $request->user()->id,
         ]);
 
@@ -75,7 +75,7 @@ class DocumentoController extends Controller
     public function download(Request $request, Documento $documento): StreamedResponse
     {
         abort_unless(
-            $documento->esPublico() || $request->user()?->can('documentos.ver'),
+            $request->user()?->can('documentos.ver'),
             403,
         );
 
@@ -91,7 +91,7 @@ class DocumentoController extends Controller
     public function previsualizar(Request $request, Documento $documento): StreamedResponse
     {
         abort_unless(
-            $documento->esPublico() || $request->user()?->can('documentos.ver'),
+            $request->user()?->can('documentos.ver'),
             403,
         );
 

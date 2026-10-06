@@ -2,11 +2,13 @@
 import { computed, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
+    ApartmentOutlined,
     CheckCircleOutlined,
     ClockCircleOutlined,
     ExclamationCircleOutlined,
     EyeOutlined,
     FilterOutlined,
+    FolderOutlined,
     HourglassOutlined,
     PlusOutlined,
     SyncOutlined,
@@ -38,6 +40,7 @@ const { filtros, orden, cargando, navegar, onCambioTabla } = useTablaInertia('ta
         estado: props.filtros.estado ?? undefined,
         responsable: props.filtros.responsable ?? '',
         prioridad_id: props.filtros.prioridad_id ?? undefined,
+        clasificacion: props.filtros.clasificacion ?? undefined,
         desde: props.filtros.desde ?? '',
         hasta: props.filtros.hasta ?? '',
         registrado_por: props.filtros.registrado_por ?? '',
@@ -88,10 +91,18 @@ const ESTADO_META = {
 const colorEstado = (e) => ESTADO_META[e]?.color ?? 'default';
 const hexEstado = (e) => ESTADO_META[e]?.hex ?? '#64748b';
 
+const opcionesClasificacion = [
+    { value: 'general', label: 'General' },
+    { value: 'proyecto', label: 'Por proyecto' },
+    { value: 'categoria', label: 'Categoría' },
+];
+const ICONO_CLASIFICACION = { proyecto: FolderOutlined, categoria: ApartmentOutlined };
+
 const opciones = (l, label = 'nombre') => (l ?? []).map((o) => ({ label: o[label], value: o.id }));
 const opcionesFiltro = {
     estado: computed(() => opcionesEstado),
     prioridad_id: computed(() => opciones(props.catalogos.prioridades)),
+    clasificacion: computed(() => opcionesClasificacion),
 };
 
 const columns = computed(() => [
@@ -99,6 +110,7 @@ const columns = computed(() => [
     { title: 'Responsable(s)', key: 'responsables', filtro: 'texto', filtroClave: 'responsable', width: 190 },
     { title: 'Fecha límite', key: 'fecha_limite', dataIndex: 'fecha_limite', sorter: true, width: 140 },
     { title: 'Prioridad', key: 'prioridad', filtro: 'select', filtroClave: 'prioridad_id', width: 130 },
+    { title: 'Clasificación', key: 'clasificacion', filtro: 'select', filtroClave: 'clasificacion', width: 170 },
     {
         title: 'Estado',
         key: 'estado',
@@ -285,7 +297,7 @@ const tarjetas = computed(() => [
                                 class="tarea-titulo__dot"
                                 :style="{ background: hexEstado(record.estado) }"
                             ></span>
-                            {{ record.titulo || record.descripcion }}
+                            <span class="tarea-titulo__txt">{{ record.titulo || record.descripcion }}</span>
                         </a>
                         <div v-if="record.titulo && record.descripcion" class="tarea-descripcion">
                             {{ record.descripcion }}
@@ -307,6 +319,9 @@ const tarjetas = computed(() => [
                             <ExclamationCircleOutlined v-if="record.vencida" />
                             {{ fecha(record.fecha_limite) }}
                         </span>
+                        <div v-if="record.retraso_dias > 0" class="retraso">
+                            Realizada con {{ record.retraso_dias }} {{ record.retraso_dias === 1 ? 'día' : 'días' }} de retraso
+                        </div>
                     </template>
 
                     <template v-else-if="column.key === 'prioridad'">
@@ -318,6 +333,14 @@ const tarjetas = computed(() => [
                             {{ record.prioridad.nombre }}
                         </a-tag>
                         <span v-else class="vacio">—</span>
+                    </template>
+
+                    <template v-else-if="column.key === 'clasificacion'">
+                        <span v-if="record.clasificacion === 'general'" class="vacio">General</span>
+                        <span v-else class="clasificacion-chip">
+                            <component :is="ICONO_CLASIFICACION[record.clasificacion]" />
+                            {{ record.proyecto?.nombre ?? record.categoria_tarea?.nombre ?? '—' }}
+                        </span>
                     </template>
 
                     <template v-else-if="column.key === 'estado'">
@@ -352,6 +375,8 @@ const tarjetas = computed(() => [
             ref="modalTarea"
             :usuarios="catalogos.usuarios ?? []"
             :prioridades="catalogos.prioridades ?? []"
+            :proyectos="catalogos.proyectos ?? []"
+            :categorias="catalogos.categorias ?? []"
         />
     </AppLayout>
 </template>
@@ -686,8 +711,11 @@ const tarjetas = computed(() => [
     transition: color 0.14s ease;
 }
 
-.tarea-titulo:hover {
+.tarea-titulo:hover .tarea-titulo__txt {
     color: #0d84c9;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
 }
 
 .tarea-titulo__dot {
@@ -713,6 +741,12 @@ const tarjetas = computed(() => [
 /* ==========================================================
    Fecha vencida
    ========================================================== */
+.retraso {
+    margin-top: 4px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #b45309;
+}
 .fecha-vencida {
     display: inline-flex;
     align-items: center;
@@ -789,5 +823,14 @@ const tarjetas = computed(() => [
 
 .vacio {
     color: #94a3b8;
+}
+
+.clasificacion-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: #0f6fb0;
 }
 </style>

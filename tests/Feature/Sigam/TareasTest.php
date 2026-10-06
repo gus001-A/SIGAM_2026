@@ -7,6 +7,7 @@ use App\Models\Tarea;
 use App\Models\Usuario;
 use Database\Seeders\RolesPermisosSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class TareasTest extends TestCase
@@ -23,6 +24,14 @@ class TareasTest extends TestCase
 
         $this->supervisor = Usuario::factory()->create();
         $this->supervisor->assignRole('supervisor');
+    }
+
+    /** Inicia la tarea por la transición real, para que el responsable quede registrado como participante activo. */
+    private function iniciar(Tarea $tarea): void
+    {
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'en_proceso', 'nota' => 'Inicio'])
+            ->assertSessionHasNoErrors();
     }
 
     public function test_crear_tarea_requiere_al_menos_un_responsable(): void
@@ -75,21 +84,56 @@ class TareasTest extends TestCase
 
     public function test_transicion_a_realizada_requiere_nota_de_cierre(): void
     {
-        $tarea = Tarea::create(['titulo' => 'Pintar bardas', 'descripcion' => 'Pintar bardas', 'fecha_limite' => now()->addDay(), 'estado' => 'en_proceso']);
+        $tarea = Tarea::create(['titulo' => 'Pintar bardas', 'descripcion' => 'Pintar bardas', 'fecha_limite' => now()->addDay(), 'estado' => 'pendiente']);
         $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now()]);
+        $this->iniciar($tarea);
 
         $this->actingAs($this->supervisor)
             ->post(route('tareas.transicion', $tarea), ['estado' => 'realizada'])
             ->assertSessionHasErrors('nota');
 
         $this->actingAs($this->supervisor)
-            ->post(route('tareas.transicion', $tarea), ['estado' => 'realizada', 'nota' => 'Listo', 'costo' => 150])
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'realizada', 'nota' => 'Listo', 'costo' => 150, 'evidencias' => [UploadedFile::fake()->image('realizada.jpg')]])
             ->assertRedirect();
 
         $tarea->refresh();
         $this->assertSame('realizada', $tarea->estado);
         $this->assertSame('LISTO', $tarea->nota_cierre);
         $this->assertNotNull($tarea->realizada_at);
+    }
+
+    public function test_dias_de_retraso_se_calculan_al_completar_una_tarea_vencida(): void
+    {
+        $tarea = Tarea::create(['titulo' => 'Limpiar cisterna', 'descripcion' => 'Limpiar cisterna', 'fecha_limite' => now()->subDays(3)->toDateString(), 'estado' => 'pendiente']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now()]);
+        $this->iniciar($tarea);
+
+        $this->assertNull($tarea->diasRetraso());
+
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'realizada', 'nota' => 'Listo', 'evidencias' => [UploadedFile::fake()->image('cisterna.jpg')]])
+            ->assertRedirect();
+
+        $this->assertSame(3, $tarea->refresh()->diasRetraso());
+        $this->actingAs($this->supervisor)
+            ->get(route('tareas.index', ['vista' => 'completadas']))
+            ->assertInertia(fn ($p) => $p->where('tareas.data.0.retraso_dias', 3));
+        $this->actingAs($this->supervisor)
+            ->get(route('tareas.show', $tarea))
+            ->assertInertia(fn ($p) => $p->where('retrasoDias', 3));
+    }
+
+    public function test_tarea_entregada_a_tiempo_no_tiene_retraso(): void
+    {
+        $tarea = Tarea::create(['titulo' => 'Revisar techo', 'descripcion' => 'Revisar techo', 'fecha_limite' => now()->addDays(2)->toDateString(), 'estado' => 'pendiente']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now()]);
+        $this->iniciar($tarea);
+
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'realizada', 'nota' => 'Listo', 'evidencias' => [UploadedFile::fake()->image('techo.jpg')]])
+            ->assertRedirect();
+
+        $this->assertSame(0, $tarea->refresh()->diasRetraso());
     }
 
     public function test_no_se_puede_saltar_de_pendiente_a_realizada(): void
@@ -114,7 +158,7 @@ class TareasTest extends TestCase
             ->assertSessionHasErrors('nota');
 
         $this->actingAs($this->supervisor)
-            ->post(route('tareas.transicion', $tarea), ['estado' => 'cancelada', 'nota' => 'Ya no aplica'])
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'cancelada', 'nota' => 'Ya no aplica', 'evidencias' => [UploadedFile::fake()->image('cancelada.jpg')]])
             ->assertRedirect();
 
         $this->assertSame('cancelada', $tarea->fresh()->estado);
@@ -197,5 +241,168 @@ class TareasTest extends TestCase
         $this->actingAs($tecnico)
             ->delete(route('tareas.destroy', $tarea))
             ->assertForbidden();
+    }
+
+    public function test_un_avance_admite_varias_fotos(): void
+    {
+        $tarea = Tarea::create(['titulo' => 'Pintar', 'descripcion' => 'Pintar', 'fecha_limite' => now()->addDay(), 'estado' => 'pendiente']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now()]);
+
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), [
+                'estado' => 'en_proceso',
+                'nota' => 'Primer avance',
+                'evidencias' => [
+                    UploadedFile::fake()->image('uno.jpg'),
+                    UploadedFile::fake()->image('dos.jpg'),
+                    UploadedFile::fake()->image('tres.jpg'),
+                ],
+            ])
+            ->assertRedirect();
+
+        $movimiento = $tarea->historialEstados()->where('estado_destino', 'en_proceso')->firstOrFail();
+        $this->assertCount(3, $movimiento->evidencias);
+    }
+
+    public function test_un_avance_no_exige_foto(): void
+    {
+        $tarea = Tarea::create(['titulo' => 'Pintar', 'descripcion' => 'Pintar', 'fecha_limite' => now()->addDay(), 'estado' => 'pendiente']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now()]);
+
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'en_proceso', 'nota' => 'Sin foto'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('en_proceso', $tarea->refresh()->estado);
+    }
+
+    public function test_tarea_compartida_no_se_cierra_hasta_que_avance_cada_participante(): void
+    {
+        $otro = Usuario::factory()->create();
+        $otro->assignRole('tecnico');
+
+        $tarea = Tarea::create(['titulo' => 'Pintar bardas', 'descripcion' => 'Pintar bardas', 'fecha_limite' => now()->addDay(), 'estado' => 'pendiente']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now(), 'es_principal' => true]);
+        $tarea->responsables()->attach($otro->id, ['asignado_at' => now()]);
+
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'en_proceso', 'nota' => 'Inicio'])
+            ->assertSessionHasNoErrors();
+
+        // El otro participante todavía no ha hecho nada: no se puede cerrar.
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'realizada', 'nota' => 'Listo'])
+            ->assertSessionHasErrors('estado');
+        $this->assertSame('en_proceso', $tarea->refresh()->estado);
+
+        // Cada participante registra su avance, con su nombre en la bitácora.
+        $this->actingAs($otro)
+            ->post(route('tareas.avance', $tarea), ['nota' => 'Ya pinté la barda norte'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue($tarea->historialEstados()->where('cambiado_por', $otro->id)->where('nota', 'like', '%NORTE%')->exists());
+        $this->assertSame(0, $tarea->participantesPendientes()->count());
+
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'realizada', 'nota' => 'Listo'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('realizada', $tarea->refresh()->estado);
+    }
+
+    public function test_solo_el_principal_puede_cerrar_sin_esperar(): void
+    {
+        $otro = Usuario::factory()->create();
+        $otro->assignRole('tecnico');
+
+        $tarea = Tarea::create(['titulo' => 'Revisar', 'descripcion' => 'Revisar', 'fecha_limite' => now()->addDay(), 'estado' => 'pendiente']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now(), 'es_principal' => true]);
+        $tarea->responsables()->attach($otro->id, ['asignado_at' => now()]);
+
+        $this->actingAs($this->supervisor)->post(route('tareas.transicion', $tarea), ['estado' => 'en_proceso', 'nota' => 'Inicio']);
+
+        // Un participante que no es el principal no puede forzar el cierre.
+        $this->actingAs($otro)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'realizada', 'nota' => 'Listo', 'cerrar_sin_esperar' => true])
+            ->assertSessionHasErrors('estado');
+        $this->assertSame('en_proceso', $tarea->refresh()->estado);
+
+        // El principal sí puede, y la nota deja constancia de a quién no esperó.
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'realizada', 'nota' => 'Listo', 'cerrar_sin_esperar' => true])
+            ->assertSessionHasNoErrors();
+
+        $tarea->refresh();
+        $this->assertSame('realizada', $tarea->estado);
+        $this->assertStringContainsString('CERRADA SIN ESPERAR A', $tarea->nota_cierre);
+    }
+
+    public function test_la_ficha_muestra_quien_edito_la_tarea_y_cuando(): void
+    {
+        $tarea = Tarea::create(['titulo' => 'Original', 'descripcion' => 'Original', 'fecha_limite' => now()->addDay(), 'estado' => 'pendiente']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now(), 'es_principal' => true]);
+
+        $this->actingAs($this->supervisor);
+        $tarea->update(['titulo' => 'Cambiado']);
+
+        $this->actingAs($this->supervisor)
+            ->get(route('tareas.show', $tarea))
+            ->assertInertia(fn ($p) => $p
+                ->has('bitacora', 1)
+                ->where('bitacora.0.accion', 'actualizar')
+                ->where('bitacora.0.usuario', $this->supervisor->nombre_completo)
+                ->where('bitacora.0.cambios.0.campo', 'titulo')
+                ->where('bitacora.0.cambios.0.despues', 'CAMBIADO'));
+    }
+
+    public function test_la_bitacora_ignora_los_cambios_de_estado(): void
+    {
+        $tarea = Tarea::create(['titulo' => 'Estado', 'descripcion' => 'Estado', 'fecha_limite' => now()->addDay(), 'estado' => 'pendiente']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now(), 'es_principal' => true]);
+
+        $this->actingAs($this->supervisor);
+        $tarea->update(['estado' => 'en_proceso', 'iniciada_at' => now()]);
+
+        $this->actingAs($this->supervisor)
+            ->get(route('tareas.show', $tarea))
+            ->assertInertia(fn ($p) => $p->has('bitacora', 0));
+    }
+
+    public function test_un_avance_admite_pdf_y_word_y_rechaza_otros_archivos(): void
+    {
+        $tarea = Tarea::create(['titulo' => 'Informe', 'descripcion' => 'Informe', 'fecha_limite' => now()->addDay(), 'estado' => 'pendiente']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now(), 'es_principal' => true]);
+        $this->iniciar($tarea);
+
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.avance', $tarea), [
+                'nota' => 'Adjunto el informe',
+                'evidencias' => [
+                    UploadedFile::fake()->create('acta.pdf', 120, 'application/pdf'),
+                    UploadedFile::fake()->create('informe.docx', 120, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+                ],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $movimiento = $tarea->historialEstados()->where('nota', 'like', '%INFORME%')->firstOrFail();
+        $this->assertCount(2, $movimiento->evidencias);
+
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.avance', $tarea), [
+                'nota' => 'Con un ejecutable',
+                'evidencias' => [UploadedFile::fake()->create('virus.exe', 10)],
+            ])
+            ->assertSessionHasErrors('evidencias.0');
+    }
+
+    public function test_avance_solo_se_registra_con_la_tarea_en_proceso(): void
+    {
+        $tarea = Tarea::create(['titulo' => 'Pendiente', 'descripcion' => 'Pendiente', 'fecha_limite' => now()->addDay(), 'estado' => 'pendiente']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now(), 'es_principal' => true]);
+
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.avance', $tarea), ['nota' => 'Antes de empezar'])
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, $tarea->historialEstados()->count());
     }
 }

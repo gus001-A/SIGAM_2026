@@ -3,11 +3,13 @@
 use App\Http\Controllers\Admin\RolController;
 use App\Http\Controllers\Admin\UsuarioController;
 use App\Http\Controllers\AuditoriaController;
+use App\Http\Controllers\Catalogo\CategoriaTareaController;
 use App\Http\Controllers\Catalogo\EstadoEquipoController;
 use App\Http\Controllers\Catalogo\EstadoMantenimientoController;
 use App\Http\Controllers\Catalogo\MarcaController;
 use App\Http\Controllers\Catalogo\MaterialController;
 use App\Http\Controllers\Catalogo\PrioridadController;
+use App\Http\Controllers\Catalogo\ProyectoController;
 use App\Http\Controllers\Catalogo\TipoAreaController;
 use App\Http\Controllers\Catalogo\TipoEquipoController;
 use App\Http\Controllers\Catalogo\TipoLimpiezaController;
@@ -87,6 +89,8 @@ Route::middleware(['auth'])->group(function (): void {
         'catalogos/materiales' => MaterialController::class,
         'catalogos/tipos-area' => TipoAreaController::class,
         'catalogos/tipos-limpieza' => TipoLimpiezaController::class,
+        'catalogos/proyectos' => ProyectoController::class,
+        'catalogos/categorias-tarea' => CategoriaTareaController::class,
     ] as $ruta => $controlador) {
         $nombre = str_replace(['catalogos/', '-'], ['catalogos.', '_'], $ruta);
         Route::get($ruta, [$controlador, 'index'])->name("{$nombre}.index");
@@ -124,6 +128,7 @@ Route::middleware(['auth'])->group(function (): void {
         ->parameters(['tareas' => 'tarea'])
         ->only(['index', 'create', 'store', 'show', 'update', 'destroy']);
     Route::post('tareas/{tarea}/transicion', [TareaController::class, 'transicion'])->name('tareas.transicion');
+    Route::post('tareas/{tarea}/avance', [TareaController::class, 'avance'])->name('tareas.avance');
     Route::post('tareas/{tarea}/responsables', [TareaResponsableController::class, 'store'])->name('tareas.responsables.store');
     Route::delete('tareas/{tarea}/responsables/{responsable}', [TareaResponsableController::class, 'destroy'])->name('tareas.responsables.destroy');
     Route::post('tareas/{tarea}/materiales', [MaterialTareaController::class, 'store'])->name('tareas.materiales.store');

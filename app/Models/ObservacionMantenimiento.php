@@ -6,6 +6,7 @@ use App\Models\Concerns\ConvierteMayusculas;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class ObservacionMantenimiento extends Model
 {
@@ -13,9 +14,9 @@ class ObservacionMantenimiento extends Model
 
     protected $table = 'observaciones_mantenimiento';
 
-    public $timestamps = false;
+    const UPDATED_AT = null;
 
-    protected $fillable = ['mantenimiento_id', 'usuario_id', 'tipo', 'cuerpo', 'created_at'];
+    protected $fillable = ['mantenimiento_id', 'usuario_id', 'tipo', 'cuerpo', 'documento_evidencia_id'];
 
     protected function camposMayusculas(): array
     {
@@ -35,5 +36,11 @@ class ObservacionMantenimiento extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class);
+    }
+
+    public function evidencias(): MorphToMany
+    {
+        return $this->morphToMany(Documento::class, 'movimiento', 'evidencias_movimiento', 'movimiento_id', 'documento_id')
+            ->withTimestamps();
     }
 }

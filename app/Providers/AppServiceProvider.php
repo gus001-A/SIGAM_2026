@@ -31,6 +31,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Fuerza la zona horaria de PHP a la configurada en config/app.php
+        // (America/Mexico_City). Necesario en hostings compartidos donde
+        // php.ini suele estar en UTC y no se puede modificar.
+        date_default_timezone_set(config('app.timezone'));
+
         Vite::prefetch(concurrency: 3);
 
         $this->auditoriaDeAutenticacion();

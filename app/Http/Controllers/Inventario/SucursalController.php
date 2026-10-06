@@ -139,6 +139,7 @@ class SucursalController extends Controller
         $sucursal->loadCount(['equipos', 'usuarios', 'ubicaciones', 'solicitudes', 'mantenimientos']);
 
         return Inertia::render('Inventario/Sucursales/Show', [
+            'bitacora' => $sucursal->bitacoraCambios(),
             'sucursal' => [
                 'id' => $sucursal->id,
                 'codigo' => $sucursal->codigo,

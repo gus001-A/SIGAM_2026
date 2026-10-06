@@ -4,6 +4,7 @@ import { Head, router, useForm } from '@inertiajs/vue3';
 import {
     ApartmentOutlined,
     CalendarOutlined,
+    CameraOutlined,
     CheckCircleFilled,
     CheckCircleOutlined,
     ClockCircleOutlined,
@@ -31,8 +32,8 @@ import FichaEncabezado from '@/Components/FichaEncabezado.vue';
 import ListaDocumentos from '@/Components/ListaDocumentos.vue';
 import CampoFechaHora from '@/Components/CampoFechaHora.vue';
 import SelectCatalogo from '@/Components/SelectCatalogo.vue';
-import ModalFicha from '@/Components/ModalFicha.vue';
-import CampoEvidencia from '@/Components/CampoEvidencia.vue';
+import CampoEvidencias from '@/Components/CampoEvidencias.vue';
+import GaleriaEvidencias from '@/Components/GaleriaEvidencias.vue';
 import { usePermisos } from '@/composables/usePermisos';
 import { hoyISO, reglaDespuesDe, reglaNoPasada } from '@/utils/restricciones';
 
@@ -42,6 +43,7 @@ const props = defineProps({
     faltantesCierre: { type: Array, default: () => [] },
     catalogos: { type: Object, default: () => ({}) },
     sello: { type: Object, default: null },
+    retrasoDias: { type: Number, default: null },
 });
 
 const { puede } = usePermisos();
@@ -86,6 +88,16 @@ const fechaHora = (v) =>
 const moneda = (v) => (v == null ? 'No especificado' : new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v));
 const dato = (v) => v || 'No especificado';
 
+/* Divide una fecha en { fecha, hora } */
+const partesFecha = (v) => {
+    if (!v) return { fecha: 'No especificado', hora: '' };
+    const d = new Date(v);
+    return {
+        fecha: d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }),
+        hora: d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
+    };
+};
+
 const cronologia = computed(() => {
     const deEstados = (m.value.historial_estados ?? []).map((hh) => ({
         key: `estado-${hh.id}`,
@@ -108,59 +120,28 @@ const cronologia = computed(() => {
     return [...deEstados, ...deReprogramaciones].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 });
 
-// ===== infoOrden CONDICIONAL: solo muestra plan y solicitud si existen =====
 const infoOrden = computed(() => {
     const base = [
-        { icono: TagOutlined, label: 'Tipo', valor: dato(m.value.tipo?.nombre), color: '#0d84c9' },
-        { icono: FlagOutlined, label: 'Prioridad', valor: dato(m.value.prioridad?.nombre), color: m.value.prioridad?.color || '#d64545' },
-        { icono: CalendarOutlined, label: 'Programado', valor: fecha(m.value.programado_inicio), color: '#6b4bc9' },
+        { icono: TagOutlined, label: 'Tipo', valor: dato(m.value.tipo?.nombre), color: '#0d84c9', tipo: 'texto' },
+        { icono: FlagOutlined, label: 'Prioridad', valor: dato(m.value.prioridad?.nombre), color: m.value.prioridad?.color || '#d64545', tipo: 'texto' },
+        { icono: CalendarOutlined, label: 'Programado', valor: fecha(m.value.programado_inicio), color: '#6b4bc9', tipo: 'fecha' },
     ];
     if (m.value.solicitud?.folio) {
-        base.push({
-            icono: FileDoneOutlined,
-            label: 'Solicitud origen',
-            valor: m.value.solicitud.folio,
-            color: '#e08a1e',
-        });
-    }
-    if (m.value.plan?.nombre) {
-        base.push({
-            icono: CalendarOutlined,
-            label: 'Plan preventivo',
-            valor: m.value.plan.nombre,
-            color: '#1f9e86',
-        });
+        base.push({ icono: FileDoneOutlined, label: 'Solicitud', valor: m.value.solicitud.folio, color: '#e08a1e', tipo: 'texto' });
+    } else if (m.value.plan?.nombre) {
+        base.push({ icono: CalendarOutlined, label: 'Plan', valor: m.value.plan.nombre, color: '#1f9e86', tipo: 'texto' });
     }
     return base;
 });
 
-const infoUbicacion = computed(() => [
-    m.value.equipo
-        ? { icono: ToolOutlined, label: 'Equipo', valor: `${m.value.equipo.codigo_activo} — ${m.value.equipo.descripcion}`, color: '#0d84c9' }
-        : { icono: EnvironmentOutlined, label: 'Instalación', valor: dato(m.value.ubicacion?.nombre), color: '#0d84c9' },
-    { icono: ApartmentOutlined, label: 'Sucursal', valor: dato(m.value.sucursal?.nombre), color: '#1f9e86' },
-]);
-
-const infoResponsables = computed(() => {
-    const base = [
-        {
-            icono: UserOutlined,
-            label: 'Creado por',
-            valor: m.value.creado?.usuario
-                ? `${m.value.creado.usuario} · ${fechaHora(m.value.creado.fecha)}`
-                : `${dato(m.value.creado_por?.nombre)} · ${fechaHora(m.value.created_at)}`,
-            color: '#173a5f',
-        },
+/* Ubicación y responsables — SIN "Creado por" */
+const infoUbicacion = computed(() => {
+    return [
+        m.value.equipo
+            ? { icono: ToolOutlined, label: 'Equipo', valor: `${m.value.equipo.codigo_activo} — ${m.value.equipo.descripcion}`, color: '#0d84c9' }
+            : { icono: EnvironmentOutlined, label: 'Instalación', valor: dato(m.value.ubicacion?.nombre), color: '#0d84c9' },
+        { icono: ApartmentOutlined, label: 'Sucursal', valor: dato(m.value.sucursal?.nombre), color: '#1f9e86' },
     ];
-    if (m.value.supervisor?.nombre) {
-        base.push({
-            icono: UserOutlined,
-            label: 'Supervisor',
-            valor: m.value.supervisor.nombre,
-            color: '#1f9e86',
-        });
-    }
-    return base;
 });
 
 const tecnicosActivos = computed(() => (m.value.asignaciones ?? []).filter((a) => !a.desasignado_at));
@@ -192,6 +173,7 @@ const motivoDiagnosticar = computed(() => {
     return '';
 });
 
+/* Resumen para el modal: todos los bloques */
 const resumenTrabajo = computed(() => [
     { key: 'diagnostico', icono: FileDoneOutlined, label: 'Diagnóstico', valor: m.value.diagnostico, color: '#6b4bc9' },
     { key: 'actividades', icono: ToolOutlined, label: 'Actividades', valor: m.value.descripcion_trabajo, color: '#0d84c9' },
@@ -199,6 +181,14 @@ const resumenTrabajo = computed(() => [
     { key: 'condicion', icono: CheckCircleOutlined, label: 'Condición final', valor: m.value.condicion_final, color: '#1f9e86' },
     { key: 'mano_obra', icono: DollarOutlined, label: 'Mano de obra', valor: moneda(m.value.costo_mano_obra), color: '#e08a1e', mono: true },
     { key: 'otros_costos', icono: DollarOutlined, label: 'Otros costos', valor: moneda(m.value.costo_otros), color: '#a86717', mono: true },
+]);
+
+/* Card: solo 4 bloques */
+const cardDiagnostico = computed(() => [
+    { key: 'diagnostico', icono: FileDoneOutlined, label: 'Diagnóstico', valor: m.value.diagnostico, color: '#6b4bc9', tipo: 'texto' },
+    { key: 'observaciones', icono: FileTextOutlined, label: 'Observaciones', valor: m.value.observaciones, color: '#173a5f', tipo: 'texto' },
+    { key: 'mano_obra', icono: DollarOutlined, label: 'Mano de obra', valor: moneda(m.value.costo_mano_obra), color: '#e08a1e', tipo: 'mono' },
+    { key: 'otros_costos', icono: DollarOutlined, label: 'Otros costos', valor: moneda(m.value.costo_otros), color: '#a86717', tipo: 'mono' },
 ]);
 
 const LIMITE_MAT = 6;
@@ -216,29 +206,41 @@ const totalMateriales = computed(() => {
 
 // --- Cambiar estado ---
 const modalEstado = ref(false);
-const formEstado = useForm({ estado: null, nota: '', evidencia: null });
+const formEstado = useForm({ estado: null, nota: '', evidencias: [] });
 const abrirEstado = (slug) => {
     formEstado.reset();
     formEstado.clearErrors();
     formEstado.estado = slug;
+    formEstado.nota = '';
+    formEstado.evidencias = [];
     modalEstado.value = true;
 };
+const cerrarEstado = () => {
+    modalEstado.value = false;
+    formEstado.reset();
+    formEstado.clearErrors();
+};
+const EVIDENCIA_OPCIONAL = ['supervisado', 'cerrado'];
 const confirmarEstado = () => {
     formEstado.clearErrors();
-    if (!formEstado.evidencia) {
-        formEstado.setError('evidencia', 'Adjunta una evidencia para este movimiento.');
+    if (!formEstado.nota?.trim()) {
+        formEstado.setError('nota', 'Escribe una nota para este movimiento.');
+        return;
+    }
+    if (!EVIDENCIA_OPCIONAL.includes(formEstado.estado) && !formEstado.evidencias.length) {
+        formEstado.setError('evidencias', 'Adjunta al menos una imagen de evidencia para este movimiento.');
         return;
     }
     formEstado.post(route('mantenimientos.transicion', m.value.id), {
         preserveScroll: true,
         forceFormData: true,
-        onSuccess: () => (modalEstado.value = false),
+        onSuccess: () => {
+            modalEstado.value = false;
+            formEstado.reset();
+        },
     });
 };
 
-/* ==========================================================
-   Botones de transición con estilo hero
-   ========================================================== */
 const botonesTransicion = computed(() =>
     props.transicionesPosibles
         .filter((slug) => slug !== 'reprogramado' && slug !== 'autorizado')
@@ -272,7 +274,7 @@ const botonesTransicion = computed(() =>
 
 // --- Reprogramar ---
 const modalReprogramar = ref(false);
-const formReprogramar = useForm({ programado_inicio: '', programado_fin: '', motivo: '', evidencia: null });
+const formReprogramar = useForm({ programado_inicio: '', programado_fin: '', motivo: '', evidencias: [] });
 const reglasReprogramar = reactive({
     programado_inicio: [{ required: true, message: 'Indica la nueva fecha.' }, reglaNoPasada('La nueva fecha no puede ser anterior a hoy.')],
     programado_fin: [reglaDespuesDe(() => formReprogramar.programado_inicio, 'El fin debe ser posterior al inicio.', true)],
@@ -282,39 +284,48 @@ const reglasReprogramar = reactive({
 const abrirReprogramar = () => {
     formReprogramar.reset();
     formReprogramar.clearErrors();
+    formReprogramar.programado_inicio = '';
+    formReprogramar.programado_fin = '';
+    formReprogramar.motivo = '';
+    formReprogramar.evidencias = [];
     modalReprogramar.value = true;
 };
 
 const cerrarReprogramar = () => {
     modalReprogramar.value = false;
+    formReprogramar.reset();
 };
 
 const reprogramar = () => {
     formReprogramar.clearErrors();
-    if (!formReprogramar.evidencia) {
-        formReprogramar.setError('evidencia', 'Adjunta una evidencia para reprogramar.');
+    if (!formReprogramar.evidencias.length) {
+        formReprogramar.setError('evidencias', 'Adjunta al menos una evidencia para reprogramar.');
         return;
     }
     formReprogramar.post(route('mantenimientos.reprogramar', m.value.id), {
         preserveScroll: true,
         forceFormData: true,
-        onSuccess: () => (modalReprogramar.value = false),
+        onSuccess: () => {
+            modalReprogramar.value = false;
+            formReprogramar.reset();
+        },
     });
 };
 
 // --- Diagnóstico y trabajo ---
 const modalTrabajo = ref(false);
 const modoTrabajo = ref('ver');
+
 const formTrabajo = useForm({
-    diagnostico: m.value.diagnostico ?? '',
-    descripcion_trabajo: m.value.descripcion_trabajo ?? '',
-    observaciones: m.value.observaciones ?? '',
-    condicion_final: m.value.condicion_final ?? '',
-    costo_mano_obra: m.value.costo_mano_obra ?? '',
-    costo_otros: m.value.costo_otros ?? '',
+    diagnostico: '',
+    descripcion_trabajo: '',
+    observaciones: '',
+    condicion_final: '',
+    costo_mano_obra: '',
+    costo_otros: '',
 });
 
-const abrirVerTrabajo = () => {
+const cargarTrabajoDesdeM = () => {
     formTrabajo.clearErrors();
     formTrabajo.diagnostico = m.value.diagnostico ?? '';
     formTrabajo.descripcion_trabajo = m.value.descripcion_trabajo ?? '';
@@ -322,18 +333,16 @@ const abrirVerTrabajo = () => {
     formTrabajo.condicion_final = m.value.condicion_final ?? '';
     formTrabajo.costo_mano_obra = m.value.costo_mano_obra ?? '';
     formTrabajo.costo_otros = m.value.costo_otros ?? '';
+};
+
+const abrirVerTrabajo = () => {
+    cargarTrabajoDesdeM();
     modoTrabajo.value = 'ver';
     modalTrabajo.value = true;
 };
 
 const abrirEditarTrabajo = () => {
-    formTrabajo.clearErrors();
-    formTrabajo.diagnostico = m.value.diagnostico ?? '';
-    formTrabajo.descripcion_trabajo = m.value.descripcion_trabajo ?? '';
-    formTrabajo.observaciones = m.value.observaciones ?? '';
-    formTrabajo.condicion_final = m.value.condicion_final ?? '';
-    formTrabajo.costo_mano_obra = m.value.costo_mano_obra ?? '';
-    formTrabajo.costo_otros = m.value.costo_otros ?? '';
+    cargarTrabajoDesdeM();
     modoTrabajo.value = 'editar';
     modalTrabajo.value = true;
 };
@@ -341,12 +350,16 @@ const abrirEditarTrabajo = () => {
 const guardarTrabajo = () =>
     formTrabajo.put(route('mantenimientos.update', m.value.id), {
         preserveScroll: true,
-        onSuccess: () => (modalTrabajo.value = false),
+        onSuccess: () => {
+            modalTrabajo.value = false;
+            formTrabajo.reset();
+        },
     });
 
 const cerrarTrabajo = () => {
     modalTrabajo.value = false;
     modoTrabajo.value = 'ver';
+    formTrabajo.reset();
 };
 
 // --- Técnico ---
@@ -359,11 +372,14 @@ const tecnicoSeleccionado = computed(() =>
 const abrirTecnico = () => {
     formTecnico.reset();
     formTecnico.clearErrors();
+    formTecnico.tecnico_id = undefined;
+    formTecnico.es_principal = false;
     modalTecnico.value = true;
 };
 
 const cerrarTecnico = () => {
     modalTecnico.value = false;
+    formTecnico.reset();
 };
 
 const asignarTecnico = () => {
@@ -399,11 +415,18 @@ const totalMaterialForm = computed(() => {
 const abrirMaterial = () => {
     formMaterial.reset();
     formMaterial.clearErrors();
+    formMaterial.material_id = undefined;
+    formMaterial.descripcion = '';
+    formMaterial.cantidad = 1;
+    formMaterial.unidad = 'pza';
+    formMaterial.costo_unitario = '';
+    formMaterial.notas = '';
     modalMaterial.value = true;
 };
 
 const cerrarMaterial = () => {
     modalMaterial.value = false;
+    formMaterial.reset();
 };
 
 const agregarMaterial = () => {
@@ -436,11 +459,13 @@ const abrirObs = () => {
     formObs.reset();
     formObs.clearErrors();
     formObs.tipo = 'comentario';
+    formObs.cuerpo = '';
     modalObs.value = true;
 };
 
 const cerrarObs = () => {
     modalObs.value = false;
+    formObs.reset();
 };
 
 const agregarObs = () => {
@@ -454,6 +479,9 @@ const agregarObs = () => {
     });
 };
 
+// --- Modal Bitácora ---
+const modalBitacora = ref(false);
+
 const modalEvidencias = ref(false);
 const modalCronologia = ref(false);
 
@@ -465,13 +493,8 @@ const darBaja = async () => {
 const nombreAsignador = (t) => t.asignado_por?.nombre ?? 'Sistema';
 
 const bitacoraTotal = computed(() => m.value.bitacora?.length ?? 0);
+const bitacoraConFoto = computed(() => (m.value.bitacora ?? []).filter((o) => o.evidencias?.length).length);
 
-const fotoBitacora = ref(null);
-const modalFotoBitacora = ref(false);
-const abrirFotoBitacora = (doc) => {
-    fotoBitacora.value = doc;
-    modalFotoBitacora.value = true;
-};
 </script>
 
 <template>
@@ -495,6 +518,9 @@ const abrirFotoBitacora = (doc) => {
                         :color="m.tipo.categoria === 'urgente' || m.tipo.categoria === 'emergencia' ? 'volcano' : m.tipo.categoria === 'preventivo' ? 'green' : 'blue'"
                         class="tipo-tag">
                         <ToolOutlined /> {{ m.tipo.nombre }}
+                    </a-tag>
+                    <a-tag v-if="retrasoDias > 0" color="warning">
+                        Completada con {{ retrasoDias }} {{ retrasoDias === 1 ? 'día' : 'días' }} de retraso
                     </a-tag>
                 </template>
                 <template #acciones>
@@ -547,12 +573,25 @@ const abrirFotoBitacora = (doc) => {
                 <div class="problema-card__meta">
                     <div class="problema-card__objetivo">
                         {{ m.equipo ? `${m.equipo.codigo_activo} — ${m.equipo.descripcion}` : (m.ubicacion?.nombre ??
-                        '') }}
+                            '') }}
                     </div>
                     <div class="problema-card__desc">
                         {{ m.problema_reportado || 'ORDEN DE MANTENIMIENTO SIN DESCRIPCIÓN DE PROBLEMA.' }}
                     </div>
                 </div>
+
+                <button type="button" class="btn-bitacora" @click="modalBitacora = true">
+                    <span class="btn-bitacora__ic">
+                        <ClockCircleOutlined />
+                    </span>
+                    <span class="btn-bitacora__txt">
+                        <span class="btn-bitacora__l">Bitácora</span>
+                        <span class="btn-bitacora__s">
+                            {{ bitacoraTotal ? `${bitacoraTotal} movimiento${bitacoraTotal === 1 ? '' : 's'}` : 'Sin movimientos' }}
+                        </span>
+                    </span>
+                    <span v-if="bitacoraTotal" class="btn-bitacora__badge">{{ bitacoraTotal }}</span>
+                </button>
             </div>
 
             <div class="grid-ficha">
@@ -568,14 +607,21 @@ const abrirFotoBitacora = (doc) => {
                             </div>
                         </div>
                         <div class="card__body">
-                            <div class="mini-grid mini-grid--2">
+                            <div class="mini-grid mini-grid--4">
                                 <div v-for="d in infoOrden" :key="d.label" class="mini" :style="{ '--c': d.color }">
                                     <span class="mini__ic">
                                         <component :is="d.icono" />
                                     </span>
                                     <span class="mini__t">
                                         <span class="mini__l">{{ d.label }}</span>
-                                        <span class="mini__v">{{ d.valor }}</span>
+                                        <!-- Programado: fecha arriba, hora abajo -->
+                                        <template v-if="d.tipo === 'fecha'">
+                                            <span class="mini__v mini__v--fecha">{{
+                                                partesFecha(m.programado_inicio).fecha }}</span>
+                                            <span class="mini__v mini__v--hora">{{ partesFecha(m.programado_inicio).hora
+                                            }}</span>
+                                        </template>
+                                        <span v-else class="mini__v">{{ d.valor }}</span>
                                     </span>
                                 </div>
                             </div>
@@ -599,18 +645,6 @@ const abrirFotoBitacora = (doc) => {
                         <div class="card__body">
                             <div class="mini-grid mini-grid--2">
                                 <div v-for="d in infoUbicacion" :key="d.label" class="mini" :style="{ '--c': d.color }">
-                                    <span class="mini__ic">
-                                        <component :is="d.icono" />
-                                    </span>
-                                    <span class="mini__t">
-                                        <span class="mini__l">{{ d.label }}</span>
-                                        <span class="mini__v">{{ d.valor }}</span>
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="mini-grid mini-grid--full mt-grid">
-                                <div v-for="d in infoResponsables" :key="d.label" class="mini"
-                                    :style="{ '--c': d.color }">
                                     <span class="mini__ic">
                                         <component :is="d.icono" />
                                     </span>
@@ -676,75 +710,6 @@ const abrirFotoBitacora = (doc) => {
                 </div>
 
                 <div class="col-der">
-                    <!-- ==========================================================
-                         BITÁCORA (compacta, sin tag, thumb más grande)
-                         ========================================================== -->
-                    <div class="card card--bitacora">
-                        <div class="card__head">
-                            <div class="card__ico" style="--c: #0d84c9">
-                                <ClockCircleOutlined />
-                            </div>
-                            <div class="card__meta">
-                                <div class="card__titulo">
-                                    Bitácora
-                                    <span v-if="bitacoraTotal" class="badge badge--blue">{{ bitacoraTotal }}</span>
-                                </div>
-                                <div class="card__sub">Notas rápidas, seguimiento y supervisiones</div>
-                            </div>
-                            <a-button v-if="puede('mantenimientos.editar') && !esCerrada" class="card__extra"
-                                size="small" type="text" @click="abrirObs">
-                                <template #icon>
-                                    <PlusOutlined />
-                                </template>
-                                Agregar
-                            </a-button>
-                        </div>
-                        <div class="card__body card__body--bitacora">
-                            <div v-if="m.bitacora?.length" class="mb-list mb-list--inline">
-                                <article v-for="(o, i) in (m.bitacora ?? [])" :key="o.id" class="mb-item"
-                                    :class="{ 'mb-item--supervision': o.tipo === 'supervision' }">
-                                    <div class="mb-item__rail">
-                                        <span class="mb-item__ic">
-                                            <component :is="o.tipo === 'supervision' ? FlagOutlined : MessageOutlined" />
-                                        </span>
-                                        <span v-if="i < m.bitacora.length - 1" class="mb-item__linea"></span>
-                                    </div>
-                                    <div class="mb-item__card">
-                                        <div class="mb-item__card-head">
-                                            <span class="mb-item__avatar"
-                                                :style="{ background: o.tipo === 'supervision' ? 'linear-gradient(135deg, #6b4bc9, #563a9e)' : 'linear-gradient(135deg, #0d84c9, #0a6ba6)' }">
-                                                {{ (o.usuario?.nombre ?? 'S').charAt(0).toUpperCase() }}
-                                            </span>
-                                            <div class="mb-item__user">
-                                                <span class="mb-item__user-name">{{ o.usuario?.nombre ?? 'Sistema' }}</span>
-                                                <span class="mb-item__user-time">
-                                                    <ClockCircleOutlined /> {{ fecha(o.created_at) }}
-                                                </span>
-                                            </div>
-                                            <!-- Thumb más grande, sin tag al lado -->
-                                            <button v-if="o.evidencia" type="button" class="mb-item__thumb"
-                                                title="Ver evidencia" @click="abrirFotoBitacora(o.evidencia)">
-                                                <img :src="o.evidencia.url" alt="Evidencia" />
-                                                <span class="mb-item__thumb-overlay">
-                                                    <EyeOutlined />
-                                                </span>
-                                            </button>
-                                        </div>
-                                        <p class="mb-item__cuerpo">{{ o.cuerpo }}</p>
-                                    </div>
-                                </article>
-                            </div>
-                            <div v-else class="mb-vacio mb-vacio--inline">
-                                <div class="mb-vacio__ic">
-                                    <ClockCircleOutlined />
-                                </div>
-                                <div class="mb-vacio__t">Sin movimientos registrados</div>
-                                <div class="mb-vacio__s">Aquí verás las notas rápidas, seguimiento y supervisiones que
-                                    se registren para esta orden.</div>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="card card--trabajo">
                         <div class="card__head">
                             <div class="card__ico" style="--c: #6b4bc9">
@@ -787,18 +752,32 @@ const abrirFotoBitacora = (doc) => {
                             </div>
 
                             <div v-else class="trabajo-resumen">
-                                <div class="tr-grid">
-                                    <div v-for="b in resumenTrabajo" :key="b.key" class="tr-card"
-                                        :class="{ 'tr-card--vacio': !b.valor || b.valor === 'No especificado' }"
+                                <div class="tr-bloques-texto">
+                                    <div v-for="b in cardDiagnostico.filter(x => x.tipo === 'texto')" :key="b.key"
+                                        class="tr-bloque-texto"
+                                        :class="{ 'tr-bloque-texto--vacio': !b.valor || b.valor === 'No especificado' }"
                                         :style="{ '--c': b.color }">
-                                        <span class="tr-card__head">
-                                            <span class="tr-card__ic">
+                                        <span class="tr-bloque-texto__head">
+                                            <span class="tr-bloque-texto__ic">
                                                 <component :is="b.icono" />
                                             </span>
-                                            <span class="tr-card__l">{{ b.label }}</span>
+                                            <span class="tr-bloque-texto__l">{{ b.label }}</span>
                                         </span>
-                                        <span class="tr-card__v" :class="{ 'tr-card__v--mono': b.mono }">
+                                        <span class="tr-bloque-texto__v">
                                             {{ b.valor || 'Sin registrar' }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="tr-costos-linea">
+                                    <div v-for="b in cardDiagnostico.filter(x => x.tipo === 'mono')" :key="b.key"
+                                        class="tr-costo-chip" :style="{ '--c': b.color }">
+                                        <span class="tr-costo-chip__ic">
+                                            <component :is="b.icono" />
+                                        </span>
+                                        <span class="tr-costo-chip__t">
+                                            <span class="tr-costo-chip__l">{{ b.label }}</span>
+                                            <span class="tr-costo-chip__v">{{ b.valor }}</span>
                                         </span>
                                     </div>
                                 </div>
@@ -876,9 +855,80 @@ const abrirFotoBitacora = (doc) => {
             </div>
         </div>
 
-        <!-- ==========================================================
-             MODAL DIAGNÓSTICO Y TRABAJO — más ancho, 2 columnas
-             ========================================================== -->
+        <!-- MODAL BITÁCORA (sin botón Agregar) -->
+        <a-modal v-model:open="modalBitacora" :footer="null" :closable="false" :width="720" centered
+            class="modal-bitacora" :mask-closable="true">
+            <div class="modal-bitacora__wrap">
+                <header class="mb-head">
+                    <div class="mb-head__ico">
+                        <ClockCircleOutlined />
+                    </div>
+                    <div class="mb-head__meta">
+                        <div class="mb-head__row">
+                            <h2 class="mb-head__titulo">Bitácora</h2>
+                            <span class="mb-head__badge">
+                                <MessageOutlined /> {{ bitacoraTotal }} movimiento{{ bitacoraTotal === 1 ? '' : 's' }}
+                            </span>
+                            <span v-if="bitacoraConFoto" class="mb-head__badge">
+                                <CameraOutlined /> {{ bitacoraConFoto }} con foto
+                            </span>
+                        </div>
+                        <p class="mb-head__sub">Notas rápidas, seguimiento y supervisiones de esta orden.</p>
+                    </div>
+                    <button type="button" class="mb-head__close" title="Cerrar"
+                        @click="modalBitacora = false">✕</button>
+                </header>
+
+                <div class="mb-body">
+                    <div v-if="m.bitacora?.length" class="mb-scroll">
+                        <div class="mb-list mb-list--inline">
+                            <article v-for="(o, i) in (m.bitacora ?? [])" :key="o.id" class="mb-item"
+                                :class="{ 'mb-item--supervision': o.tipo === 'supervision' }">
+                                <div class="mb-item__rail">
+                                    <span class="mb-item__ic">
+                                        <component :is="o.tipo === 'supervision' ? FlagOutlined : MessageOutlined" />
+                                    </span>
+                                    <span v-if="i < m.bitacora.length - 1" class="mb-item__linea"></span>
+                                </div>
+                                <div class="mb-item__card">
+                                    <div class="mb-item__card-head">
+                                        <span class="mb-item__avatar"
+                                            :style="{ background: o.tipo === 'supervision' ? 'linear-gradient(135deg, #6b4bc9, #563a9e)' : 'linear-gradient(135deg, #0d84c9, #0a6ba6)' }">
+                                            {{ (o.usuario?.nombre ?? 'S').charAt(0).toUpperCase() }}
+                                        </span>
+                                        <div class="mb-item__user">
+                                            <span class="mb-item__user-name">{{ o.usuario?.nombre ?? 'Sistema' }}</span>
+                                            <span class="mb-item__user-time">
+                                                <ClockCircleOutlined /> {{ fecha(o.created_at) }}
+                                            </span>
+                                        </div>
+                                        <span v-if="o.evidencias?.length" class="mb-item__conteo">
+                                            <CameraOutlined /> {{ o.evidencias.length }}
+                                        </span>
+                                    </div>
+                                    <p class="mb-item__cuerpo">{{ o.cuerpo }}</p>
+                                    <GaleriaEvidencias v-if="o.evidencias?.length" :documentos="o.evidencias" class="mb-item__fotos" />
+                                </div>
+                            </article>
+                        </div>
+                    </div>
+                    <div v-else class="mb-vacio mb-vacio--inline">
+                        <div class="mb-vacio__ic">
+                            <ClockCircleOutlined />
+                        </div>
+                        <div class="mb-vacio__t">Sin movimientos registrados</div>
+                        <div class="mb-vacio__s">Aquí verás las notas rápidas, seguimiento y supervisiones que
+                            se registren para esta orden.</div>
+                    </div>
+                </div>
+
+                <footer class="mb-footer">
+                    <a-button size="large" @click="modalBitacora = false">Cerrar</a-button>
+                </footer>
+            </div>
+        </a-modal>
+
+        <!-- MODAL DIAGNÓSTICO Y TRABAJO -->
         <a-modal v-model:open="modalTrabajo" :footer="null" :closable="false" :width="980" centered
             class="modal-trabajo" :mask-closable="!formTrabajo.processing">
             <div class="modal-trabajo__wrap">
@@ -909,7 +959,6 @@ const abrirFotoBitacora = (doc) => {
                 </header>
 
                 <div class="mt2-body">
-                    <!-- Vista de solo lectura (2 columnas) -->
                     <div v-if="modoTrabajo === 'ver'" class="tv-list">
                         <div v-for="b in resumenTrabajo" :key="b.key" class="tv-bloque" :style="{ '--c': b.color }">
                             <div class="tv-bloque__head">
@@ -925,13 +974,11 @@ const abrirFotoBitacora = (doc) => {
                         </div>
                     </div>
 
-                    <!-- Vista de edición (2 columnas: dx/actividades, obs/costos) -->
                     <div v-else>
                         <a-alert v-if="!puede('mantenimientos.editar')" type="info" show-icon class="mb-3"
                             message="Solo lectura: no tienes permiso para editar la captura de trabajo." />
                         <a-form layout="vertical" :disabled="!puede('mantenimientos.editar')">
                             <div class="trabajo-grid-2x2">
-                                <!-- Fila 1: Diagnóstico | Actividades -->
                                 <section class="step">
                                     <div class="step__head">
                                         <span class="step__num">1</span>
@@ -970,7 +1017,6 @@ const abrirFotoBitacora = (doc) => {
                                     </div>
                                 </section>
 
-                                <!-- Fila 2: Observaciones | Costos -->
                                 <section class="step">
                                     <div class="step__head">
                                         <span class="step__num">3</span>
@@ -1088,20 +1134,6 @@ const abrirFotoBitacora = (doc) => {
                 :puede-eliminar="puede('documentos.desactivar') && !esCerrada" />
         </a-modal>
 
-        <ModalFicha :show="modalFotoBitacora" :titulo="fotoBitacora?.titulo ?? 'Evidencia'"
-            :subtitulo="fotoBitacora?.nombre_original" :icono="ToolOutlined" color="#e08a1e" max-width="lg"
-            @close="modalFotoBitacora = false">
-            <div v-if="fotoBitacora?.url" class="foto-modal">
-                <img :src="fotoBitacora.url" alt="Evidencia" />
-            </div>
-            <template #footer>
-                <a v-if="fotoBitacora" :href="route('documentos.download', fotoBitacora.id)"
-                    class="ant-btn ant-btn-default" target="_blank">Descargar</a>
-                <a v-if="fotoBitacora" :href="fotoBitacora.url" class="ant-btn ant-btn-primary" target="_blank">Abrir en
-                    nueva pestaña</a>
-            </template>
-        </ModalFicha>
-
         <a-modal v-model:open="modalCronologia" title="Cronología de la orden" :footer="null" :width="640">
             <a-timeline v-if="cronologia.length">
                 <a-timeline-item v-for="ev in cronologia" :key="ev.key" :color="ev.color">
@@ -1119,35 +1151,83 @@ const abrirFotoBitacora = (doc) => {
             <a-empty v-else description="Sin movimientos registrados" />
         </a-modal>
 
-        <!-- Cambiar estado -->
-        <a-modal v-model:open="modalEstado" ok-text="Confirmar" cancel-text="Cancelar"
-            :confirm-loading="formEstado.processing" class="modal-bonita" @ok="confirmarEstado">
-            <template #title>
-                <div class="modal-head" :style="{ '--c': ESTADO_COLOR_HEX[formEstado.estado] || '#173a5f' }">
-                    <span class="modal-head__ic">
+        <!-- Cambiar estado (SOLO IMÁGENES como evidencia) -->
+        <a-modal v-model:open="modalEstado" :footer="null" :closable="false" :width="640" centered
+            class="modal-estado" :style="{ '--c': ESTADO_COLOR_HEX[formEstado.estado] || '#173a5f' }"
+            :mask-closable="!formEstado.processing">
+            <div class="modal-estado__wrap">
+                <header class="me-head">
+                    <div class="me-head__ico">
                         <component :is="ICONO_ESTADO[formEstado.estado] || SwapOutlined" />
-                    </span>
-                    <div class="modal-head__t">
-                        <span class="modal-head__l">{{ ETIQUETA_ESTADO[formEstado.estado] || 'Cambiar estado' }}</span>
-                        <span class="modal-head__s">Registra este movimiento de la orden</span>
                     </div>
-                </div>
-            </template>
-            <div class="mov-section">
-                <span class="mov-section__l">Nota <small>(opcional)</small></span>
-                <a-textarea v-model:value="formEstado.nota" :rows="2"
-                    placeholder="Detalles adicionales del movimiento…" />
-            </div>
-            <div class="mov-section">
-                <span class="mov-section__l">Evidencia <span class="mov-req">*</span></span>
-                <p class="mov-section__hint">Foto, reporte o documento que respalde este movimiento.</p>
-                <CampoEvidencia v-model="formEstado.evidencia" />
-                <p v-if="formEstado.errors.evidencia" class="mov-error">{{ formEstado.errors.evidencia }}</p>
+                    <div class="me-head__meta">
+                        <div class="me-head__row">
+                            <h2 class="me-head__titulo">{{ ETIQUETA_ESTADO[formEstado.estado] || 'Cambiar estado' }}</h2>
+                            <span class="me-head__badge">
+                                <SwapOutlined /> Cambio de estado
+                            </span>
+                        </div>
+                        <p class="me-head__sub">Registra este movimiento de la orden.</p>
+                    </div>
+                    <button type="button" class="me-head__close" :disabled="formEstado.processing" title="Cerrar"
+                        @click="cerrarEstado">✕</button>
+                </header>
+
+                <form class="me-body" @submit.prevent="confirmarEstado">
+                    <section class="step">
+                        <div class="step__head">
+                            <span class="step__num">1</span>
+                            <div class="step__meta">
+                                <span class="step__title">
+                                    <FileTextOutlined /> Nota
+                                </span>
+                                <span class="step__sub">¿Qué pasó en este movimiento?</span>
+                            </div>
+                        </div>
+                        <div class="step__body">
+                            <a-textarea v-model:value="formEstado.nota" :rows="3"
+                                placeholder="Detalles adicionales del movimiento…" show-count :maxlength="500" />
+                            <p v-if="formEstado.errors.nota" class="error-msg">{{ formEstado.errors.nota }}</p>
+                        </div>
+                    </section>
+
+                    <section class="step step--preview">
+                        <div class="step__head">
+                            <span class="step__num">2</span>
+                            <div class="step__meta">
+                                <span class="step__title">
+                                    <CheckCircleOutlined /> Evidencia
+                                    <small v-if="EVIDENCIA_OPCIONAL.includes(formEstado.estado)">(opcional)</small>
+                                </span>
+                                <span class="step__sub">
+                                    {{ EVIDENCIA_OPCIONAL.includes(formEstado.estado)
+                                        ? 'Adjunta una imagen que respalde este movimiento, si quieres.'
+                                        : 'Adjunta una imagen que respalde este movimiento.' }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="step__body">
+                            <CampoEvidencias v-model="formEstado.evidencias" />
+                            <p v-if="formEstado.errors.evidencias" class="error-msg">{{ formEstado.errors.evidencias }}</p>
+                        </div>
+                    </section>
+                </form>
+
+                <footer class="me-footer">
+                    <a-button size="large" :disabled="formEstado.processing" @click="cerrarEstado">Cancelar</a-button>
+                    <a-button type="primary" size="large" class="btn-submit" :loading="formEstado.processing"
+                        :disabled="formEstado.processing" @click="confirmarEstado">
+                        <template #icon>
+                            <component :is="ICONO_ESTADO[formEstado.estado] || SwapOutlined" />
+                        </template>
+                        Confirmar
+                    </a-button>
+                </footer>
             </div>
         </a-modal>
 
         <!-- REPROGRAMAR -->
-        <a-modal v-model:open="modalReprogramar" :footer="null" :closable="false" :width="720" centered
+        <a-modal v-model:open="modalReprogramar" :footer="null" :closable="false" :width="1020" centered
             class="modal-reprogramar" :mask-closable="!formReprogramar.processing">
             <div class="modal-reprogramar__wrap">
                 <header class="mr-head">
@@ -1235,9 +1315,9 @@ const abrirFotoBitacora = (doc) => {
                             </div>
                         </div>
                         <div class="step__body">
-                            <CampoEvidencia v-model="formReprogramar.evidencia" />
-                            <p v-if="formReprogramar.errors.evidencia" class="error-msg">{{
-                                formReprogramar.errors.evidencia }}
+                            <CampoEvidencias v-model="formReprogramar.evidencias" />
+                            <p v-if="formReprogramar.errors.evidencias" class="error-msg">{{
+                                formReprogramar.errors.evidencias }}
                             </p>
                         </div>
                     </section>
@@ -1257,9 +1337,7 @@ const abrirFotoBitacora = (doc) => {
             </div>
         </a-modal>
 
-        <!-- ==========================================================
-             MODAL ASIGNAR TÉCNICO — sin Notas
-             ========================================================== -->
+        <!-- MODAL ASIGNAR TÉCNICO -->
         <a-modal v-model:open="modalTecnico" :footer="null" :closable="false" :width="820" centered
             class="modal-tecnico" :mask-closable="!formTecnico.processing">
             <div class="modal-tecnico__wrap">
@@ -1286,7 +1364,6 @@ const abrirFotoBitacora = (doc) => {
 
                 <div class="mt-body">
                     <a-form layout="vertical">
-                        <!-- Fila 2x2: Selecciona técnico | Rol y notas -->
                         <div class="tecnico-grid-2x2">
                             <section class="step">
                                 <div class="step__head">
@@ -1332,7 +1409,6 @@ const abrirFotoBitacora = (doc) => {
                             </section>
                         </div>
 
-                        <!-- Vista previa abajo (ancho completo) -->
                         <section v-if="tecnicoSeleccionado" class="step step--preview">
                             <div class="step__head">
                                 <span class="step__num">3</span>
@@ -1352,7 +1428,7 @@ const abrirFotoBitacora = (doc) => {
                                         <span class="tec-preview__nombre">{{ tecnicoSeleccionado.nombre }}</span>
                                         <span class="tec-preview__sub">
                                             {{ tecnicoSeleccionado.recomendado ? '⭐ Recomendado para esta orden' :
-                                            'Técnico asignable' }}
+                                                'Técnico asignable' }}
                                         </span>
                                     </div>
                                 </div>
@@ -1511,11 +1587,9 @@ const abrirFotoBitacora = (doc) => {
             </div>
         </a-modal>
 
-        <!-- ==========================================================
-             MODAL AGREGAR OBSERVACIÓN — rediseñado
-             ========================================================== -->
-        <a-modal v-model:open="modalObs" :footer="null" :closable="false" :width="640" centered
-            class="modal-obs" :mask-closable="!formObs.processing">
+        <!-- MODAL AGREGAR OBSERVACIÓN (queda disponible por si se reactiva) -->
+        <a-modal v-model:open="modalObs" :footer="null" :closable="false" :width="640" centered class="modal-obs"
+            :mask-closable="!formObs.processing">
             <div class="modal-obs__wrap">
                 <header class="mo-head">
                     <div class="mo-head__ico">
@@ -1612,12 +1686,12 @@ const abrirFotoBitacora = (doc) => {
         </a-modal>
 
         <ConfirmarDialog ref="confirmar" />
-    </AppLayout>
+        </AppLayout>
 </template>
 
 <style scoped>
 /* ==========================================================
-   BOTONES HERO (acciones del header) — aplicados
+   BOTONES HERO
    ========================================================== */
 .btn-hero {
     position: relative;
@@ -1777,29 +1851,38 @@ const abrirFotoBitacora = (doc) => {
 /* ==========================================================
    Base
    ========================================================== */
-.foto-modal {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    padding: 0;
-    margin: 0;
-    max-height: 65vh;
-    overflow: hidden;
-}
-
-.foto-modal img {
-    max-width: 100%;
-    max-height: 65vh;
-    object-fit: contain;
-    border-radius: 8px;
-}
-
+/* ==========================================================
+   SCROLL DE PANTALLA ACTIVADO
+   ========================================================== */
 .ficha-compacta {
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-height: 0;
+    max-height: calc(100vh - 130px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scroll-behavior: smooth;
+}
+
+.ficha-compacta::-webkit-scrollbar {
+    width: 10px;
+}
+
+.ficha-compacta::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 5px;
+}
+
+.ficha-compacta::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 5px;
+}
+
+.ficha-compacta::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 .estado-tag,
@@ -1824,6 +1907,9 @@ const abrirFotoBitacora = (doc) => {
     font-size: 12px;
 }
 
+/* ==========================================================
+   Problema-card + botón Bitácora
+   ========================================================== */
 .problema-card {
     display: flex;
     gap: 14px;
@@ -1893,6 +1979,90 @@ const abrirFotoBitacora = (doc) => {
     color: var(--sigam-texto);
 }
 
+.btn-bitacora {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 46px;
+    padding: 0 14px 0 8px;
+    border-radius: 12px;
+    border: 1px solid #cfe3f2;
+    background: linear-gradient(135deg, #eef6fc 0%, #e0effb 100%);
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+    overflow: hidden;
+    transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease, filter 0.14s ease;
+}
+
+.btn-bitacora:hover {
+    transform: translateY(-1px);
+    border-color: #0d84c9;
+    box-shadow: 0 8px 20px -8px rgba(13, 132, 201, 0.55);
+    filter: brightness(1.02);
+}
+
+.btn-bitacora:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.btn-bitacora__ic {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    color: #fff;
+    background: linear-gradient(135deg, #0d84c9 0%, #0a6ba6 100%);
+    box-shadow: 0 4px 10px -3px rgba(13, 132, 201, 0.6);
+}
+
+.btn-bitacora__txt {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    text-align: left;
+    line-height: 1.1;
+    min-width: 0;
+}
+
+.btn-bitacora__l {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #0a4c78;
+}
+
+.btn-bitacora__s {
+    font-size: 10px;
+    font-weight: 600;
+    color: #0d6ca6;
+}
+
+.btn-bitacora__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #0d84c9 0%, #0a6ba6 100%);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    box-shadow: 0 3px 8px -2px rgba(13, 132, 201, 0.55);
+    flex-shrink: 0;
+}
+
+/* ==========================================================
+   Grid principal
+   ========================================================== */
 .grid-ficha {
     display: grid;
     grid-template-columns: 1.15fr 1fr;
@@ -1974,19 +2144,6 @@ const abrirFotoBitacora = (doc) => {
     padding: 12px 15px;
 }
 
-/* Card bitácora: fondo distinto, altura reducida */
-.card--bitacora .card__head {
-    background: linear-gradient(120deg, #eef6fc, #fff 70%);
-}
-
-.card__body--bitacora {
-    padding: 10px 12px;
-    max-height: 280px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-}
-
-/* Botón "Asignar" con letra blanca siempre */
 .btn-asignar-tecnico {
     color: #ffffff !important;
     font-weight: 700;
@@ -2046,6 +2203,9 @@ const abrirFotoBitacora = (doc) => {
     color: #0d6ca6;
 }
 
+/* ==========================================================
+   Mini-cards
+   ========================================================== */
 .mini-grid {
     display: grid;
     gap: 8px;
@@ -2053,6 +2213,14 @@ const abrirFotoBitacora = (doc) => {
 
 .mini-grid--2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mini-grid--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mini-grid--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .mini-grid--full {
@@ -2072,6 +2240,7 @@ const abrirFotoBitacora = (doc) => {
     background: color-mix(in srgb, var(--c) 6%, #fff);
     border: 1px solid color-mix(in srgb, var(--c) 18%, transparent);
     transition: transform 0.14s ease, box-shadow 0.14s ease;
+    min-width: 0;
 }
 
 .mini:hover {
@@ -2097,6 +2266,7 @@ const abrirFotoBitacora = (doc) => {
     flex-direction: column;
     min-width: 0;
     gap: 0;
+    flex: 1;
 }
 
 .mini__l {
@@ -2105,6 +2275,9 @@ const abrirFotoBitacora = (doc) => {
     font-weight: 700;
     color: var(--sigam-tenue);
     line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .mini__v {
@@ -2113,6 +2286,31 @@ const abrirFotoBitacora = (doc) => {
     color: var(--sigam-texto);
     word-break: break-word;
     line-height: 1.22;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Programado: fecha arriba y hora abajo */
+.mini__v--fecha {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--sigam-texto);
+    line-height: 1.15;
+    -webkit-line-clamp: 1;
+    white-space: nowrap;
+}
+
+.mini__v--hora {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sigam-tenue);
+    line-height: 1.15;
+    -webkit-line-clamp: 1;
+    white-space: nowrap;
+    margin-top: 1px;
 }
 
 .normas-inline {
@@ -2132,26 +2330,29 @@ const abrirFotoBitacora = (doc) => {
     color: var(--sigam-tenue);
 }
 
+/* ==========================================================
+   Diagnóstico y trabajo — versión simplificada
+   ========================================================== */
 .diagnostico-vacio {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     flex-wrap: wrap;
-    padding: 14px 16px;
+    padding: 16px 18px;
     border: 1px dashed #c9b8f0;
     border-radius: 12px;
     background: linear-gradient(120deg, #f5efff 0%, #fff 80%);
 }
 
 .diagnostico-vacio__ico {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     flex: none;
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 19px;
+    font-size: 20px;
     color: #fff;
     background: linear-gradient(135deg, #6b4bc9 0%, #563a9e 100%);
     box-shadow: 0 5px 14px rgba(107, 75, 201, 0.32);
@@ -2165,15 +2366,15 @@ const abrirFotoBitacora = (doc) => {
 .diagnostico-vacio__t {
     font-weight: 800;
     color: var(--sigam-navy);
-    font-size: 13px;
+    font-size: 13.5px;
     line-height: 1.2;
 }
 
 .diagnostico-vacio__s {
     font-size: 11.5px;
     color: var(--sigam-tenue);
-    margin-top: 2px;
-    line-height: 1.35;
+    margin-top: 3px;
+    line-height: 1.4;
 }
 
 .btn-diagnosticar {
@@ -2210,96 +2411,161 @@ const abrirFotoBitacora = (doc) => {
 .trabajo-resumen {
     display: flex;
     flex-direction: column;
+    gap: 12px;
+}
+
+.tr-bloques-texto {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
 }
 
-.tr-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.tr-card {
+.tr-bloque-texto {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    padding: 9px 10px;
-    border-radius: 11px;
+    gap: 7px;
+    padding: 11px 12px;
+    border-radius: 12px;
     background: color-mix(in srgb, var(--c) 5%, #fff);
-    border: 1px solid color-mix(in srgb, var(--c) 20%, transparent);
-    border-left: 3px solid var(--c);
+    border: 1px solid color-mix(in srgb, var(--c) 18%, transparent);
+    border-left: 4px solid var(--c);
     min-width: 0;
+    transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 
-.tr-card--vacio {
+.tr-bloque-texto:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--c) 18%, transparent);
+}
+
+.tr-bloque-texto--vacio {
     background: #fafbfc;
     border-color: var(--sigam-borde-suave);
     border-left-color: var(--sigam-tenue);
 }
 
-.tr-card__head {
+.tr-bloque-texto__head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     min-width: 0;
 }
 
-.tr-card__ic {
-    width: 20px;
-    height: 20px;
+.tr-bloque-texto__ic {
+    width: 22px;
+    height: 22px;
     flex-shrink: 0;
     border-radius: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 11px;
     color: #fff;
     background: var(--c);
 }
 
-.tr-card--vacio .tr-card__ic {
+.tr-bloque-texto--vacio .tr-bloque-texto__ic {
     background: var(--sigam-tenue);
 }
 
-.tr-card__l {
-    font-size: 9.5px;
+.tr-bloque-texto__l {
+    font-size: 10px;
     font-weight: 800;
     text-transform: uppercase;
+    letter-spacing: 0.03em;
     color: color-mix(in srgb, var(--c) 80%, #000);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.tr-card--vacio .tr-card__l {
+.tr-bloque-texto--vacio .tr-bloque-texto__l {
     color: var(--sigam-tenue);
 }
 
-.tr-card__v {
-    font-size: 11.5px;
+.tr-bloque-texto__v {
+    font-size: 12px;
     font-weight: 600;
     color: var(--sigam-texto);
-    line-height: 1.3;
+    line-height: 1.45;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    min-height: 30px;
+    min-height: 34px;
 }
 
-.tr-card__v--mono {
-    font-size: 13px;
-    font-weight: 800;
-    color: var(--sigam-navy);
-    -webkit-line-clamp: 1;
-    min-height: auto;
-}
-
-.tr-card--vacio .tr-card__v {
+.tr-bloque-texto--vacio .tr-bloque-texto__v {
     color: var(--sigam-tenue);
     font-style: italic;
     font-weight: 400;
+}
+
+.tr-costos-linea {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.tr-costo-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--c) 8%, #fff);
+    border: 1px solid color-mix(in srgb, var(--c) 22%, transparent);
+    border-left: 4px solid var(--c);
+    min-width: 0;
+    transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.tr-costo-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--c) 20%, transparent);
+}
+
+.tr-costo-chip__ic {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #fff;
+    background: var(--c);
+    box-shadow: 0 3px 8px -3px color-mix(in srgb, var(--c) 60%, transparent);
+}
+
+.tr-costo-chip__t {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1;
+}
+
+.tr-costo-chip__l {
+    font-size: 9.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: color-mix(in srgb, var(--c) 85%, #000);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tr-costo-chip__v {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--sigam-navy);
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .btn-ver-trabajo {
@@ -2307,7 +2573,7 @@ const abrirFotoBitacora = (doc) => {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    height: 36px;
+    height: 40px;
     padding: 0 16px;
     border: 1px solid #c9b8f0;
     border-radius: 10px;
@@ -2318,6 +2584,7 @@ const abrirFotoBitacora = (doc) => {
     font-weight: 700;
     cursor: pointer;
     transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+    width: 100%;
 }
 
 .btn-ver-trabajo:hover {
@@ -2326,6 +2593,9 @@ const abrirFotoBitacora = (doc) => {
     box-shadow: 0 6px 14px rgba(107, 75, 201, 0.22);
 }
 
+/* ==========================================================
+   Materiales
+   ========================================================== */
 .mat-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2459,6 +2729,9 @@ const abrirFotoBitacora = (doc) => {
     font-size: 14px;
 }
 
+/* ==========================================================
+   Técnicos
+   ========================================================== */
 .tecnicos {
     display: flex;
     flex-direction: column;
@@ -2542,103 +2815,330 @@ const abrirFotoBitacora = (doc) => {
     background: #fbeaea;
 }
 
-.modal-head {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+/* ==========================================================
+   MODAL CAMBIAR ESTADO
+   ========================================================== */
+.modal-estado :deep(.ant-modal-content) {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 18px;
+    box-shadow: 0 30px 80px -20px rgba(15, 37, 71, 0.45);
 }
 
-.modal-head__ic {
-    width: 38px;
-    height: 38px;
+.modal-estado :deep(.ant-modal-body) {
+    padding: 0;
+}
+
+.modal-estado__wrap {
+    display: flex;
+    flex-direction: column;
+    background: #f5f8fb;
+}
+
+.me-head {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    background: linear-gradient(135deg, #ffffff 0%, color-mix(in srgb, var(--c) 8%, #fff) 100%);
+    border-bottom: 1px solid color-mix(in srgb, var(--c) 22%, #e2e8f0);
     flex-shrink: 0;
-    border-radius: 11px;
+    overflow: hidden;
+}
+
+.me-head::before {
+    content: '';
+    position: absolute;
+    right: -60px;
+    top: -60px;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--c) 15%, transparent) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.me-head__ico {
+    position: relative;
+    z-index: 1;
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 13px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 20px;
     color: #fff;
     background: var(--c);
-    box-shadow: 0 8px 16px -8px color-mix(in srgb, var(--c) 70%, transparent);
+    box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--c) 70%, transparent);
 }
 
-.modal-head__t {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
+.me-head__meta {
+    position: relative;
+    z-index: 1;
+    flex: 1;
     min-width: 0;
 }
 
-.modal-head__l {
-    font-size: 16px;
-    font-weight: 800;
-    color: #0f172a;
-    line-height: 1.25;
-}
-
-.modal-head__s {
-    font-size: 12px;
-    color: var(--sigam-tenue);
-    font-weight: 500;
-}
-
-.modal-bonita :deep(.ant-modal-header) {
-    padding-bottom: 14px;
-}
-
-.modal-bonita :deep(.ant-modal-body) {
-    padding-top: 18px;
-}
-
-.modal-bonita__footer {
+.me-head__row {
     display: flex;
-    justify-content: flex-end;
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid var(--sigam-borde-suave);
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
-.mov-section {
-    margin-bottom: 18px;
+.me-head__titulo {
+    font-size: 17px;
+    font-weight: 800;
+    color: #173a5f;
+    margin: 0;
+    line-height: 1.2;
 }
 
-.mov-section:last-child {
-    margin-bottom: 0;
-}
-
-.mov-section__l {
-    display: block;
-    font-size: 11.5px;
+.me-head__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 10.5px;
     font-weight: 800;
     text-transform: uppercase;
-    color: var(--sigam-navy);
-    margin-bottom: 6px;
+    color: var(--c);
+    background: color-mix(in srgb, var(--c) 12%, #fff);
+    border: 1px solid color-mix(in srgb, var(--c) 25%, #fff);
 }
 
-.mov-section__l small {
-    text-transform: none;
-    font-weight: 500;
-    color: var(--sigam-tenue);
-}
-
-.mov-section__hint {
-    font-size: 11.5px;
-    color: var(--sigam-tenue);
-    margin: -2px 0 8px;
-}
-
-.mov-req {
-    color: #d64545;
-}
-
-.mov-error {
+.me-head__sub {
+    margin: 3px 0 0;
     font-size: 12px;
+    color: #7b8a9c;
+    line-height: 1.3;
+}
+
+.me-head__close {
+    position: relative;
+    z-index: 1;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+}
+
+.me-head__close:hover:not(:disabled) {
+    background: #fdecec;
+    border-color: #fecaca;
     color: #d64545;
-    margin-top: 6px;
+    transform: rotate(90deg);
+}
+
+.me-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 22px 6px;
+    background: #fff;
+}
+
+.me-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 22px;
+    background: linear-gradient(180deg, #fafcfe 0%, #ffffff 100%);
+    border-top: 1px solid #e2e8f0;
+    flex-shrink: 0;
+    box-shadow: 0 -6px 16px -12px rgba(15, 37, 71, 0.18);
+}
+
+.me-footer .btn-submit {
+    background: var(--c) !important;
+    border-color: var(--c) !important;
+    font-weight: 800;
+    box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--c) 65%, transparent);
+    transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+}
+
+.me-footer .btn-submit:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
 }
 
 /* ==========================================================
-   BITÁCORA — versión compacta con thumb grande en el header
+   MODAL BITÁCORA
+   ========================================================== */
+.modal-bitacora :deep(.ant-modal-content) {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 18px;
+    box-shadow: 0 30px 80px -20px rgba(15, 37, 71, 0.45);
+}
+
+.modal-bitacora :deep(.ant-modal-body) {
+    padding: 0;
+}
+
+.modal-bitacora__wrap {
+    display: flex;
+    flex-direction: column;
+    background: #f5f8fb;
+    max-height: 85vh;
+}
+
+.mb-head {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    background: linear-gradient(135deg, #ffffff 0%, #eef6fc 100%);
+    border-bottom: 1px solid #cfe3f2;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.mb-head::before {
+    content: '';
+    position: absolute;
+    right: -60px;
+    top: -60px;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(13, 132, 201, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.mb-head__ico {
+    position: relative;
+    z-index: 1;
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: #fff;
+    background: linear-gradient(135deg, #0d84c9 0%, #0a6ba6 100%);
+    box-shadow: 0 8px 20px -8px rgba(13, 132, 201, 0.65);
+}
+
+.mb-head__meta {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    min-width: 0;
+}
+
+.mb-head__row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mb-head__titulo {
+    font-size: 17px;
+    font-weight: 800;
+    color: #173a5f;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.mb-head__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #0d6ca6;
+    background: #e8f3fb;
+    border: 1px solid #cfe3f2;
+}
+
+.mb-head__sub {
+    margin: 3px 0 0;
+    font-size: 12px;
+    color: #7b8a9c;
+    line-height: 1.3;
+}
+
+.mb-head__close {
+    position: relative;
+    z-index: 1;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+}
+
+.mb-head__close:hover {
+    background: #fdecec;
+    border-color: #fecaca;
+    color: #d64545;
+    transform: rotate(90deg);
+}
+
+.mb-body {
+    padding: 14px 18px 16px;
+    background: #fff;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.mb-scroll {
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: 8px;
+    scrollbar-width: thin;
+}
+
+.mb-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+
+.mb-scroll::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.mb-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.mb-scroll::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ==========================================================
+   Bitácora (items)
    ========================================================== */
 .mb-list {
     display: flex;
@@ -2677,14 +3177,14 @@ const abrirFotoBitacora = (doc) => {
 }
 
 .mb-item__ic {
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
     flex-shrink: 0;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 11px;
     color: #fff;
     background: linear-gradient(135deg, #0d84c9 0%, #0a6ba6 100%);
     box-shadow: 0 0 0 2px #fff, 0 2px 6px -1px rgba(13, 132, 201, 0.4);
@@ -2709,10 +3209,10 @@ const abrirFotoBitacora = (doc) => {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    padding: 7px 9px;
-    margin-bottom: 8px;
-    border-radius: 9px;
+    gap: 6px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border-radius: 11px;
     background: #fbfdff;
     border: 1px solid #e2e8f0;
     border-left: 3px solid #0d84c9;
@@ -2733,19 +3233,19 @@ const abrirFotoBitacora = (doc) => {
 .mb-item__card-head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
 .mb-item__avatar {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     flex-shrink: 0;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 800;
     color: #fff;
     box-shadow: 0 2px 5px -2px rgba(15, 37, 71, 0.35);
@@ -2760,72 +3260,45 @@ const abrirFotoBitacora = (doc) => {
 }
 
 .mb-item__user-name {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 800;
     color: #173a5f;
     line-height: 1.15;
 }
 
 .mb-item__user-time {
-    font-size: 9.5px;
+    font-size: 10px;
     color: #7b8a9c;
     display: inline-flex;
     align-items: center;
     gap: 3px;
 }
 
-/* Cuadrito de evidencia más grande (40x40) */
-.mb-item__thumb {
-    position: relative;
-    width: 40px;
-    height: 40px;
-    flex-shrink: 0;
-    border-radius: 8px;
-    border: 1px solid #cfe3f2;
-    overflow: hidden;
-    cursor: pointer;
-    background: #0f2c4a;
-    padding: 0;
-    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
-}
-
-.mb-item__thumb img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.mb-item__thumb-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
+.mb-item__conteo {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    background: rgba(15, 44, 74, 0.55);
-    color: #fff;
-    font-size: 14px;
-    opacity: 0;
-    transition: opacity 0.18s ease;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #0d6ca6;
+    background: #e6f2fb;
+    border-radius: 999px;
+    padding: 2px 8px;
+    flex-shrink: 0;
 }
 
-.mb-item__thumb:hover {
-    transform: scale(1.08);
-    border-color: #0d84c9;
-    box-shadow: 0 6px 14px -6px rgba(13, 132, 201, 0.65);
-}
-
-.mb-item__thumb:hover .mb-item__thumb-overlay {
-    opacity: 1;
+.mb-item__fotos {
+    padding-left: 32px;
+    margin-top: 2px;
 }
 
 .mb-item__cuerpo {
     margin: 0;
-    font-size: 11.5px;
-    line-height: 1.4;
+    font-size: 12.5px;
+    line-height: 1.5;
     color: #2b3a4f;
     white-space: pre-line;
-    padding-left: 2px;
+    padding-left: 32px;
 }
 
 .mb-vacio {
@@ -2834,22 +3307,22 @@ const abrirFotoBitacora = (doc) => {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 24px 16px;
+    padding: 32px 16px;
     text-align: center;
 }
 
 .mb-vacio--inline {
-    padding: 20px 12px;
+    padding: 32px 12px;
 }
 
 .mb-vacio__ic {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: 12px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 17px;
+    font-size: 18px;
     color: #94a3b8;
     background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
@@ -2869,19 +3342,32 @@ const abrirFotoBitacora = (doc) => {
 }
 
 .mb-vacio__t {
-    font-size: 12.5px;
+    font-size: 13.5px;
     font-weight: 800;
     color: #173a5f;
-    margin-top: 2px;
+    margin-top: 4px;
 }
 
 .mb-vacio__s {
-    font-size: 11px;
+    font-size: 12px;
     color: #7b8a9c;
-    max-width: 280px;
-    line-height: 1.4;
+    max-width: 300px;
+    line-height: 1.45;
 }
 
+.mb-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 22px;
+    background: linear-gradient(180deg, #fafcfe 0%, #ffffff 100%);
+    border-top: 1px solid #e2e8f0;
+    flex-shrink: 0;
+    box-shadow: 0 -6px 16px -12px rgba(15, 37, 71, 0.18);
+}
+
+/* ==========================================================
+   Cronología
+   ========================================================== */
 .cron {
     display: flex;
     justify-content: space-between;
@@ -2929,7 +3415,7 @@ const abrirFotoBitacora = (doc) => {
 }
 
 /* ==========================================================
-   MODAL TRABAJO (diagnóstico) — más ancho, 2 columnas
+   MODAL TRABAJO
    ========================================================== */
 .modal-trabajo :deep(.ant-modal-content) {
     padding: 0;
@@ -3274,7 +3760,7 @@ const abrirFotoBitacora = (doc) => {
 }
 
 /* ==========================================================
-   MODAL TÉCNICO — nuevo color (azul)
+   MODAL TÉCNICO
    ========================================================== */
 .modal-tecnico :deep(.ant-modal-content) {
     padding: 0;
@@ -3804,7 +4290,7 @@ const abrirFotoBitacora = (doc) => {
 }
 
 /* ==========================================================
-   MODAL AGREGAR OBSERVACIÓN — rediseñado
+   MODAL OBSERVACIÓN
    ========================================================== */
 .modal-obs :deep(.ant-modal-content) {
     padding: 0;
@@ -3939,7 +4425,6 @@ const abrirFotoBitacora = (doc) => {
     background: #fff;
 }
 
-/* Selector de tipo como tarjetas */
 .obs-tipos {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -4244,29 +4729,16 @@ const abrirFotoBitacora = (doc) => {
     filter: brightness(1.06);
 }
 
-/* Responsive */
-@media (min-width: 1200px) {
-    .ficha-compacta {
-        max-height: calc(100vh - 100px);
-        overflow: hidden;
-    }
-
-    .grid-ficha {
-        min-height: 0;
-    }
-
-    .col-izq,
-    .col-der {
-        max-height: calc(100vh - 260px);
-        overflow-y: auto;
-        scrollbar-width: thin;
-        padding-right: 4px;
-    }
-}
-
+/* ==========================================================
+   Responsive
+   ========================================================== */
 @media (max-width: 1199px) {
     .grid-ficha {
         grid-template-columns: 1fr;
+    }
+
+    .mini-grid--4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -4278,17 +4750,20 @@ const abrirFotoBitacora = (doc) => {
     .tv-list {
         grid-template-columns: 1fr;
     }
+
+    .tr-bloques-texto {
+        grid-template-columns: 1fr;
+    }
+
+    .tr-costos-linea {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 @media (max-width: 767px) {
 
-    .tr-grid,
     .mat-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .tr-grid {
-        grid-template-rows: auto;
     }
 
     .rango {
@@ -4314,16 +4789,43 @@ const abrirFotoBitacora = (doc) => {
     .tecnico-grid-2x2 {
         grid-template-columns: 1fr;
     }
+
+    .mini-grid--3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .problema-card {
+        flex-wrap: wrap;
+    }
+
+    .btn-bitacora {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .ficha-compacta {
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
+    }
 }
 
 @media (max-width: 575px) {
-    .mini-grid--2 {
+
+    .mini-grid--2,
+    .mini-grid--3,
+    .mini-grid--4 {
         grid-template-columns: 1fr;
     }
 
     .problema-card {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .btn-bitacora {
+        width: 100%;
+        justify-content: flex-start;
     }
 
     .diagnostico-vacio {
@@ -4336,7 +4838,8 @@ const abrirFotoBitacora = (doc) => {
         justify-content: center;
     }
 
-    .tr-grid,
+    .tr-bloques-texto,
+    .tr-costos-linea,
     .mat-grid {
         grid-template-columns: 1fr;
     }
@@ -4349,7 +4852,8 @@ const abrirFotoBitacora = (doc) => {
     .mt-head,
     .mm-head,
     .mt2-head,
-    .mo-head {
+    .mo-head,
+    .mb-head {
         padding: 14px 16px;
     }
 
@@ -4357,7 +4861,8 @@ const abrirFotoBitacora = (doc) => {
     .mt-head__titulo,
     .mm-head__titulo,
     .mt2-head__titulo,
-    .mo-head__titulo {
+    .mo-head__titulo,
+    .mb-head__titulo {
         font-size: 15px;
     }
 
@@ -4365,7 +4870,8 @@ const abrirFotoBitacora = (doc) => {
     .mt-body,
     .mm-body,
     .mt2-body,
-    .mo-body {
+    .mo-body,
+    .mb-body {
         padding: 14px 16px 6px;
     }
 

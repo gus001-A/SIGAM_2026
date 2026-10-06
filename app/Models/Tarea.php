@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 /**
  * Tarea de seguimiento general (administrativa, no ligada a un equipo o
@@ -23,7 +24,8 @@ class Tarea extends Model
     protected $table = 'tareas';
 
     protected $fillable = [
-        'titulo', 'descripcion', 'fecha_limite', 'prioridad_id', 'estado', 'nota_avance', 'nota_cierre', 'nota_cancelacion',
+        'titulo', 'descripcion', 'fecha_limite', 'prioridad_id', 'clasificacion', 'proyecto_id', 'categoria_tarea_id',
+        'estado', 'nota_avance', 'nota_cierre', 'nota_cancelacion',
         'costo', 'iniciada_at', 'realizada_at', 'cancelada_at', 'creado_por',
     ];
 
@@ -53,6 +55,16 @@ class Tarea extends Model
         return $this->belongsTo(Prioridad::class);
     }
 
+    public function proyecto(): BelongsTo
+    {
+        return $this->belongsTo(Proyecto::class);
+    }
+
+    public function categoriaTarea(): BelongsTo
+    {
+        return $this->belongsTo(CategoriaTarea::class);
+    }
+
     public function creadoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'creado_por');
@@ -78,6 +90,41 @@ class Tarea extends Model
     public function materiales(): HasMany
     {
         return $this->hasMany(MaterialTarea::class);
+    }
+
+    /**
+     * Responsables activos que todavía no han hecho nada en la tarea desde que
+     * se inició. Mientras haya alguno, la tarea no puede pasar a realizada
+     * (salvo que el responsable principal decida cerrarla sin esperar).
+     *
+     * @return Collection<int, Usuario>
+     */
+    public function participantesPendientes(): Collection
+    {
+        return $this->asignaciones()->whereNull('desasignado_at')->with('usuario')->get()
+            ->filter(fn (TareaResponsable $a) => ! $this->historialEstados()
+                ->where('cambiado_por', $a->usuario_id)
+                ->when($this->iniciada_at, fn ($q) => $q->where('cambiado_at', '>=', $this->iniciada_at))
+                ->exists())
+            ->map(fn (TareaResponsable $a) => $a->usuario)
+            ->values();
+    }
+
+    /**
+     * Días de retraso con los que se completó la tarea: diferencia entre la
+     * fecha límite y el día en que se marcó como realizada. 0 si se entregó a
+     * tiempo y null si aún no está realizada (no hay fecha de cierre todavía).
+     */
+    public function diasRetraso(): ?int
+    {
+        if ($this->estado !== 'realizada' || blank($this->realizada_at) || blank($this->fecha_limite)) {
+            return null;
+        }
+
+        $diferencia = $this->fecha_limite->copy()->startOfDay()
+            ->diff($this->realizada_at->copy()->startOfDay());
+
+        return $diferencia->invert ? 0 : $diferencia->days;
     }
 
     /** El costo ya no se captura a mano: se recalcula a partir de los materiales. */

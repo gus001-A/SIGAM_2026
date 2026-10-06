@@ -38,7 +38,7 @@ const subirDoc = ref(null);
 const abrirPdf = () => subirDoc.value?.abrirPdf();
 const abrirImagen = () => subirDoc.value?.abrirImagen();
 
-const ROLES_DOC = ['evidencia', 'cotización', 'factura', 'foto'];
+const ROLES_DOC = ['evidencia', 'cotizacion', 'factura', 'foto'];
 
 const fecha = (v) => (v ? new Date(v).toLocaleDateString('es-MX') : 'No especificado');
 const fechaHora = (v) =>
@@ -221,6 +221,16 @@ const rechazar = () => {
    ========================================================== */
 const modalOrdenes = ref(false);
 const modalDocumentos = ref(false);
+
+/* ==========================================================
+   Callback cuando se sube un documento (para debug / UX)
+   ========================================================== */
+const onDocumentoSubido = (doc) => {
+    console.log('[Solicitud] Documento subido:', doc);
+};
+const onDocumentoError = (err) => {
+    console.error('[Solicitud] Error al subir documento:', err);
+};
 </script>
 
 <template>
@@ -251,7 +261,6 @@ const modalDocumentos = ref(false);
                         Rechazada
                     </span>
 
-                    <!-- Orden: primero Autorizar (primario), después Rechazar (danger) -->
                     <button
                         v-if="puedeConvertir"
                         type="button"
@@ -813,8 +822,10 @@ const modalDocumentos = ref(false);
             relacionable-tipo="solicitud"
             :relacionable-id="solicitud.id"
             :roles="ROLES_DOC"
+            @subido="onDocumentoSubido"
+            @error="onDocumentoError"
         />
-    </AppLayout>
+        </AppLayout>
 </template>
 
 <style scoped>
@@ -1613,7 +1624,7 @@ const modalDocumentos = ref(false);
 .rango {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
-    align-items: center;  /* centra verticalmente el "al" respecto a los inputs */
+    align-items: center;
     gap: 12px;
 }
 
@@ -1628,7 +1639,7 @@ const modalDocumentos = ref(false);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: 40px;  /* misma altura que el input grande */
+    height: 40px;
     padding: 0 8px;
     font-size: 12px;
     font-weight: 800;
@@ -1636,7 +1647,7 @@ const modalDocumentos = ref(false);
     letter-spacing: 0.08em;
     color: #7b8a9c;
     white-space: nowrap;
-    align-self: end;  /* alineado al final del row para quedar a la altura del input */
+    align-self: end;
     margin-bottom: 0;
 }
 

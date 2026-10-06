@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -87,6 +88,32 @@ class Usuario extends Authenticatable
     public function sucursalesResponsable(): HasMany
     {
         return $this->hasMany(Sucursal::class, 'responsable_id');
+    }
+
+    /**
+     * Sucursales que el usuario puede ver en todo el sistema (listados,
+     * filtros, selectores de "trabajar por sucursal"): el superadministrador
+     * ve todas las activas; cualquier otro rol queda acotado a las que
+     * tenga asignadas — nunca a las de alguien más.
+     */
+    public function sucursalesPermitidas(): Collection
+    {
+        if ($this->puedeVerTodasLasSucursales()) {
+            return Sucursal::activos()->orderBy('nombre')->get();
+        }
+
+        return $this->sucursales()->where('sucursales.estado', 'activo')->orderBy('nombre')->get();
+    }
+
+    /** @return list<int> */
+    public function sucursalIdsPermitidos(): array
+    {
+        return $this->sucursalesPermitidas()->pluck('id')->all();
+    }
+
+    public function puedeVerTodasLasSucursales(): bool
+    {
+        return $this->hasRole('superadministrador');
     }
 
     public function solicitudes(): HasMany

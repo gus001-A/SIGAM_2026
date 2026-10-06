@@ -28,6 +28,7 @@ const props = defineProps({
     mantenimientos: { type: Object, required: true },
     kpis: { type: Object, default: () => ({}) },
     sucursalId: { type: [Number, String], default: null },
+    puedeVerTodas: { type: Boolean, default: false },
     filtros: { type: Object, default: () => ({}) },
     orden: { type: Object, default: () => ({}) },
     catalogos: { type: Object, default: () => ({}) },
@@ -101,7 +102,7 @@ const opcionesFiltro = {
 };
 
 const opcionesSucursal = computed(() => [
-    { value: 'todas', label: 'Todas las sucursales' },
+    ...(props.puedeVerTodas ? [{ value: 'todas', label: 'Todas las sucursales' }] : []),
     ...opciones(props.catalogos.sucursales),
 ]);
 
@@ -114,7 +115,6 @@ const columns = [
     { title: 'Folio', key: 'folio', dataIndex: 'folio', sorter: true, filtro: 'texto', filtroClave: 'folio', width: 150 },
     { title: 'Equipo / instalación', key: 'objetivo', filtro: 'texto', filtroClave: 'equipo', width: 230 },
     { title: 'Tipo', key: 'tipo', filtro: 'select', filtroClave: 'tipo_id', width: 160 },
-    { title: 'Sucursal', key: 'sucursal', width: 150 },
     { title: 'Prioridad', key: 'prioridad', filtro: 'select', filtroClave: 'prioridad_id', width: 140 },
     { title: 'Estado', key: 'estado', filtro: 'select', filtroClave: 'estado_id', width: 160 },
     { title: 'Técnico(s)', key: 'tecnicos', filtro: 'select', filtroClave: 'tecnico_id', width: 180 },
@@ -329,14 +329,6 @@ const modalOrden = ref(null);
                         <span v-else class="vacio">—</span>
                     </template>
 
-                    <template v-else-if="column.key === 'sucursal'">
-                        <span v-if="record.sucursal" class="sucursal">
-                            <BankOutlined />
-                            {{ record.sucursal }}
-                        </span>
-                        <span v-else class="vacio">—</span>
-                    </template>
-
                     <template v-else-if="column.key === 'prioridad'">
                         <a-tag
                             v-if="record.prioridad"
@@ -371,6 +363,9 @@ const modalOrden = ref(null);
 
                     <template v-else-if="column.key === 'programado_inicio'">
                         <span class="fecha">{{ fecha(record.programado_inicio) }}</span>
+                        <div v-if="record.retraso_dias > 0" class="retraso">
+                            Realizada con {{ record.retraso_dias }} {{ record.retraso_dias === 1 ? 'día' : 'días' }} de retraso
+                        </div>
                     </template>
 
                     <template v-else-if="column.key === 'registrado'">
@@ -737,23 +732,6 @@ const modalOrden = ref(null);
 }
 
 /* ==========================================================
-   Sucursal
-   ========================================================== */
-.sucursal {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: #2b3a4f;
-}
-
-.sucursal .anticon {
-    color: #1f9e86;
-    font-size: 13px;
-}
-
-/* ==========================================================
    Tag de prioridad
    ========================================================== */
 .tag-prioridad {
@@ -868,6 +846,13 @@ const modalOrden = ref(null);
     font-weight: 600;
     color: #2b3a4f;
     font-variant-numeric: tabular-nums;
+}
+
+.retraso {
+    margin-top: 4px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #b45309;
 }
 
 /* ==========================================================

@@ -25,6 +25,7 @@ const props = defineProps({
     solicitudes: { type: Object, required: true },
     kpis: { type: Object, default: () => ({}) },
     sucursalId: { type: [Number, String], default: null },
+    puedeVerTodas: { type: Boolean, default: false },
     filtros: { type: Object, default: () => ({}) },
     orden: { type: Object, default: () => ({}) },
     catalogos: { type: Object, default: () => ({}) },
@@ -92,7 +93,7 @@ const opcionesFiltro = {
 };
 
 const opcionesSucursal = computed(() => [
-    { value: 'todas', label: 'Todas las sucursales' },
+    ...(props.puedeVerTodas ? [{ value: 'todas', label: 'Todas las sucursales' }] : []),
     ...opciones(props.catalogos.sucursales),
 ]);
 

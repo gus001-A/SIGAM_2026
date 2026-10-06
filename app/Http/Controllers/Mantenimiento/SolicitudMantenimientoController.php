@@ -42,7 +42,7 @@ class SolicitudMantenimientoController extends Controller
         $orden = in_array($request->query('orden'), self::ORDENABLES, true) ? $request->query('orden') : 'id';
         $dir = $request->query('dir') === 'asc' ? 'asc' : 'desc';
         $texto = fn (string $c): ?string => filled($request->query($c)) ? trim((string) $request->query($c)) : null;
-        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
+        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'), $request->user());
 
         // Alcance visible del usuario + sucursal (sin los demás filtros) para
         // los KPIs — se quedan estables al filtrar.
@@ -121,10 +121,11 @@ class SolicitudMantenimientoController extends Controller
             'solicitudes' => $solicitudes,
             'kpis' => $kpis,
             'sucursalId' => $sucursalId,
+            'puedeVerTodas' => $request->user()->puedeVerTodasLasSucursales(),
             'filtros' => $request->only(['folio', 'equipo', 'solicitante', 'prioridad_id', 'estado_id', 'desde', 'hasta', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => [
-                'sucursales' => Sucursal::activos()->orderBy('nombre')->get(['id', 'nombre']),
+                'sucursales' => $request->user()->sucursalesPermitidas(),
                 'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre', 'color']),
                 'estados' => EstadoMantenimiento::activos()->orderBy('orden')->get(['id', 'nombre', 'clave']),
                 'equipos' => $request->user()->can('solicitudes.crear')
@@ -203,6 +204,7 @@ class SolicitudMantenimientoController extends Controller
         ]);
 
         return Inertia::render('Mantenimiento/Solicitudes/Show', [
+            'bitacora' => $solicitud->bitacoraCambios(),
             'solicitud' => [
                 'id' => $solicitud->id,
                 'folio' => $solicitud->folio,

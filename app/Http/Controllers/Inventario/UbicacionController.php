@@ -27,7 +27,7 @@ class UbicacionController extends Controller
     {
         $this->authorize('ubicaciones.ver');
 
-        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
+        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'), $request->user());
         $modoTodas = $sucursalId === null;
 
         // Filtro de estado: 'activo' | 'inactivo' | null (= todos)
@@ -59,8 +59,9 @@ class UbicacionController extends Controller
         $creadores = Auditoria::creadoPorMasivo(Ubicacion::class, $ubicaciones->pluck('id'));
 
         return Inertia::render('Inventario/Ubicaciones/Index', [
-            'sucursales' => Sucursal::activos()->orderBy('nombre')->get(['id', 'nombre']),
+            'sucursales' => $request->user()->sucursalesPermitidas(),
             'sucursalSeleccionada' => $modoTodas ? SeleccionSucursal::TODAS : $sucursalId,
+            'puedeVerTodas' => $request->user()->puedeVerTodasLasSucursales(),
             'kpis' => [
                 'total' => $ubicaciones->count(),
                 'con_equipos' => $ubicaciones->where('equipos_count', '>', 0)->count(),

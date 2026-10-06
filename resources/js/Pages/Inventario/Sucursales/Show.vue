@@ -288,7 +288,7 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
         <SubirDocumento ref="subirDoc" relacionable-tipo="sucursal" :relacionable-id="sucursal.id"
             :roles="['contrato', 'plano', 'permiso', 'certificado']" />
         <ConfirmarDialog ref="confirmar" />
-    </AppLayout>
+        </AppLayout>
 </template>
 
 <style scoped>

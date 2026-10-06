@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * Orden de mantenimiento (preventivo / correctivo / urgente). Especificación v2.0 §5.12.
@@ -42,6 +43,31 @@ class Mantenimiento extends Model
             'costo_mano_obra' => 'decimal:2',
             'costo_otros' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Fecha límite de la orden: fin programado, o inicio si no se capturó fin.
+     */
+    public function fechaLimite(): ?Carbon
+    {
+        return $this->programado_fin ?? $this->programado_inicio;
+    }
+
+    /**
+     * Días de retraso con los que se completó la orden: diferencia entre la
+     * fecha límite y el día en que se marcó como realizada. 0 si se completó a
+     * tiempo y null si todavía no hay fecha de término.
+     */
+    public function diasRetraso(): ?int
+    {
+        if (blank($this->completado_at) || blank($this->fechaLimite())) {
+            return null;
+        }
+
+        $diferencia = $this->fechaLimite()->copy()->startOfDay()
+            ->diff($this->completado_at->copy()->startOfDay());
+
+        return $diferencia->invert ? 0 : $diferencia->days;
     }
 
     public function auditoriaModulo(): string
@@ -116,7 +142,7 @@ class Mantenimiento extends Model
 
     public function observaciones(): HasMany
     {
-        return $this->hasMany(ObservacionMantenimiento::class);
+        return $this->hasMany(ObservacionMantenimiento::class)->orderByDesc('id');
     }
 
     public function materiales(): HasMany

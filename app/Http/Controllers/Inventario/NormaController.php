@@ -105,7 +105,11 @@ class NormaController extends Controller
         $norma->load(['documento', 'documentos', 'equipos:id,codigo_activo,descripcion']);
         $norma->loadCount(['equipos', 'planes', 'mantenimientos']);
 
-        return Inertia::render('Normas/Show', ['norma' => $norma, 'sello' => $norma->selloAuditoria()]);
+        return Inertia::render('Normas/Show', [
+            'norma' => $norma,
+            'sello' => $norma->selloAuditoria(),
+            'bitacora' => $norma->bitacoraCambios(),
+        ]);
     }
 
     public function edit(Norma $norma): Response

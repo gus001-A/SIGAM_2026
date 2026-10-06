@@ -165,18 +165,8 @@ const reactivar = (norma) => router.put(route('normas.restore', norma.id), {}, {
         <!-- ==========================================================
              Barra unificada de filtros (limpiar aquí dentro)
              ========================================================== -->
-        <div class="barra-filtros">
-            <div class="barra-filtros__grupo">
-                <span class="barra-filtros__ic" style="--c: #0d84c9">
-                    <FileProtectOutlined />
-                </span>
-                <span class="barra-filtros__l">Filtrar por</span>
-                <span class="barra-filtros__hint">
-                    Usa los campos debajo de cada columna para acotar los resultados.
-                </span>
-            </div>
-
-            <a-button v-if="hayFiltros()" class="barra-filtros__limpiar" @click="limpiar">
+        <div v-if="hayFiltros()" class="barra-filtros">
+            <a-button class="barra-filtros__limpiar" @click="limpiar">
                 <template #icon>
                     <FilterOutlined />
                 </template>
@@ -222,7 +212,7 @@ const reactivar = (norma) => router.put(route('normas.restore', norma.id), {}, {
                                 class="norma__dot"
                                 :style="{ background: record.estado === 'activo' ? (record.revision_vencida ? '#d64545' : '#1f9e86') : '#94a3b8' }"
                             ></span>
-                            {{ record.codigo }}
+                            <span class="norma__txt">{{ record.codigo }}</span>
                             <PaperClipOutlined v-if="record.tiene_documento" class="norma__clip" />
                         </a>
                     </template>
@@ -572,13 +562,14 @@ const reactivar = (norma) => router.put(route('normas.restore', norma.id), {}, {
     color: #173a5f;
     cursor: pointer;
     text-decoration: none;
-    border-bottom: 1px dashed transparent;
-    transition: color 0.14s ease, border-color 0.14s ease;
+    transition: color 0.14s ease;
 }
 
-.norma:hover {
+.norma:hover .norma__txt {
     color: #0d84c9;
-    border-bottom-color: #0d84c9;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
 }
 
 .norma__dot {

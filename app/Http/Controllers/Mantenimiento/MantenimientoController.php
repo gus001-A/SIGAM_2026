@@ -7,8 +7,10 @@ use App\Http\Requests\Mantenimiento\GuardarMantenimientoRequest;
 use App\Models\Documento;
 use App\Models\Equipo;
 use App\Models\EstadoMantenimiento;
+use App\Models\HistorialEstadoMantenimiento;
 use App\Models\Mantenimiento;
 use App\Models\Material;
+use App\Models\ObservacionMantenimiento;
 use App\Models\Prioridad;
 use App\Models\Sucursal;
 use App\Models\TipoMantenimiento;
@@ -16,7 +18,7 @@ use App\Models\Ubicacion;
 use App\Models\Usuario;
 use App\Support\Auditoria;
 use App\Support\CicloMantenimiento;
-use App\Support\Documentos;
+use App\Support\Evidencias;
 use App\Support\Folios;
 use App\Support\SeleccionSucursal;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,6 +26,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,7 +47,7 @@ class MantenimientoController extends Controller
         $orden = in_array($request->query('orden'), self::ORDENABLES, true) ? $request->query('orden') : 'id';
         $dir = $request->query('dir') === 'asc' ? 'asc' : 'desc';
         $texto = fn (string $c): ?string => filled($request->query($c)) ? trim((string) $request->query($c)) : null;
-        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
+        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'), $request->user());
 
         // Alcance visible del usuario + sucursal (sin los demás filtros de
         // texto/columna) para los KPIs — se quedan estables al filtrar.
@@ -120,6 +123,7 @@ class MantenimientoController extends Controller
             'tecnicos' => $m->tecnicos->pluck('nombre')->implode(', '),
             'programado_inicio' => $m->programado_inicio,
             'completado_at' => $m->completado_at,
+            'retraso_dias' => $m->diasRetraso(),
             'creado_por' => $m->creadoPor?->nombre ?? ($creadores[$m->id]['usuario'] ?? null),
             'creado_en' => $creadores[$m->id]['fecha'] ?? null,
             'created_at' => $m->created_at,
@@ -129,6 +133,7 @@ class MantenimientoController extends Controller
             'mantenimientos' => $mantenimientos,
             'kpis' => $kpis,
             'sucursalId' => $sucursalId,
+            'puedeVerTodas' => $request->user()->puedeVerTodasLasSucursales(),
             'filtros' => $request->only(['folio', 'equipo', 'tipo_id', 'prioridad_id', 'estado_id', 'tecnico_id', 'desde', 'hasta', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => $this->catalogos($sucursalId),
@@ -182,6 +187,24 @@ class MantenimientoController extends Controller
             ->with('exito', "Orden {$mantenimiento->folio} creada.");
     }
 
+    /** Convierte un cambio de estado de la orden al formato de la bitácora. */
+    private function movimientoBitacora(HistorialEstadoMantenimiento $h): array
+    {
+        return [
+            'id' => 'h'.$h->id,
+            'accion' => 'estado',
+            'etiqueta' => $h->estadoOrigen ? 'Cambió estado' : 'Creó la orden',
+            'usuario' => $h->cambiadoPor?->nombre_completo ?? 'Sistema',
+            'fecha' => $h->cambiado_at?->toISOString(),
+            'nota' => $h->nota,
+            'cambios' => [[
+                'campo' => 'estado',
+                'antes' => $h->estadoOrigen?->nombre,
+                'despues' => $h->estadoDestino?->nombre,
+            ]],
+        ];
+    }
+
     public function show(Mantenimiento $mantenimiento): Response
     {
         $this->authorize('mantenimientos.ver');
@@ -201,6 +224,7 @@ class MantenimientoController extends Controller
             'asignaciones.tecnico:id,nombre',
             'asignaciones.asignadoPor:id,nombre',
             'observaciones.usuario:id,nombre',
+            'observaciones.evidencias',
             'materiales.material:id,nombre,unidad',
             'normas:id,codigo,nombre',
             'historialEstados.estadoOrigen:id,nombre,clave',
@@ -217,12 +241,20 @@ class MantenimientoController extends Controller
 
         // La relación `observaciones()` (bitácora) y la columna de texto
         // `observaciones` (captura de diagnóstico/trabajo) comparten nombre;
-        // al serializar, una relación cargada tapa el atributo del mismo
-        // nombre. Se expone la relación bajo otra llave para que ambas
-        // lleguen intactas al frontend.
-        $mantenimiento->setRelation('bitacora', $mantenimiento->getRelation('observaciones'));
+        // `$mantenimiento->observaciones` es ambiguo (Eloquent resuelve
+        // primero el atributo/columna), así que aquí también hay que usar
+        // getRelation() en vez de la propiedad mágica.
+        $bitacora = $mantenimiento->getRelation('observaciones');
+
+        // Cada foto expone la URL de previsualización segura (`url()` es un
+        // método normal del modelo, no una relación).
+        $bitacora->each(fn (ObservacionMantenimiento $o) => $o->evidencias
+            ->each(fn ($doc) => $doc->setAttribute('url', $doc->url())));
+
+        // Se expone la relación bajo otra llave para que, al serializar, no
+        // tape el atributo del mismo nombre.
+        $mantenimiento->setRelation('bitacora', $bitacora);
         $mantenimiento->unsetRelation('observaciones');
-        $this->adjuntarEvidenciaABitacora($mantenimiento);
 
         $data = $mantenimiento->toArray();
         $data['creado'] = [
@@ -232,6 +264,14 @@ class MantenimientoController extends Controller
 
         return Inertia::render('Mantenimiento/Ordenes/Show', [
             'mantenimiento' => $data,
+            'retrasoDias' => $mantenimiento->diasRetraso(),
+            'bitacora' => $mantenimiento->bitacoraCambios(30, $mantenimiento->loadMissing([
+                'historialEstados.estadoOrigen:id,nombre',
+                'historialEstados.estadoDestino:id,nombre',
+                'historialEstados.cambiadoPor:id,nombre,apellidos',
+            ])->historialEstados
+                ->map(fn (HistorialEstadoMantenimiento $h) => $this->movimientoBitacora($h))
+                ->all()),
             'sello' => $mantenimiento->selloAuditoria(),
             'transicionesPosibles' => CicloMantenimiento::siguientes($mantenimiento->estado->clave),
             'faltantesCierre' => CicloMantenimiento::validarCierre($mantenimiento),
@@ -241,40 +281,6 @@ class MantenimientoController extends Controller
                 'materiales' => Material::activos()->orderBy('nombre')->get(['id', 'nombre', 'unidad', 'costo_referencia']),
             ],
         ]);
-    }
-
-    /**
-     * transicion()/reprogramar() crean, en la misma transacción, tanto la
-     * entrada de bitácora como su documento de evidencia con un título
-     * predecible ("Evidencia: {estado}" / "Evidencia: reprogramación").
-     * Se empareja aquí para que la vista muestre la foto junto al
-     * movimiento sin tener que adivinarlo en el frontend.
-     */
-    private function adjuntarEvidenciaABitacora(Mantenimiento $mantenimiento): void
-    {
-        $documentos = $mantenimiento->documentos;
-
-        $mantenimiento->bitacora->each(function ($obs) use ($documentos): void {
-            // `ConvierteMayusculas` ya guardó `cuerpo` y `titulo` en mayúsculas
-            // (ver camposMayusculas() de ObservacionMantenimiento/Documento).
-            $cuerpo = mb_strtoupper((string) $obs->cuerpo);
-            if (preg_match('/^SE MOVIÓ LA ORDEN A «(.+?)»\./u', $cuerpo, $coincidencia)) {
-                $titulo = mb_strtoupper("Evidencia: {$coincidencia[1]}");
-            } elseif (str_starts_with($cuerpo, 'SE REPROGRAMÓ LA ORDEN:')) {
-                $titulo = mb_strtoupper('Evidencia: reprogramación');
-            } else {
-                return;
-            }
-
-            $documento = $documentos
-                ->where('titulo', $titulo)
-                ->sortBy(fn (Documento $d) => abs($d->created_at->diffInSeconds($obs->created_at)))
-                ->first();
-
-            if ($documento) {
-                $obs->setAttribute('evidencia', $documento);
-            }
-        });
     }
 
     private function tecnicosConRecomendacion(Mantenimiento $mantenimiento): Collection
@@ -328,8 +334,13 @@ class MantenimientoController extends Controller
 
         $datos = $request->validate([
             'estado' => ['required', 'string'],
-            'nota' => ['nullable', 'string', 'max:500'],
-            'evidencia' => ['required', 'file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp'],
+            'nota' => ['required', 'string', 'max:500'],
+            // La evidencia es obligatoria para avanzar, menos al supervisar.
+            'evidencias' => [
+                Rule::requiredIf(fn () => ! in_array($request->input('estado'), ['supervisado', 'cerrado'], true)),
+                'array', 'max:'.Evidencias::MAXIMO,
+            ],
+            'evidencias.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp'],
         ]);
 
         $origen = $mantenimiento->estado->clave;
@@ -373,20 +384,20 @@ class MantenimientoController extends Controller
                 'cambiado_at' => now(),
             ]);
 
-            Documentos::adjuntarEvidencia(
-                $mantenimiento,
-                $request->file('evidencia'),
-                $request->user()->id,
-                "Evidencia: {$estadoDestino->nombre}",
-            );
-
-            // 👇 NUEVO: registrar el movimiento en la bitácora (observaciones)
-            $mantenimiento->observaciones()->create([
+            $movimiento = $mantenimiento->observaciones()->create([
                 'tipo' => 'comentario',
                 'cuerpo' => "Se movió la orden a «{$estadoDestino->nombre}»."
                                 .(! empty($datos['nota']) ? " Nota: {$datos['nota']}" : ''),
                 'usuario_id' => $request->user()->id,
             ]);
+
+            Evidencias::adjuntar(
+                $mantenimiento,
+                $movimiento,
+                $request->file('evidencias', []),
+                $request->user()->id,
+                "Evidencia: {$estadoDestino->nombre}",
+            );
         });
 
         return back()->with('exito', "Orden movida a «{$destino}».");
@@ -400,7 +411,8 @@ class MantenimientoController extends Controller
             'programado_inicio' => ['required', 'date', 'after_or_equal:today'],
             'programado_fin' => ['nullable', 'date', 'after:programado_inicio'],
             'motivo' => ['required', 'string', 'max:500'],
-            'evidencia' => ['required', 'file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp'],
+            'evidencias' => ['required', 'array', 'min:1', 'max:'.Evidencias::MAXIMO],
+            'evidencias.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp'],
         ], [
             'programado_inicio.after_or_equal' => 'La nueva fecha no puede ser anterior a hoy.',
             'programado_fin.after' => 'La fecha de fin debe ser posterior a la de inicio.',
@@ -422,19 +434,19 @@ class MantenimientoController extends Controller
                 'programado_fin' => $datos['programado_fin'] ?? null,
             ]);
 
-            Documentos::adjuntarEvidencia(
-                $mantenimiento,
-                $request->file('evidencia'),
-                $request->user()->id,
-                'Evidencia: reprogramación',
-            );
-
-            // 👇 Registrar también la reprogramación en bitácora
-            $mantenimiento->observaciones()->create([
+            $movimiento = $mantenimiento->observaciones()->create([
                 'tipo' => 'comentario',
                 'cuerpo' => "Se reprogramó la orden: {$datos['motivo']}",
                 'usuario_id' => $request->user()->id,
             ]);
+
+            Evidencias::adjuntar(
+                $mantenimiento,
+                $movimiento,
+                $request->file('evidencias'),
+                $request->user()->id,
+                'Evidencia: reprogramación',
+            );
         });
 
         return back()->with('exito', 'Orden reprogramada.');
@@ -470,7 +482,7 @@ class MantenimientoController extends Controller
         $puedeCrear = request()->user()?->can('mantenimientos.crear');
 
         return [
-            'sucursales' => Sucursal::activos()->orderBy('nombre')->get(['id', 'nombre']),
+            'sucursales' => request()->user()->sucursalesPermitidas(),
             'tipos' => TipoMantenimiento::activos()->orderBy('nombre')->get(['id', 'nombre', 'categoria']),
             'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre', 'color']),
             'estados' => EstadoMantenimiento::activos()->orderBy('orden')->get(['id', 'nombre', 'clave']),

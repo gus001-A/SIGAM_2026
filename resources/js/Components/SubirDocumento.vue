@@ -1,12 +1,10 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
+import { message } from 'ant-design-vue';
 import {
     CloseCircleFilled,
-    FileExcelOutlined,
     FilePdfOutlined,
-    FileWordOutlined,
-    FileUnknownOutlined,
     InboxOutlined,
     PictureOutlined,
 } from '@ant-design/icons-vue';
@@ -18,9 +16,59 @@ const props = defineProps({
     roles: { type: Array, default: () => [] },
 });
 
-// =========================================================
-//  Modal PDF
-// =========================================================
+/* ==========================================================
+   Constantes de validación
+   ========================================================== */
+const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
+const TIPOS_PDF = ['application/pdf'];
+const TIPOS_IMG = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const EXT_PDF = ['.pdf'];
+const EXT_IMG = ['.jpg', '.jpeg', '.png', '.webp'];
+
+const extDe = (nombre = '') => {
+    const i = nombre.lastIndexOf('.');
+    return i >= 0 ? nombre.slice(i).toLowerCase() : '';
+};
+
+const validarArchivo = (file, tipo) => {
+    const esPdf = tipo === 'pdf';
+    const mimesOk = esPdf ? TIPOS_PDF : TIPOS_IMG;
+    const extsOk = esPdf ? EXT_PDF : EXT_IMG;
+    const ext = extDe(file.name);
+
+    // 1) Tamaño
+    if (file.size > MAX_BYTES) {
+        const mb = (file.size / 1024 / 1024).toFixed(1);
+        message.error(`El archivo pesa ${mb} MB y el máximo permitido es 20 MB.`);
+        return false;
+    }
+
+    // 2) Tipo MIME (algunos navegadores no lo dan en drag&drop)
+    if (file.type && !mimesOk.includes(file.type)) {
+        message.error(
+            esPdf
+                ? 'Solo se permite PDF.'
+                : 'Solo se permiten imágenes JPG, PNG o WEBP.',
+        );
+        return false;
+    }
+
+    // 3) Extensión (fallback si no hay MIME)
+    if (!extsOk.includes(ext)) {
+        message.error(
+            esPdf
+                ? 'El archivo debe tener extensión .pdf'
+                : 'La imagen debe ser .jpg, .jpeg, .png o .webp',
+        );
+        return false;
+    }
+
+    return true;
+};
+
+/* ==========================================================
+   Modal PDF
+   ========================================================== */
 const abiertoPdf = ref(false);
 const fileListPdf = ref([]);
 const previewUrlPdf = ref(null);
@@ -36,6 +84,7 @@ const formPdf = useForm({
 
 const abrirPdf = () => {
     formPdf.reset();
+    formPdf.clearErrors();
     formPdf.relacionable_tipo = props.relacionableTipo;
     formPdf.relacionable_id = props.relacionableId;
     fileListPdf.value = [];
@@ -44,7 +93,17 @@ const abrirPdf = () => {
     abiertoPdf.value = true;
 };
 
+const cerrarPdf = () => {
+    abiertoPdf.value = false;
+    formPdf.reset();
+    formPdf.clearErrors();
+    fileListPdf.value = [];
+    if (previewUrlPdf.value) URL.revokeObjectURL(previewUrlPdf.value);
+    previewUrlPdf.value = null;
+};
+
 const antesDeSubirPdf = (file) => {
+    if (!validarArchivo(file, 'pdf')) return false;
     fileListPdf.value = [file];
     formPdf.archivo = file;
     if (previewUrlPdf.value) URL.revokeObjectURL(previewUrlPdf.value);
@@ -65,23 +124,38 @@ const pesoArchivoPdf = computed(() =>
 );
 
 const enviarPdf = () => {
+    formPdf.clearErrors();
     if (!formPdf.archivo) {
         formPdf.setError('archivo', 'Selecciona un archivo PDF.');
+        message.warning('Selecciona un archivo PDF antes de continuar.');
         return;
     }
     formPdf.post(route('documentos.store'), {
         preserveScroll: true,
         forceFormData: true,
         onSuccess: () => {
+            message.success('PDF subido correctamente.');
             quitarArchivoPdf();
             abiertoPdf.value = false;
+            formPdf.reset();
+        },
+        onError: (errs) => {
+            // Mantiene el modal abierto y muestra los errores del backend
+            const primero = Object.values(errs ?? {})[0];
+            if (primero) message.error(String(primero));
+        },
+        onFinish: () => {
+            // Si el backend devolvió 200 pero con errores en form, no cerramos
+            if (Object.keys(formPdf.errors ?? {}).length > 0) {
+                abiertoPdf.value = true;
+            }
         },
     });
 };
 
-// =========================================================
-//  Modal Imagen
-// =========================================================
+/* ==========================================================
+   Modal Imagen
+   ========================================================== */
 const abiertoImg = ref(false);
 const fileListImg = ref([]);
 const previewUrlImg = ref(null);
@@ -97,6 +171,7 @@ const formImg = useForm({
 
 const abrirImagen = () => {
     formImg.reset();
+    formImg.clearErrors();
     formImg.relacionable_tipo = props.relacionableTipo;
     formImg.relacionable_id = props.relacionableId;
     fileListImg.value = [];
@@ -105,7 +180,17 @@ const abrirImagen = () => {
     abiertoImg.value = true;
 };
 
+const cerrarImg = () => {
+    abiertoImg.value = false;
+    formImg.reset();
+    formImg.clearErrors();
+    fileListImg.value = [];
+    if (previewUrlImg.value) URL.revokeObjectURL(previewUrlImg.value);
+    previewUrlImg.value = null;
+};
+
 const antesDeSubirImg = (file) => {
+    if (!validarArchivo(file, 'img')) return false;
     fileListImg.value = [file];
     formImg.archivo = file;
     if (previewUrlImg.value) URL.revokeObjectURL(previewUrlImg.value);
@@ -126,21 +211,33 @@ const pesoArchivoImg = computed(() =>
 );
 
 const enviarImg = () => {
+    formImg.clearErrors();
     if (!formImg.archivo) {
         formImg.setError('archivo', 'Selecciona una imagen.');
+        message.warning('Selecciona una imagen antes de continuar.');
         return;
     }
     formImg.post(route('documentos.store'), {
         preserveScroll: true,
         forceFormData: true,
         onSuccess: () => {
+            message.success('Imagen subida correctamente.');
             quitarArchivoImg();
             abiertoImg.value = false;
+            formImg.reset();
+        },
+        onError: (errs) => {
+            const primero = Object.values(errs ?? {})[0];
+            if (primero) message.error(String(primero));
+        },
+        onFinish: () => {
+            if (Object.keys(formImg.errors ?? {}).length > 0) {
+                abiertoImg.value = true;
+            }
         },
     });
 };
 
-// Exponemos ambos métodos al padre
 defineExpose({ abrirPdf, abrirImagen });
 </script>
 
@@ -149,7 +246,8 @@ defineExpose({ abrirPdf, abrirImagen });
          MODAL PDF
     ========================================================== -->
     <a-modal v-model:open="abiertoPdf" title="Adjuntar PDF" :width="540" :confirm-loading="formPdf.processing"
-        ok-text="Subir PDF" cancel-text="Cancelar" centered class="modal-doc" @ok="enviarPdf">
+        :ok-button-props="{ disabled: !formPdf.archivo || formPdf.processing }" ok-text="Subir PDF"
+        cancel-text="Cancelar" centered class="modal-doc" @ok="enviarPdf" @cancel="cerrarPdf">
         <a-form layout="vertical" class="pt-1">
             <a-form-item :validate-status="formPdf.errors.archivo ? 'error' : undefined"
                 :help="formPdf.errors.archivo || undefined">
@@ -186,8 +284,9 @@ defineExpose({ abrirPdf, abrirImagen });
             </a-form-item>
 
             <a-form-item v-if="roles.length" label="Evidencia de">
-                <a-select v-model:value="formPdf.rol" :options="roles.map((r) => ({ value: r, label: r.toUpperCase() }))"
-                    allow-clear placeholder="Sin especificar" />
+                <a-select v-model:value="formPdf.rol"
+                    :options="roles.map((r) => ({ value: r, label: r.toUpperCase() }))" allow-clear
+                    placeholder="Sin especificar" />
             </a-form-item>
         </a-form>
     </a-modal>
@@ -196,22 +295,22 @@ defineExpose({ abrirPdf, abrirImagen });
          MODAL IMAGEN
     ========================================================== -->
     <a-modal v-model:open="abiertoImg" title="Adjuntar imagen" :width="540" :confirm-loading="formImg.processing"
-        ok-text="Subir imagen" cancel-text="Cancelar" centered class="modal-doc" @ok="enviarImg">
+        :ok-button-props="{ disabled: !formImg.archivo || formImg.processing }" ok-text="Subir imagen"
+        cancel-text="Cancelar" centered class="modal-doc" @ok="enviarImg" @cancel="cerrarImg">
         <a-form layout="vertical" class="pt-1">
             <a-form-item :validate-status="formImg.errors.archivo ? 'error' : undefined"
                 :help="formImg.errors.archivo || undefined">
                 <template v-if="!formImg.archivo">
-                    <a-upload-dragger :file-list="fileListImg" :max-count="1"
-                        :before-upload="antesDeSubirImg" accept=".jpg,.jpeg,.png,.webp,image/*" @remove="quitarArchivoImg"
-                        class="drop-img">
+                    <a-upload-dragger :file-list="fileListImg" :max-count="1" :before-upload="antesDeSubirImg"
+                        accept=".jpg,.jpeg,.png,.webp,image/*" @remove="quitarArchivoImg" class="drop-img">
                         <p class="ant-upload-drag-icon">
                             <PictureOutlined />
                         </p>
                         <p class="ant-upload-text">Haz clic o arrastra una imagen</p>
                         <p class="ant-upload-hint">JPG, PNG o WEBP · máx. 20 MB</p>
                     </a-upload-dragger>
-                    <BotonTomarFoto class="sd-tomar-foto" texto="O tomar foto con la cámara"
-                        titulo="Adjuntar imagen" @capturada="antesDeSubirImg" />
+                    <BotonTomarFoto class="sd-tomar-foto" texto="O tomar foto con la cámara" titulo="Adjuntar imagen"
+                        @capturada="antesDeSubirImg" />
                 </template>
 
                 <div v-else class="sd-prev">
@@ -242,8 +341,9 @@ defineExpose({ abrirPdf, abrirImagen });
             </a-form-item>
 
             <a-form-item v-if="roles.length" label="Evidencia de">
-                <a-select v-model:value="formImg.rol" :options="roles.map((r) => ({ value: r, label: r.toUpperCase() }))"
-                    allow-clear placeholder="Sin especificar" />
+                <a-select v-model:value="formImg.rol"
+                    :options="roles.map((r) => ({ value: r, label: r.toUpperCase() }))" allow-clear
+                    placeholder="Sin especificar" />
             </a-form-item>
         </a-form>
     </a-modal>
@@ -426,5 +526,11 @@ defineExpose({ abrirPdf, abrirImagen });
 .modal-doc :deep(.ant-btn-primary:hover) {
     background: #0f6fb0;
     border-color: #0f6fb0;
+}
+
+.modal-doc :deep(.ant-btn-primary[disabled]) {
+    background: #cbd5e1;
+    border-color: #cbd5e1;
+    color: #f1f5f9;
 }
 </style>

@@ -269,7 +269,7 @@ const onMenuAccion = ({ key }) => key === 'baja' && desactivar();
         </div>
 
         <ConfirmarDialog ref="confirmar" />
-    </AppLayout>
+        </AppLayout>
 </template>
 
 <style scoped>

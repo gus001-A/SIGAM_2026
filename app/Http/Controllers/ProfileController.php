@@ -27,8 +27,15 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
-        $request->user()->save();
+        $usuario = $request->user();
+        $usuario->fill($request->validated());
+
+        // Un correo nuevo debe volver a verificarse.
+        if ($usuario->isDirty('email')) {
+            $usuario->email_verified_at = null;
+        }
+
+        $usuario->save();
 
         return Redirect::route('profile.edit');
     }

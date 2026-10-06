@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import {
     ApartmentOutlined,
+    AppstoreOutlined,
     CheckCircleOutlined,
     CheckOutlined,
     ClearOutlined,
@@ -10,6 +11,7 @@ import {
     EnvironmentOutlined,
     FilterOutlined,
     FlagOutlined,
+    FolderOutlined,
     InboxOutlined,
     PlusOutlined,
     SafetyCertificateOutlined,
@@ -60,6 +62,8 @@ const CATALOGOS = [
     { ruta: 'catalogos.materiales', label: 'Materiales', icono: InboxOutlined, color: '#16a34a' },
     { ruta: 'catalogos.tipos_area', label: 'Tipos de área', icono: ApartmentOutlined, color: '#a86717' },
     { ruta: 'catalogos.tipos_limpieza', label: 'Tipos de limpieza', icono: ClearOutlined, color: '#0d6fae' },
+    { ruta: 'catalogos.proyectos', label: 'Proyectos', icono: FolderOutlined, color: '#0f6fb0' },
+    { ruta: 'catalogos.categorias_tarea', label: 'Categorías de tarea', icono: AppstoreOutlined, color: '#b45309' },
 ];
 const irCatalogo = (ruta) => {
     if (ruta !== props.rutaBase) router.visit(route(`${ruta}.index`));

@@ -137,8 +137,8 @@ class NotificacionesTest extends TestCase
 
     public function test_index_filtra_no_leidas_y_marca_todas(): void
     {
-        Notificaciones::crear($this->admin->id, 'asignacion', 'A', null, ['ref' => 'a']);
-        Notificaciones::crear($this->admin->id, 'urgencia', 'B', null, ['ref' => 'b']);
+        Notificaciones::crear($this->admin->id, 'tarea_asignada', 'A', null, ['ref' => 'a']);
+        Notificaciones::crear($this->admin->id, 'solicitud_creada', 'B', null, ['ref' => 'b']);
         Notificacion::where('titulo', 'A')->update(['leida_at' => now()]);
 
         $this->actingAs($this->admin)
@@ -164,7 +164,7 @@ class NotificacionesTest extends TestCase
 
     public function test_contador_no_leidas_json(): void
     {
-        Notificaciones::crear($this->admin->id, 'urgencia', 'X', null, ['ref' => 'x']);
+        Notificaciones::crear($this->admin->id, 'solicitud_creada', 'X', null, ['ref' => 'x']);
 
         $this->actingAs($this->admin)
             ->getJson(route('notificaciones.no_leidas'))

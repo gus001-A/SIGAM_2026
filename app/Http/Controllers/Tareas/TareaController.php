@@ -4,19 +4,22 @@ namespace App\Http\Controllers\Tareas;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tareas\GuardarTareaRequest;
+use App\Models\CategoriaTarea;
 use App\Models\HistorialEstadoTarea;
 use App\Models\Material;
 use App\Models\Prioridad;
+use App\Models\Proyecto;
 use App\Models\Tarea;
 use App\Models\Usuario;
 use App\Support\Auditoria;
 use App\Support\CicloTarea;
-use App\Support\Documentos;
+use App\Support\Evidencias;
 use App\Support\Notificaciones;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -64,7 +67,11 @@ class TareaController extends Controller
         ];
 
         $tareas = Tarea::query()
-            ->with(['responsables' => fn ($q) => $q->wherePivotNull('desasignado_at'), 'prioridad:id,nombre,color', 'creadoPor:id,nombre'])
+            ->with([
+                'responsables' => fn ($q) => $q->wherePivotNull('desasignado_at'),
+                'prioridad:id,nombre,color', 'creadoPor:id,nombre',
+                'proyecto:id,nombre', 'categoriaTarea:id,nombre',
+            ])
             // Solo el superadministrador ve las tareas de todos; el resto solo
             // ve las que le asignaron o las que él mismo registró.
             ->tap($visibles)
@@ -74,6 +81,9 @@ class TareaController extends Controller
                 ->where('titulo', 'like', "%{$v}%")->orWhere('descripcion', 'like', "%{$v}%")))
             ->when($vista === 'activas' && $texto('estado'), fn (Builder $q, $v) => $q->where('estado', $v))
             ->when($request->integer('prioridad_id'), fn (Builder $q, $v) => $q->where('prioridad_id', $v))
+            ->when($texto('clasificacion'), fn (Builder $q, $v) => $q->where('clasificacion', $v))
+            ->when($request->integer('proyecto_id'), fn (Builder $q, $v) => $q->where('proyecto_id', $v))
+            ->when($request->integer('categoria_tarea_id'), fn (Builder $q, $v) => $q->where('categoria_tarea_id', $v))
             ->when($texto('responsable'), fn (Builder $q, $v) => $q->whereHas(
                 'responsables',
                 fn (Builder $r) => $r->whereNull('tarea_responsables.desasignado_at')
@@ -99,7 +109,11 @@ class TareaController extends Controller
             'estado' => $t->estado,
             'fecha_limite' => $t->fecha_limite,
             'vencida' => in_array($t->estado, self::ESTADOS_ACTIVOS, true) && $t->fecha_limite->isPast(),
+            'retraso_dias' => $t->diasRetraso(),
             'prioridad' => $t->prioridad,
+            'clasificacion' => $t->clasificacion,
+            'proyecto' => $t->proyecto,
+            'categoria_tarea' => $t->categoriaTarea,
             'responsables' => $t->responsables->pluck('nombre_completo')->implode(', '),
             'creado_por' => $creadores[$t->id]['usuario'] ?? null,
             'creado_en' => $creadores[$t->id]['fecha'] ?? null,
@@ -109,11 +123,13 @@ class TareaController extends Controller
             'tareas' => $tareas,
             'kpis' => $kpis,
             'vista' => $vista,
-            'filtros' => $request->only(['descripcion', 'estado', 'responsable', 'prioridad_id', 'desde', 'hasta', 'vencidas', 'registrado_por']),
+            'filtros' => $request->only(['descripcion', 'estado', 'responsable', 'prioridad_id', 'clasificacion', 'proyecto_id', 'categoria_tarea_id', 'desde', 'hasta', 'vencidas', 'registrado_por']),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => [
                 'usuarios' => Usuario::where('estado', 'activo')->orderBy('nombre')->get(['id', 'nombre', 'apellidos']),
                 'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre', 'color']),
+                'proyectos' => Proyecto::activos()->orderBy('nombre')->get(['id', 'nombre']),
+                'categorias' => CategoriaTarea::activos()->orderBy('nombre')->get(['id', 'nombre']),
             ],
         ]);
     }
@@ -125,6 +141,8 @@ class TareaController extends Controller
         return Inertia::render('Tareas/Form', [
             'usuarios' => Usuario::where('estado', 'activo')->orderBy('nombre')->get(['id', 'nombre', 'apellidos']),
             'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre']),
+            'proyectos' => Proyecto::activos()->orderBy('nombre')->get(['id', 'nombre']),
+            'categorias' => CategoriaTarea::activos()->orderBy('nombre')->get(['id', 'nombre']),
         ]);
     }
 
@@ -132,7 +150,7 @@ class TareaController extends Controller
     {
         $tarea = DB::transaction(function () use ($request) {
             $tarea = Tarea::create([
-                ...$request->safe()->only(['titulo', 'descripcion', 'fecha_limite', 'prioridad_id']),
+                ...$request->datosClasificados(),
                 'estado' => 'pendiente',
                 'creado_por' => $request->user()->id,
             ]);
@@ -169,7 +187,7 @@ class TareaController extends Controller
         return redirect()->route('tareas.show', $tarea)->with('exito', 'Tarea registrada.');
     }
 
-    public function show(Tarea $tarea): Response
+    public function show(Request $request, Tarea $tarea): Response
     {
         $this->authorize('tareas.ver');
         $this->verificarPertenencia($tarea);
@@ -178,25 +196,36 @@ class TareaController extends Controller
             'asignaciones.usuario:id,nombre,apellidos,telefono',
             'asignaciones.asignadoPor:id,nombre',
             'historialEstados.cambiadoPor:id,nombre,apellidos',
-            'historialEstados.documentoEvidencia',
+            'historialEstados.evidencias',
             'prioridad:id,nombre,color',
+            'proyecto:id,nombre',
+            'categoriaTarea:id,nombre',
             'creadoPor:id,nombre',
             'materiales.material:id,nombre',
         ]);
 
         // El documento expone su URL de previsualización segura (no es una
         // relación, así que hay que llamar al método explícitamente).
-        $tarea->historialEstados->each(function (HistorialEstadoTarea $hh): void {
-            $hh->documentoEvidencia?->setAttribute('url', $hh->documentoEvidencia->url());
-        });
+        $tarea->historialEstados->each(fn (HistorialEstadoTarea $hh) => $hh->evidencias
+            ->each(fn ($doc) => $doc->setAttribute('url', $doc->url())));
 
         return Inertia::render('Tareas/Show', [
             'tarea' => $tarea,
+            'retrasoDias' => $tarea->diasRetraso(),
+            'bitacora' => $tarea->bitacoraCambios(30, $tarea->historialEstados
+                ->map(fn (HistorialEstadoTarea $h) => $this->movimientoBitacora($h))
+                ->all()),
             'sello' => $tarea->selloAuditoria(),
             'transicionesPosibles' => CicloTarea::siguientes($tarea->estado),
+            'avances' => $this->resumenAvances($tarea),
+            'pendientesAvance' => $tarea->participantesPendientes()->pluck('nombre_completo')->values(),
+            'soyParticipante' => $tarea->asignaciones()->whereNull('desasignado_at')->where('usuario_id', $request->user()->id)->exists(),
+            'soyPrincipal' => $this->esPrincipal($tarea, $request->user()->id),
             'catalogos' => [
                 'usuarios' => Usuario::where('estado', 'activo')->orderBy('nombre')->get(['id', 'nombre', 'apellidos']),
                 'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre']),
+                'proyectos' => Proyecto::activos()->orderBy('nombre')->get(['id', 'nombre']),
+                'categorias' => CategoriaTarea::activos()->orderBy('nombre')->get(['id', 'nombre']),
                 'materiales' => Material::activos()->orderBy('nombre')->get(['id', 'nombre', 'unidad', 'costo_referencia']),
             ],
         ]);
@@ -210,7 +239,7 @@ class TareaController extends Controller
             return back()->with('error', 'No se puede editar una tarea realizada o cancelada.');
         }
 
-        $tarea->update($request->safe()->only(['titulo', 'descripcion', 'fecha_limite', 'prioridad_id']));
+        $tarea->update($request->datosClasificados());
 
         $this->notificarResponsables($tarea, $request->user()->id, 'tarea_modificada', "Tarea modificada: {$tarea->titulo}", 'Se actualizaron los datos de una tarea que tienes asignada.');
 
@@ -245,43 +274,67 @@ class TareaController extends Controller
         }
 
         $reglas = [
-            'nota' => ['nullable', 'string', 'max:1000'],
-            'evidencia' => ['required', 'file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp'],
+            'nota' => ['required', 'string', 'max:1000'],
+            'evidencias' => ['nullable', 'array', 'max:'.Evidencias::MAXIMO],
+            'evidencias.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx'],
+            'cerrar_sin_esperar' => ['nullable', 'boolean'],
         ];
         if ($destino === 'realizada') {
             $this->authorize('tareas.cerrar');
-            $reglas['nota'] = ['required', 'string', 'max:1000'];
-        }
-        if ($destino === 'cancelada') {
-            $reglas['nota'] = ['required', 'string', 'max:1000'];
         }
         $datos = $request->validate($reglas);
 
-        DB::transaction(function () use ($tarea, $origen, $destino, $datos, $request): void {
+        // En tareas compartidas, nadie cierra hasta que cada participante haya hecho algo.
+        // Solo el responsable principal puede cerrar sin esperar, y queda anotado.
+        $sinEsperar = collect();
+        if ($destino === 'realizada') {
+            $pendientes = $tarea->participantesPendientes();
+            if ($pendientes->isNotEmpty()) {
+                $nombres = $pendientes->pluck('nombre_completo')->join(', ');
+                if (! $request->boolean('cerrar_sin_esperar')) {
+                    throw ValidationException::withMessages([
+                        'estado' => "Faltan avances de: {$nombres}. Cada participante debe registrar su avance antes de cerrar la tarea.",
+                    ]);
+                }
+                if (! $this->esPrincipal($tarea, $request->user()->id)) {
+                    throw ValidationException::withMessages([
+                        'estado' => 'Solo el responsable principal puede cerrar la tarea sin esperar a los demás.',
+                    ]);
+                }
+                $sinEsperar = $pendientes;
+            }
+        }
+
+        $nota = $datos['nota'];
+        if ($sinEsperar->isNotEmpty()) {
+            $nota .= ' (Cerrada sin esperar a: '.$sinEsperar->pluck('nombre_completo')->join(', ').')';
+        }
+
+        DB::transaction(function () use ($tarea, $origen, $destino, $nota, $request): void {
             $tarea->estado = $destino;
             match ($destino) {
-                'en_proceso' => $tarea->fill(['iniciada_at' => now(), 'nota_avance' => $datos['nota'] ?? null]),
-                'realizada' => $tarea->fill(['realizada_at' => now(), 'nota_cierre' => $datos['nota']]),
-                'cancelada' => $tarea->fill(['cancelada_at' => now(), 'nota_cancelacion' => $datos['nota']]),
+                'en_proceso' => $tarea->fill(['iniciada_at' => now(), 'nota_avance' => $nota]),
+                'realizada' => $tarea->fill(['realizada_at' => now(), 'nota_cierre' => $nota]),
+                'cancelada' => $tarea->fill(['cancelada_at' => now(), 'nota_cancelacion' => $nota]),
                 default => null,
             };
             $tarea->save();
 
-            $documento = Documentos::adjuntarEvidencia(
-                $tarea,
-                $request->file('evidencia'),
-                $request->user()->id,
-                'Evidencia: '.CicloTarea::etiqueta($destino),
-            );
-
-            $tarea->historialEstados()->create([
+            $movimiento = $tarea->historialEstados()->create([
                 'estado_origen' => $origen,
                 'estado_destino' => $destino,
                 'cambiado_por' => $request->user()->id,
-                'nota' => $datos['nota'] ?? null,
-                'documento_evidencia_id' => $documento->id,
+                'nota' => $nota,
                 'cambiado_at' => now(),
             ]);
+
+            Evidencias::adjuntar(
+                $tarea,
+                $movimiento,
+                $request->file('evidencias', []),
+                $request->user()->id,
+                'Evidencia: '.CicloTarea::etiqueta($destino),
+            );
         });
 
         $this->notificarResponsables(
@@ -293,6 +346,112 @@ class TareaController extends Controller
         );
 
         return back()->with('exito', 'Tarea movida a «'.CicloTarea::etiqueta($destino).'».');
+    }
+
+    /**
+     * Avance de un participante: registra su nota y fotos sin cambiar el estado
+     * de la tarea. Cada responsable deja su propia huella en la bitácora.
+     */
+    public function avance(Request $request, Tarea $tarea): RedirectResponse
+    {
+        $this->verificarPertenencia($tarea);
+
+        $usuario = $request->user();
+        $esParticipante = $tarea->asignaciones()->whereNull('desasignado_at')->where('usuario_id', $usuario->id)->exists();
+        abort_unless($esParticipante || $usuario->can('tareas.asignar'), 403);
+
+        if ($tarea->estado !== 'en_proceso') {
+            return back()->with('error', 'Solo se registran avances mientras la tarea está en proceso.');
+        }
+
+        $datos = $request->validate([
+            'nota' => ['required', 'string', 'max:1000'],
+            'evidencias' => ['nullable', 'array', 'max:'.Evidencias::MAXIMO],
+            'evidencias.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx'],
+        ]);
+
+        DB::transaction(function () use ($tarea, $datos, $request, $usuario): void {
+            $movimiento = $tarea->historialEstados()->create([
+                'estado_origen' => $tarea->estado,
+                'estado_destino' => $tarea->estado,
+                'cambiado_por' => $usuario->id,
+                'nota' => $datos['nota'],
+                'cambiado_at' => now(),
+            ]);
+
+            Evidencias::adjuntar($tarea, $movimiento, $request->file('evidencias', []), $usuario->id, 'Evidencia: Avance');
+        });
+
+        $this->notificarResponsables(
+            $tarea,
+            $usuario->id,
+            'tarea_modificada',
+            "Nuevo avance en: {$tarea->titulo}",
+            "{$usuario->nombre_completo} registró su avance.",
+        );
+
+        return back()->with('exito', 'Avance registrado.');
+    }
+
+    /** Convierte un movimiento del historial (estado o avance) al formato de la bitácora. */
+    private function movimientoBitacora(HistorialEstadoTarea $h): array
+    {
+        $avance = $h->estado_origen !== null && $h->estado_origen === $h->estado_destino;
+        $cambios = $avance ? [] : [[
+            'campo' => 'estado',
+            'antes' => $h->estado_origen ? CicloTarea::etiqueta($h->estado_origen) : null,
+            'despues' => CicloTarea::etiqueta($h->estado_destino),
+        ]];
+
+        return [
+            'id' => 'h'.$h->id,
+            'accion' => $avance ? 'avance' : 'estado',
+            'etiqueta' => $avance ? 'Registró avance' : ($h->estado_origen ? 'Cambió estado' : 'Creó la tarea'),
+            'usuario' => $h->cambiadoPor?->nombre_completo ?? 'Sistema',
+            'fecha' => $h->cambiado_at?->toISOString(),
+            'nota' => $h->nota,
+            'cambios' => $cambios,
+        ];
+    }
+
+    private function esPrincipal(Tarea $tarea, int $usuarioId): bool
+    {
+        return $tarea->asignaciones()->whereNull('desasignado_at')->where('es_principal', true)->where('usuario_id', $usuarioId)->exists();
+    }
+
+    /**
+     * Qué ha hecho cada responsable activo: su último avance (con fotos) y cuántas
+     * acciones lleva registradas. Sirve para ver de un vistazo quién ya avanzó.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function resumenAvances(Tarea $tarea): array
+    {
+        return $tarea->asignaciones()->whereNull('desasignado_at')->with('usuario:id,nombre,apellidos')->get()
+            ->map(function ($a) use ($tarea) {
+                $ultimo = $tarea->historialEstados()
+                    ->where('cambiado_por', $a->usuario_id)
+                    ->whereColumn('estado_origen', 'estado_destino')
+                    ->with('evidencias')
+                    ->latest('cambiado_at')
+                    ->first();
+
+                $ultimo?->evidencias->each(fn ($doc) => $doc->setAttribute('url', $doc->url()));
+
+                return [
+                    'usuario_id' => $a->usuario_id,
+                    'nombre' => $a->usuario?->nombre_completo,
+                    'es_principal' => (bool) $a->es_principal,
+                    'acciones' => $tarea->historialEstados()->where('cambiado_por', $a->usuario_id)->count(),
+                    'ultimo' => $ultimo ? [
+                        'nota' => $ultimo->nota,
+                        'fecha' => $ultimo->cambiado_at?->toISOString(),
+                        'evidencias' => $ultimo->evidencias,
+                    ] : null,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /** Notifica a los responsables activos de la tarea, menos a quien hizo el cambio. */

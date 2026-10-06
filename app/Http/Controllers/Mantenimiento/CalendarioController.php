@@ -7,7 +7,6 @@ use App\Models\EstadoMantenimiento;
 use App\Models\Mantenimiento;
 use App\Models\OcurrenciaPlanMantenimiento;
 use App\Models\Prioridad;
-use App\Models\Sucursal;
 use App\Models\Tarea;
 use App\Models\TipoMantenimiento;
 use App\Models\Usuario;
@@ -31,7 +30,7 @@ class CalendarioController extends Controller
 
         $desde = Carbon::parse($request->query('desde', now()->startOfMonth()->toDateString()))->startOfDay();
         $hasta = Carbon::parse($request->query('hasta', now()->endOfMonth()->toDateString()))->endOfDay();
-        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'));
+        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'), $request->user());
 
         $ordenes = Mantenimiento::query()
             ->with(['equipo:id,codigo_activo,descripcion', 'ubicacion:id,nombre', 'sucursal:id,nombre', 'tipo:id,nombre,categoria', 'prioridad:id,nombre,color', 'estado:id,nombre,clave',
@@ -118,9 +117,10 @@ class CalendarioController extends Controller
             'eventos' => $ordenes->concat($preventivos)->concat($tareas)->values(),
             'rango' => ['desde' => $desde->toDateString(), 'hasta' => $hasta->toDateString()],
             'sucursalId' => $sucursalId,
+            'puedeVerTodas' => $request->user()->puedeVerTodasLasSucursales(),
             'filtros' => $request->only(['tipo_id', 'prioridad_id', 'estado_id', 'tecnico_id']),
             'catalogos' => [
-                'sucursales' => Sucursal::activos()->orderBy('nombre')->get(['id', 'nombre']),
+                'sucursales' => $request->user()->sucursalesPermitidas(),
                 'tecnicos' => Usuario::role('tecnico')->where('estado', 'activo')->orderBy('nombre')->get(['id', 'nombre']),
                 'tipos' => TipoMantenimiento::orderBy('nombre')->get(['id', 'nombre']),
                 'prioridades' => Prioridad::orderBy('nivel')->get(['id', 'nombre', 'color']),

@@ -67,6 +67,10 @@ class EquipoController extends Controller
 
         $resumen = Sucursal::query()
             ->where('estado', 'activo')
+            ->when(
+                ! $request->user()->puedeVerTodasLasSucursales(),
+                fn (Builder $q) => $q->whereIn('sucursales.id', $request->user()->sucursalIdsPermitidos()),
+            )
             ->leftJoin('equipos', function ($j): void {
                 $j->on('equipos.sucursal_id', '=', 'sucursales.id')->whereNull('equipos.deleted_at');
             })
@@ -78,7 +82,7 @@ class EquipoController extends Controller
                 DB::raw('COALESCE(SUM(equipos.valor_adquisicion), 0) as valor_total'),
             ]);
 
-        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'), $resumen->first()->id ?? null);
+        $sucursalId = SeleccionSucursal::resolver($request->query('sucursal_id'), $request->user(), $resumen->first()->id ?? null);
         $modoTodas = $sucursalId === null;
         $sucursal = $modoTodas || $resumen->firstWhere('id', $sucursalId);
 
@@ -175,6 +179,7 @@ class EquipoController extends Controller
         return Inertia::render('Inventario/Equipos/PorSucursal', [
             'resumen' => $resumen,
             'sucursalId' => $sucursalId,
+            'puedeVerTodas' => $request->user()->puedeVerTodasLasSucursales(),
             'kpis' => $kpis,
             'equipos' => $listado,
             'filtros' => $request->only([
@@ -268,6 +273,7 @@ class EquipoController extends Controller
         ]);
 
         return Inertia::render('Inventario/Equipos/Show', [
+            'bitacora' => $equipo->bitacoraCambios(),
             'equipo' => $equipo,
             'dadoDeBaja' => $equipo->trashed(),   // 👈 para que Show.vue lo marque visualmente
             'sello' => $equipo->selloAuditoria(),
@@ -552,7 +558,7 @@ class EquipoController extends Controller
     private function catalogosFiltro(): array
     {
         return [
-            'sucursales' => Sucursal::activos()->orderBy('nombre')->get(['id', 'nombre']),
+            'sucursales' => auth()->user()->sucursalesPermitidas(),
             'tipos' => TipoEquipo::activos()->orderBy('nombre')->get(['id', 'nombre']),
             'estados' => EstadoEquipo::activos()->orderBy('nombre')->get(['id', 'nombre', 'color']),
             'proveedores' => Proveedor::activos()->orderBy('razon_social')->get(['id', 'razon_social']),

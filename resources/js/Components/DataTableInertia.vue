@@ -323,12 +323,16 @@ onBeforeUnmount(() => {
 .tabla-inertia .ant-table-tbody>tr>td a:not(.ant-btn):not(.acc) {
     color: var(--sigam-navy);
     font-weight: 600;
+    text-decoration: none;
     transition: color 0.14s ease;
 }
 
+/* Hover: color de marca + línea sólida solo bajo el texto (los iconos no se subrayan) */
 .tabla-inertia .ant-table-tbody>tr>td a:not(.ant-btn):not(.acc):hover {
-    color: var(--sigam-teal-700);
+    color: #0d84c9;
     text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
 }
 
 .tabla-inertia .ant-table-tbody .ant-tag {

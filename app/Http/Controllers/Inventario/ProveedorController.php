@@ -151,7 +151,11 @@ class ProveedorController extends Controller
 
         $proveedor->load(['documentos', 'equipos:id,codigo_activo,descripcion,proveedor_id']);
 
-        return Inertia::render('Inventario/Proveedores/Show', ['proveedor' => $proveedor, 'sello' => $proveedor->selloAuditoria()]);
+        return Inertia::render('Inventario/Proveedores/Show', [
+            'proveedor' => $proveedor,
+            'sello' => $proveedor->selloAuditoria(),
+            'bitacora' => $proveedor->bitacoraCambios(),
+        ]);
     }
 
     public function edit(Proveedor $proveedor): Response

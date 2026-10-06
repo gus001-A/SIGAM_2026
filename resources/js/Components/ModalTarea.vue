@@ -2,23 +2,28 @@
 import { computed, reactive, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import {
+    ApartmentOutlined,
     CalendarOutlined,
     CheckCircleOutlined,
     CheckSquareOutlined,
     ClockCircleOutlined,
     FileTextOutlined,
     FlagOutlined,
+    FolderOutlined,
     InfoCircleOutlined,
     SendOutlined,
     TeamOutlined,
     UserOutlined,
 } from '@ant-design/icons-vue';
 import CampoFechaHora from '@/Components/CampoFechaHora.vue';
+import SelectCatalogo from '@/Components/SelectCatalogo.vue';
 import { hoyISO, reglaNoPasada } from '@/utils/restricciones';
 
 const props = defineProps({
     usuarios: { type: Array, default: () => [] },
     prioridades: { type: Array, default: () => [] },
+    proyectos: { type: Array, default: () => [] },
+    categorias: { type: Array, default: () => [] },
 });
 
 const visible = ref(false);
@@ -28,8 +33,17 @@ const form = useForm({
     descripcion: '',
     fecha_limite: '',
     prioridad_id: undefined,
+    clasificacion: 'general',
+    proyecto_id: undefined,
+    categoria_tarea_id: undefined,
     responsables: [],
 });
+
+const opcionesClasificacion = [
+    { value: 'general', label: 'General', icono: CheckCircleOutlined },
+    { value: 'proyecto', label: 'Por proyecto', icono: FolderOutlined },
+    { value: 'categoria', label: 'Categoría', icono: ApartmentOutlined },
+];
 
 const reglas = reactive({
     titulo: [
@@ -43,6 +57,20 @@ const reglas = reactive({
     ],
     responsables: [
         { required: true, type: 'array', min: 1, message: 'Asigna al menos un responsable.' },
+    ],
+    proyecto_id: [
+        {
+            required: true,
+            message: 'Selecciona a qué proyecto pertenece.',
+            validator: (_, v) => (form.clasificacion !== 'proyecto' || v ? Promise.resolve() : Promise.reject()),
+        },
+    ],
+    categoria_tarea_id: [
+        {
+            required: true,
+            message: 'Selecciona la categoría de la tarea.',
+            validator: (_, v) => (form.clasificacion !== 'categoria' || v ? Promise.resolve() : Promise.reject()),
+        },
     ],
 });
 
@@ -262,6 +290,60 @@ defineExpose({ abrir, cerrar });
                             </label>
                         </div>
                     </div>
+                </div>
+
+                <!-- Fila: Clasificación -->
+                <div class="row">
+                    <label class="label">
+                        <FolderOutlined /> Clasificación
+                    </label>
+                    <div class="clasificacion">
+                        <label
+                            v-for="c in opcionesClasificacion"
+                            :key="c.value"
+                            class="clasif-card"
+                            :class="{ 'clasif-card--active': form.clasificacion === c.value }"
+                        >
+                            <input type="radio" class="clasif-card__input" :value="c.value" v-model="form.clasificacion" />
+                            <component :is="c.icono" class="clasif-card__ico" />
+                            <span class="clasif-card__label">{{ c.label }}</span>
+                        </label>
+                    </div>
+
+                    <a-form v-if="form.clasificacion === 'proyecto'" :model="form" layout="vertical" class="clasificacion-select">
+                        <a-form-item
+                            name="proyecto_id"
+                            :validate-status="form.errors.proyecto_id ? 'error' : undefined"
+                            :help="form.errors.proyecto_id"
+                            class="mb-0"
+                        >
+                            <SelectCatalogo
+                                v-model:value="form.proyecto_id"
+                                :options="proyectos"
+                                ruta="catalogos.proyectos"
+                                etiqueta="proyecto"
+                                placeholder="Selecciona el proyecto"
+                            />
+                        </a-form-item>
+                    </a-form>
+
+                    <a-form v-if="form.clasificacion === 'categoria'" :model="form" layout="vertical" class="clasificacion-select">
+                        <a-form-item
+                            name="categoria_tarea_id"
+                            :validate-status="form.errors.categoria_tarea_id ? 'error' : undefined"
+                            :help="form.errors.categoria_tarea_id"
+                            class="mb-0"
+                        >
+                            <SelectCatalogo
+                                v-model:value="form.categoria_tarea_id"
+                                :options="categorias"
+                                ruta="catalogos.categorias_tarea"
+                                etiqueta="categoría"
+                                etiqueta-plural="categorías"
+                                placeholder="Selecciona la categoría"
+                            />
+                        </a-form-item>
+                    </a-form>
                 </div>
 
                 <!-- Fila 4: Responsables -->
@@ -652,6 +734,76 @@ defineExpose({ abrir, cerrar });
 }
 
 /* ==========================================================
+   Clasificación
+   ========================================================== */
+.clasificacion {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.clasif-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 8px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    cursor: pointer;
+    transition:
+        border-color 0.14s ease,
+        background 0.14s ease,
+        transform 0.14s ease,
+        box-shadow 0.14s ease;
+    user-select: none;
+}
+
+.clasif-card:hover {
+    border-color: #0f6fb0;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px -6px rgba(15, 111, 176, 0.4);
+}
+
+.clasif-card--active {
+    border-color: #0f6fb0;
+    background: #eaf3fb;
+    box-shadow: 0 4px 12px -6px rgba(15, 111, 176, 0.45);
+}
+
+.clasif-card__input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.clasif-card__ico {
+    font-size: 16px;
+    color: #7b8a9c;
+}
+
+.clasif-card--active .clasif-card__ico {
+    color: #0f6fb0;
+}
+
+.clasif-card__label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #2b3a4f;
+    text-align: center;
+}
+
+.clasif-card--active .clasif-card__label {
+    color: #173a5f;
+}
+
+.clasificacion-select {
+    margin-top: 8px;
+}
+
+/* ==========================================================
    Usuarios: opción y chips
    ========================================================== */
 .usuario-op {
@@ -816,6 +968,10 @@ defineExpose({ abrir, cerrar });
     }
 
     .prioridades {
+        grid-template-columns: 1fr;
+    }
+
+    .clasificacion {
         grid-template-columns: 1fr;
     }
 

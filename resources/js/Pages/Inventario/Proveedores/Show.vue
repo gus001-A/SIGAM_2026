@@ -265,15 +265,15 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
                             </div>
                         </div>
                         <div class="card__body card__body--scroll">
-                            <div v-if="proveedor.equipos?.length" class="ordenes">
-                                <button v-for="item in proveedor.equipos" :key="item.id" type="button" class="orden"
+                            <div v-if="proveedor.equipos?.length" class="equipos-grid">
+                                <button v-for="item in proveedor.equipos" :key="item.id" type="button" class="equipo-card"
                                     @click="irA('equipos.show', item.id)">
-                                    <span class="orden__ic">
+                                    <span class="equipo-card__ic">
                                         <ToolOutlined />
                                     </span>
-                                    <span class="orden__t">
-                                        <span class="orden__folio">{{ item.codigo_activo }}</span>
-                                        <span class="orden__estado">{{ item.descripcion }}</span>
+                                    <span class="equipo-card__t">
+                                        <span class="equipo-card__folio">{{ item.codigo_activo }}</span>
+                                        <span class="equipo-card__desc">{{ item.descripcion }}</span>
                                     </span>
                                 </button>
                             </div>
@@ -333,10 +333,12 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
                             </a-space>
                         </div>
                         <div class="card__body">
-                            <ListaDocumentos :documentos="proveedor.documentos ?? []" relacionable-tipo="proveedor"
-                                :relacionable-id="proveedor.id"
-                                :roles="['contrato', 'cotización', 'factura', 'certificado']" :puede-subir="false"
-                                :puede-eliminar="puede('documentos.desactivar')" />
+                            <div class="docs-grid">
+                                <ListaDocumentos :documentos="proveedor.documentos ?? []" relacionable-tipo="proveedor"
+                                    :relacionable-id="proveedor.id"
+                                    :roles="['contrato', 'cotización', 'factura', 'certificado']" :puede-subir="false"
+                                    :puede-eliminar="puede('documentos.desactivar')" />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -347,7 +349,7 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
         <SubirDocumento ref="subirDoc" relacionable-tipo="proveedor" :relacionable-id="proveedor.id"
             :roles="['contrato', 'cotización', 'factura', 'certificado']" />
         <ConfirmarDialog ref="confirmar" />
-    </AppLayout>
+        </AppLayout>
 </template>
 
 <style scoped>
@@ -755,62 +757,112 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
 }
 
 /* ==========================================================
-   Lista de equipos
+   Equipos en grid 4 columnas
    ========================================================== */
-.ordenes {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
+.equipos-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 9px;
 }
 
-.orden {
+.equipo-card {
     display: flex;
     align-items: center;
-    gap: 11px;
+    gap: 9px;
     width: 100%;
     text-align: left;
-    padding: 10px 12px;
-    border: 1px solid var(--sigam-borde);
+    padding: 9px 11px;
+    border: 1px solid var(--sigam-borde-suave);
     border-radius: 10px;
     background: #fff;
     cursor: pointer;
     transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+    min-width: 0;
 }
 
-.orden:hover {
-    border-color: var(--sigam-navy-100);
-    box-shadow: var(--sigam-sombra-sm);
-    transform: translateX(2px);
+.equipo-card:hover {
+    border-color: #a7e0cf;
+    box-shadow: 0 3px 10px rgba(22, 128, 108, 0.14);
+    transform: translateY(-1px);
 }
 
-.orden__ic {
-    width: 32px;
-    height: 32px;
+.equipo-card__ic {
+    width: 30px;
+    height: 30px;
     flex: none;
     border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: 14px;
     background: #e4f4ec;
     color: #16806c;
 }
 
-.orden__t {
+.equipo-card__t {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    gap: 1px;
 }
 
-.orden__folio {
-    font-weight: 700;
+.equipo-card__folio {
+    font-weight: 800;
     color: var(--sigam-navy);
-    font-size: 13px;
+    font-size: 12.5px;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.orden__estado {
-    font-size: 11.5px;
+.equipo-card__desc {
+    font-size: 11px;
     color: var(--sigam-tenue);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ==========================================================
+   Documentos en grid 4 columnas
+   (forzamos grid dentro de ListaDocumentos)
+   ========================================================== */
+.docs-grid :deep(.ant-list) {
+    display: block;
+}
+
+.docs-grid :deep(.ant-list-items),
+.docs-grid :deep(ul),
+.docs-grid :deep(.lista-documentos),
+.docs-grid :deep(.documentos) {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 9px !important;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.docs-grid :deep(.ant-list-item),
+.docs-grid :deep(li) {
+    margin: 0 !important;
+    padding: 9px 11px !important;
+    border: 1px solid var(--sigam-borde-suave) !important;
+    border-radius: 10px !important;
+    background: #fff;
+    transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+.docs-grid :deep(.ant-list-item:hover),
+.docs-grid :deep(li:hover) {
+    border-color: #c9b8f0 !important;
+    box-shadow: 0 3px 10px rgba(107, 75, 201, 0.14);
+    transform: translateY(-1px);
 }
 
 /* ==========================================================
@@ -876,9 +928,37 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
 /* ==========================================================
    Responsive
    ========================================================== */
+@media (max-width: 1399px) {
+    .equipos-grid,
+    .docs-grid :deep(.ant-list-items),
+    .docs-grid :deep(ul),
+    .docs-grid :deep(.lista-documentos),
+    .docs-grid :deep(.documentos) {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+
 @media (max-width: 1199px) {
     .grid-ficha {
         grid-template-columns: 1fr;
+    }
+
+    .equipos-grid,
+    .docs-grid :deep(.ant-list-items),
+    .docs-grid :deep(ul),
+    .docs-grid :deep(.lista-documentos),
+    .docs-grid :deep(.documentos) {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+}
+
+@media (max-width: 991px) {
+    .equipos-grid,
+    .docs-grid :deep(.ant-list-items),
+    .docs-grid :deep(ul),
+    .docs-grid :deep(.lista-documentos),
+    .docs-grid :deep(.documentos) {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     }
 }
 
@@ -891,6 +971,14 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
     .btn-more {
         width: 100%;
     }
+
+    .equipos-grid,
+    .docs-grid :deep(.ant-list-items),
+    .docs-grid :deep(ul),
+    .docs-grid :deep(.lista-documentos),
+    .docs-grid :deep(.documentos) {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
 }
 
 @media (max-width: 575px) {
@@ -898,6 +986,14 @@ const abrirImagen = () => subirDoc.value?.abrirImagen();
     .mini-grid--2,
     .mini-grid--3 {
         grid-template-columns: 1fr;
+    }
+
+    .equipos-grid,
+    .docs-grid :deep(.ant-list-items),
+    .docs-grid :deep(ul),
+    .docs-grid :deep(.lista-documentos),
+    .docs-grid :deep(.documentos) {
+        grid-template-columns: 1fr !important;
     }
 }
 </style>

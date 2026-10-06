@@ -421,6 +421,8 @@ const aplicarEstado = () => {
 .link-proveedor:hover {
     color: #0d84c9;
     text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
 }
 
 .proveedor-comercial {
