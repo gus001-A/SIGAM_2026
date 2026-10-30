@@ -16,6 +16,8 @@ class TareasTest extends TestCase
 
     private Usuario $supervisor;
 
+    private Usuario $auditor;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -24,6 +26,9 @@ class TareasTest extends TestCase
 
         $this->supervisor = Usuario::factory()->create();
         $this->supervisor->assignRole('supervisor');
+
+        $this->auditor = Usuario::factory()->create();
+        $this->auditor->assignRole('auditor');
     }
 
     /** Inicia la tarea por la transición real, para que el responsable quede registrado como participante activo. */
@@ -474,11 +479,16 @@ class TareasTest extends TestCase
         $this->assertNotNull($tarea->autorizada_at);
         $this->assertSame($this->supervisor->id, $tarea->autorizado_por);
 
+        // Supervisar es exclusivo del auditor: el supervisor ya no puede.
         $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'supervisada', 'nota' => 'Intento'])
+            ->assertForbidden();
+
+        $this->actingAs($this->auditor)
             ->post(route('tareas.transicion', $tarea), ['estado' => 'supervisada', 'nota' => 'Se supervisa en sitio'])
             ->assertSessionHasNoErrors();
         $this->assertSame('supervisada', $tarea->refresh()->estado);
-        $this->assertSame($this->supervisor->id, $tarea->supervisor_id);
+        $this->assertSame($this->auditor->id, $tarea->supervisor_id);
 
         $this->actingAs($this->supervisor)
             ->post(route('tareas.transicion', $tarea), ['estado' => 'cerrada', 'nota' => 'Conforme, se cierra'])
@@ -500,16 +510,21 @@ class TareasTest extends TestCase
 
         $this->actingAs($this->supervisor)->post(route('tareas.transicion', $tarea), ['estado' => 'completada', 'nota' => 'Trabajo terminado']);
         $this->actingAs($this->supervisor)->post(route('tareas.transicion', $tarea), ['estado' => 'autorizada', 'nota' => 'Primera autorización']);
-        $this->actingAs($this->supervisor)->post(route('tareas.transicion', $tarea), ['estado' => 'supervisada', 'nota' => 'Algo no está bien']);
+        $this->actingAs($this->auditor)->post(route('tareas.transicion', $tarea), ['estado' => 'supervisada', 'nota' => 'Algo no está bien']);
 
-        // El supervisor no está de acuerdo: regresa a autorizada.
+        // Regresar a autorizada también es del auditor, no del supervisor.
         $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'autorizada', 'nota' => 'Intento'])
+            ->assertForbidden();
+
+        // El auditor no está de acuerdo: regresa a autorizada.
+        $this->actingAs($this->auditor)
             ->post(route('tareas.transicion', $tarea), ['estado' => 'autorizada', 'nota' => 'Falta corregir el acabado'])
             ->assertSessionHasNoErrors();
         $this->assertSame('autorizada', $tarea->refresh()->estado);
 
         // Se corrige y se vuelve a avanzar con una nota nueva.
-        $this->actingAs($this->supervisor)
+        $this->actingAs($this->auditor)
             ->post(route('tareas.transicion', $tarea), ['estado' => 'supervisada', 'nota' => 'Ya corregido, segunda vuelta'])
             ->assertSessionHasNoErrors();
         $this->actingAs($this->supervisor)
@@ -693,5 +708,32 @@ class TareasTest extends TestCase
             ->assertInertia(fn ($p) => $p
                 ->where('tareas.data.0.estado', 'asignada')
                 ->where('tareas.data.1.estado', 'en_proceso'));
+    }
+
+    public function test_solo_el_auditor_puede_reprogramar(): void
+    {
+        $tarea = Tarea::create(['titulo' => 'x', 'descripcion' => 'x', 'fecha_limite' => now()->addDay(), 'estado' => 'asignada']);
+        $tarea->responsables()->attach($this->supervisor->id, ['asignado_at' => now(), 'es_principal' => true]);
+
+        $this->actingAs($this->supervisor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'reprogramada', 'nota' => 'Intento'])
+            ->assertForbidden();
+
+        $this->actingAs($this->auditor)
+            ->post(route('tareas.transicion', $tarea), ['estado' => 'reprogramada', 'nota' => 'Se mueve a la otra semana'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('reprogramada', $tarea->refresh()->estado);
+    }
+
+    public function test_el_auditor_tiene_todo_lo_del_supervisor_y_mas(): void
+    {
+        $permisosSupervisor = $this->supervisor->getAllPermissions()->pluck('name');
+        $permisosAuditor = $this->auditor->getAllPermissions()->pluck('name');
+
+        $this->assertEmpty($permisosSupervisor->diff($permisosAuditor)->all());
+        $this->assertTrue($this->auditor->can('tareas.supervisar'));
+        $this->assertTrue($this->auditor->can('auditoria.exportar'));
+        $this->assertFalse($this->supervisor->can('tareas.supervisar'));
+        $this->assertFalse($this->auditor->can('usuarios.crear'));
     }
 }

@@ -30,3 +30,33 @@ router.on('invalid', (evento) => {
         onOk: () => window.location.reload(),
     });
 });
+
+/**
+ * Respuestas que no vienen de Laravel sino del servidor de hosting (firewall
+ * ModSecurity/LiteSpeed: "403 Forbidden — Access to this resource on the
+ * server is denied!", o 413 por archivos muy pesados). Inertia las pintaba
+ * tal cual en un recuadro blanco encima de la pantalla y el usuario no sabía
+ * qué pasó ni si se guardó algo. Aquí se reemplazan por un aviso claro.
+ */
+router.on('invalid', (evento) => {
+    const respuesta = evento.detail?.response;
+    const status = respuesta?.status;
+    if (status === 419 || status === 401) return;
+
+    const html = typeof respuesta?.data === 'string' ? respuesta.data : '';
+    const firewall = /Access to this resource on the server is denied|Mod_?Security|LiteSpeed/i.test(html);
+
+    let content;
+    if (status === 413) {
+        content = 'Los archivos que intentas subir pesan demasiado para el servidor. Quita algunos o súbelos en varios avances.';
+    } else if (status === 403 && firewall) {
+        content = 'El servidor bloqueó el envío por seguridad (no se guardó nada). Suele pasar por el nombre o el contenido de algún archivo adjunto: renómbralo o conviértelo (por ejemplo a PDF o JPG) e inténtalo de nuevo. Si persiste, avisa al administrador del sistema.';
+    } else if (status === 403) {
+        content = 'No tienes permiso para realizar esta acción.';
+    } else {
+        return;
+    }
+
+    evento.preventDefault();
+    Modal.error({ title: 'No se pudo completar la acción', content, centered: true, okText: 'Entendido' });
+});

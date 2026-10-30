@@ -51,7 +51,31 @@ watch(
 );
 onBeforeUnmount(liberar);
 
-const agregar = (archivo) => {
+/* El firewall del hosting (ModSecurity) rechaza con un 403 algunos envíos
+   por el nombre del archivo (acentos, comillas, `;`, `&`, dobles extensiones,
+   nombres larguísimos de WhatsApp/cámara…). Se manda con un nombre limpio:
+   solo letras sin acento, números, guion y guion bajo. */
+const nombreSeguro = (nombre) => {
+    const punto = nombre.lastIndexOf('.');
+    const ext = punto > 0 ? nombre.slice(punto + 1).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+    const base = (punto > 0 ? nombre.slice(0, punto) : nombre)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Za-z0-9_-]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .slice(0, 60) || 'evidencia';
+    return ext ? `${base}.${ext}` : base;
+};
+const limpiar = (archivo) => {
+    const nombre = nombreSeguro(archivo.name ?? 'evidencia');
+    return nombre === archivo.name
+        ? archivo
+        : new File([archivo], nombre, { type: archivo.type, lastModified: archivo.lastModified });
+};
+
+const agregar = (original) => {
+    const archivo = limpiar(original);
     if (props.soloImagenes && !esImagen(archivo)) {
         message.error('Solo se permiten imágenes (JPG, PNG o WEBP).');
         return false;

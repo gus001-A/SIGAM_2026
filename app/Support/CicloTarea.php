@@ -34,6 +34,22 @@ class CicloTarea
         'cancelada' => 'Cancelada',
     ];
 
+    /**
+     * Permiso que exige cada paso. Autorizar es del supervisor; supervisar (y
+     * regresar de Supervisada a Autorizada) y reprogramar son del auditor.
+     */
+    public static function permisoPara(string $origen, string $destino): string
+    {
+        return match (true) {
+            $destino === 'autorizada' && $origen === 'supervisada' => 'tareas.supervisar',
+            $destino === 'autorizada' => 'tareas.autorizar',
+            $destino === 'supervisada' => 'tareas.supervisar',
+            $destino === 'reprogramada' => 'tareas.reprogramar',
+            $destino === 'cerrada' => 'tareas.cerrar',
+            default => 'tareas.editar',
+        };
+    }
+
     public static function permite(string $origen, string $destino): bool
     {
         return in_array($destino, self::TRANSICIONES[$origen] ?? [], true);

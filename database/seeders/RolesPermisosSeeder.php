@@ -28,7 +28,7 @@ class RolesPermisosSeeder extends Seeder
         'formatos' => ['ver', 'crear', 'editar', 'desactivar'],
         'solicitudes' => ['ver', 'crear', 'editar', 'asignar'],
         'mantenimientos' => ['ver', 'crear', 'editar', 'asignar', 'supervisar', 'cerrar', 'exportar'],
-        'tareas' => ['ver', 'crear', 'editar', 'asignar', 'supervisar', 'cerrar', 'desactivar', 'comentar'],
+        'tareas' => ['ver', 'crear', 'editar', 'asignar', 'autorizar', 'supervisar', 'reprogramar', 'cerrar', 'desactivar', 'comentar'],
         'documentos' => ['ver', 'crear', 'desactivar'],
         'reportes' => ['ver', 'exportar'],
         'auditoria' => ['ver', 'exportar'],
@@ -51,10 +51,13 @@ class RolesPermisosSeeder extends Seeder
         // 2. Definir los permisos de cada rol.
         $soloVer = fn (array $modulos) => array_map(fn ($m) => "{$m}.ver", $modulos);
 
-        $roles = [
-            'superadministrador' => $todos,
+        // Jerarquía: superadministrador > auditor > supervisor > técnico > usuario básico.
+        // Supervisar y reprogramar tareas es exclusivo del auditor (y del
+        // superadministrador); el supervisor solo las autoriza.
+        $exclusivosAuditor = ['tareas.supervisar', 'tareas.reprogramar'];
 
-            'supervisor' => array_merge(
+        $supervisor = array_values(array_diff(
+            array_merge(
                 $this->modulo('dashboard'),
                 $soloVer(['usuarios', 'roles']),
                 ['sucursales.ver', 'sucursales.editar'],
@@ -70,6 +73,13 @@ class RolesPermisosSeeder extends Seeder
                 $this->modulo('documentos'),
                 $this->modulo('reportes'),
             ),
+            $exclusivosAuditor,
+        ));
+
+        $roles = [
+            'superadministrador' => $todos,
+
+            'supervisor' => $supervisor,
 
             'tecnico' => [
                 'dashboard.ver',
@@ -93,12 +103,13 @@ class RolesPermisosSeeder extends Seeder
                 'reportes.ver',
             ],
 
+            // Por encima del supervisor (tiene todo lo suyo) y por debajo del
+            // superadministrador: no administra usuarios ni roles.
             'auditor' => array_merge(
+                $supervisor,
                 $soloVer(array_keys(self::MATRIZ)),
-                ['auditoria.exportar', 'reportes.exportar'],
-                // Única excepción a "solo ver": puede dejar comentarios de
-                // supervisión en una tarea, igual que el supervisor.
-                ['tareas.comentar'],
+                $this->modulo('auditoria'),
+                $exclusivosAuditor,
             ),
         ];
 

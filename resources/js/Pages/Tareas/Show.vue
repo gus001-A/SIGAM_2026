@@ -326,20 +326,24 @@ const claseBotonEstado = computed(() => ({
     cancelada: 'btn-submit--red',
 }[formEstado.estado] ?? ''));
 
-/* El supervisor, al no estar de acuerdo, "regresa" la tarea de Supervisada a
+/* El auditor, al no estar de acuerdo, "regresa" la tarea de Supervisada a
    Autorizada: no se borra nada, solo se abre una nueva vuelta de revisión. */
 const esRegresoDesdeSupervisada = (slug) => t.value?.estado === 'supervisada' && slug === 'autorizada';
 
 /* Si el usuario no tiene permiso para ese paso, ni se muestra el botón
-   (antes se mostraba igual y al hacer clic daba un 403). */
+   (antes se mostraba igual y al hacer clic daba un 403).
+   Mismo criterio que `CicloTarea::permisoPara()`: autorizar es del
+   supervisor; supervisar, regresar a autorizada y reprogramar, del auditor. */
 const PERMISO_POR_ESTADO = {
-    autorizada: 'tareas.supervisar',
+    autorizada: 'tareas.autorizar',
     supervisada: 'tareas.supervisar',
+    reprogramada: 'tareas.reprogramar',
     cerrada: 'tareas.cerrar',
 };
+const permisoPara = (slug) => (esRegresoDesdeSupervisada(slug) ? 'tareas.supervisar' : PERMISO_POR_ESTADO[slug]);
 const botonesTransicion = computed(() =>
     props.transicionesPosibles
-        .filter((slug) => !PERMISO_POR_ESTADO[slug] || puede(PERMISO_POR_ESTADO[slug]))
+        .filter((slug) => !permisoPara(slug) || puede(permisoPara(slug)))
         .map((slug, i) => {
         const regreso = esRegresoDesdeSupervisada(slug);
         const hero = regreso

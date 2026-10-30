@@ -338,12 +338,7 @@ class TareaController extends Controller
             'enlace' => ['nullable', 'url', 'max:2048'],
             'cerrar_sin_esperar' => ['nullable', 'boolean'],
         ];
-        if (in_array($destino, ['autorizada', 'supervisada'], true)) {
-            $this->authorize('tareas.supervisar');
-        }
-        if ($destino === 'cerrada') {
-            $this->authorize('tareas.cerrar');
-        }
+        $this->authorize(CicloTarea::permisoPara($origen, $destino));
         $datos = $request->validate($reglas);
 
         // En tareas compartidas, nadie la da por completada hasta que cada
@@ -559,7 +554,12 @@ class TareaController extends Controller
                     'usuario_id' => $a->usuario_id,
                     'nombre' => $a->usuario?->nombre_completo,
                     'es_principal' => (bool) $a->es_principal,
-                    'acciones' => $tarea->historialEstados()->where('cambiado_por', $a->usuario_id)->count(),
+                    // Misma ventana que `participantesPendientes()`: solo cuenta
+                    // lo hecho desde que la tarea entró en proceso, para que la
+                    // etiqueta "Con avance" coincida con lo que exige el cierre.
+                    'acciones' => $tarea->historialEstados()->where('cambiado_por', $a->usuario_id)
+                        ->when($tarea->iniciada_at, fn ($q) => $q->where('cambiado_at', '>=', $tarea->iniciada_at))
+                        ->count(),
                     'ultimo' => $ultimo ? [
                         'nota' => $ultimo->nota,
                         'enlace' => $ultimo->enlace,
