@@ -65,8 +65,14 @@ const grupos = [
             { label: 'Solicitudes', ruta: 'solicitudes.index', patron: 'solicitudes.*', permiso: 'solicitudes.ver', icon: FormOutlined },
             { label: 'Órdenes', ruta: 'mantenimientos.index', patron: 'mantenimientos.*', permiso: 'mantenimientos.ver', icon: ToolOutlined },
             { label: 'Planes preventivos', ruta: 'planes.index', patron: 'planes.*', permiso: 'mantenimientos.ver', icon: CalendarOutlined },
-            { label: 'Calendario', ruta: 'calendario.index', patron: 'calendario.*', permiso: 'mantenimientos.ver', icon: CalendarOutlined },
         ],
+    },
+    {
+        clave: 'g-calendario',
+        label: 'Calendario',
+        icono: CalendarOutlined,
+        items: [{ label: 'Calendario', ruta: 'calendario.index', patron: 'calendario.*', permiso: 'mantenimientos.ver', icon: CalendarOutlined }],
+        directo: true,
     },
     {
         clave: 'g-tareas',

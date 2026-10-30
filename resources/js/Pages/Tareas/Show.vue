@@ -11,9 +11,12 @@ import {
     DollarOutlined,
     EditOutlined,
     EyeOutlined,
+    FileDoneOutlined,
     FileTextOutlined,
     FlagOutlined,
     FolderOutlined,
+    LinkOutlined,
+    MessageOutlined,
     InfoCircleOutlined,
     InboxOutlined,
     PlayCircleOutlined,
@@ -23,6 +26,7 @@ import {
     SwapOutlined,
     TeamOutlined,
     ToolOutlined,
+    UndoOutlined,
     UserOutlined,
     WhatsAppOutlined,
     EllipsisOutlined,
@@ -47,6 +51,8 @@ const props = defineProps({
     pendientesAvance: { type: Array, default: () => [] },
     soyParticipante: { type: Boolean, default: false },
     soyPrincipal: { type: Boolean, default: false },
+    puedeComentar: { type: Boolean, default: false },
+    comentariosPorMovimiento: { type: Object, default: () => ({}) },
 });
 
 const { puede } = usePermisos();
@@ -55,37 +61,61 @@ const confirmar = ref(null);
 
 const ETIQUETA_ESTADO = {
     en_proceso: 'Iniciar tarea',
-    realizada: 'Marcar como realizada',
+    completada: 'Marcar como completada',
+    autorizada: 'Autorizar',
+    supervisada: 'Supervisar',
+    cerrada: 'Cerrar tarea',
+    reprogramada: 'Reprogramar',
     cancelada: 'Cancelar tarea',
 };
 const ICONO_ESTADO = {
     en_proceso: PlayCircleOutlined,
-    realizada: CheckCircleOutlined,
+    completada: CheckCircleOutlined,
+    autorizada: FileDoneOutlined,
+    supervisada: FlagOutlined,
+    cerrada: CheckCircleOutlined,
+    reprogramada: CalendarOutlined,
     cancelada: CloseCircleOutlined,
 };
 const COLOR_ESTADO = {
-    pendiente: 'gold',
+    asignada: 'gold',
     en_proceso: 'blue',
-    realizada: 'green',
+    completada: 'lime',
+    autorizada: 'cyan',
+    supervisada: 'geekblue',
+    cerrada: 'green',
+    reprogramada: 'purple',
     cancelada: 'red',
 };
 const ETIQUETA_ESTADO_TAG = {
-    pendiente: 'Pendiente',
+    asignada: 'Asignada',
     en_proceso: 'En proceso',
-    realizada: 'Realizada',
+    completada: 'Completada',
+    autorizada: 'Autorizada',
+    supervisada: 'Supervisada',
+    cerrada: 'Cerrada',
+    reprogramada: 'Reprogramada',
     cancelada: 'Cancelada',
 };
 const COLOR_TIMELINE = {
-    pendiente: '#d4a017',
+    asignada: '#d4a017',
     en_proceso: '#0d84c9',
-    realizada: '#1f9e86',
+    completada: '#1f9e86',
+    autorizada: '#0ea5e9',
+    supervisada: '#7c3aed',
+    cerrada: '#16a34a',
+    reprogramada: '#6b4bc9',
     cancelada: '#d64545',
 };
 
 /* Mapa de colores hero para cada estado */
 const HERO_COLORES = {
     en_proceso: { c1: '#0d84c9', c2: '#0a6ba6', variante: 'primary' },
-    realizada: { c1: '#1f9e86', c2: '#16806c', variante: 'primary' },
+    completada: { c1: '#1f9e86', c2: '#16806c', variante: 'primary' },
+    autorizada: { c1: '#0ea5e9', c2: '#0a85c2', variante: 'primary' },
+    supervisada: { c1: '#7c3aed', c2: '#6d28d9', variante: 'primary' },
+    cerrada: { c1: '#16a34a', c2: '#15803d', variante: 'primary' },
+    reprogramada: { c1: '#6b4bc9', c2: '#56359e', variante: 'default' },
     cancelada: { c1: '#d64545', c2: '#b91c1c', variante: 'danger' },
 };
 
@@ -109,13 +139,16 @@ const partesFecha = (v) => {
     };
 };
 
+const ESTADOS_NO_FINALES = ['asignada', 'en_proceso', 'completada', 'autorizada', 'supervisada', 'reprogramada'];
 const vencida = computed(
     () =>
-        ['pendiente', 'en_proceso'].includes(t.value?.estado) &&
+        ESTADOS_NO_FINALES.includes(t.value?.estado) &&
         t.value?.fecha_limite &&
         new Date(t.value.fecha_limite) < new Date().setHours(0, 0, 0, 0),
 );
-const esFinal = computed(() => ['realizada', 'cancelada'].includes(t.value?.estado));
+const esFinal = computed(() => ['cerrada', 'cancelada'].includes(t.value?.estado));
+/* Los comentarios de supervisión son antes de cerrar la tarea; cerrada ya no se agregan más. */
+const tareaCerrada = computed(() => t.value?.estado === 'cerrada');
 
 /* ---------- Datos de "Información de la tarea" ---------- */
 const datos = computed(() => [
@@ -163,13 +196,14 @@ const responsablesInactivos = computed(() =>
 
 /* ---------- Cambiar estado ---------- */
 const modalEstado = ref(false);
-const formEstado = useForm({ estado: null, nota: '', evidencias: [], cerrar_sin_esperar: false });
+const formEstado = useForm({ estado: null, nota: '', evidencias: [], enlace: '', cerrar_sin_esperar: false });
 const abrirEstado = (slug) => {
     formEstado.reset();
     formEstado.clearErrors();
     formEstado.estado = slug;
     formEstado.nota = '';
     formEstado.evidencias = [];
+    formEstado.enlace = '';
     formEstado.cerrar_sin_esperar = false;
     modalEstado.value = true;
 };
@@ -180,7 +214,7 @@ const cerrarEstado = () => {
 };
 /* Pendientes: participantes que aún no han hecho nada en la tarea. */
 const cierreBloqueado = computed(
-    () => formEstado.estado === 'realizada' && props.pendientesAvance.length > 0 && !formEstado.cerrar_sin_esperar,
+    () => formEstado.estado === 'completada' && props.pendientesAvance.length > 0 && !formEstado.cerrar_sin_esperar,
 );
 const confirmarEstado = () => {
     formEstado.clearErrors();
@@ -199,10 +233,11 @@ const confirmarEstado = () => {
 };
 /* ---------- Avance de un participante (no cambia el estado) ---------- */
 const modalAvance = ref(false);
-const formAvance = useForm({ nota: '', evidencias: [] });
+const formAvance = useForm({ nota: '', evidencias: [], enlace: '' });
 const abrirAvance = () => {
     formAvance.reset();
     formAvance.clearErrors();
+    formAvance.enlace = '';
     modalAvance.value = true;
 };
 const cerrarAvance = () => {
@@ -226,21 +261,94 @@ const confirmarAvance = () => {
     });
 };
 
+/* ---------- Comentario de supervisión (solo supervisor/auditor) ---------- */
+/* ---------- Detalle de un movimiento (modal): nota del responsable +
+   comentarios de supervisión de ESE movimiento en particular ---------- */
+const modalMovimiento = ref(false);
+const movimientoActivo = ref(null);
+const comentariosDelMovimiento = computed(() =>
+    movimientoActivo.value ? (props.comentariosPorMovimiento[movimientoActivo.value.id] ?? []) : [],
+);
+const abrirMovimiento = (hh) => {
+    movimientoActivo.value = hh;
+    formComentario.reset();
+    formComentario.clearErrors();
+    modalMovimiento.value = true;
+};
+const cerrarMovimiento = () => {
+    modalMovimiento.value = false;
+    movimientoActivo.value = null;
+};
+const formComentario = useForm({ cuerpo: '' });
+const confirmarComentario = () => {
+    formComentario.clearErrors();
+    if (!formComentario.cuerpo?.trim()) {
+        formComentario.setError('cuerpo', 'Escribe el comentario.');
+        return;
+    }
+    formComentario.post(route('tareas.comentarios.store', [t.value.id, movimientoActivo.value.id]), {
+        preserveScroll: true,
+        onSuccess: () => formComentario.reset(),
+    });
+};
+
+/* ---------- Avance por participante: con 2+ responsables, cada fila solo
+   muestra el nombre y abre un modal con lo que ese usuario ha hecho. ---------- */
+const modoMultiple = computed(() => (props.avances?.length ?? 0) > 1);
+const modalParticipante = ref(false);
+const participanteActivo = ref(null);
+const movimientosDelParticipante = computed(() => {
+    if (!participanteActivo.value) return [];
+    return (t.value?.historial_estados ?? []).filter((hh) => hh.cambiado_por?.id === participanteActivo.value.usuario_id);
+});
+const abrirParticipante = (item) => {
+    participanteActivo.value = item;
+    modalParticipante.value = true;
+};
+const cerrarParticipante = () => {
+    modalParticipante.value = false;
+    participanteActivo.value = null;
+};
+/* Desde el detalle de un participante también se puede abrir el detalle de
+   (y comentar) uno de sus movimientos en particular. */
+const abrirMovimientoDesdeParticipante = (hh) => {
+    modalParticipante.value = false;
+    abrirMovimiento(hh);
+};
+
 const estiloIconoEstado = computed(() => {
     const hero = HERO_COLORES[formEstado.estado];
     return hero ? { '--mh1': hero.c1, '--mh2': hero.c2 } : {};
 });
 const claseBotonEstado = computed(() => ({
-    realizada: 'btn-submit--green',
+    completada: 'btn-submit--green',
+    cerrada: 'btn-submit--green',
     cancelada: 'btn-submit--red',
 }[formEstado.estado] ?? ''));
+
+/* El supervisor, al no estar de acuerdo, "regresa" la tarea de Supervisada a
+   Autorizada: no se borra nada, solo se abre una nueva vuelta de revisión. */
+const esRegresoDesdeSupervisada = (slug) => t.value?.estado === 'supervisada' && slug === 'autorizada';
+
+/* Si el usuario no tiene permiso para ese paso, ni se muestra el botón
+   (antes se mostraba igual y al hacer clic daba un 403). */
+const PERMISO_POR_ESTADO = {
+    autorizada: 'tareas.supervisar',
+    supervisada: 'tareas.supervisar',
+    cerrada: 'tareas.cerrar',
+};
 const botonesTransicion = computed(() =>
-    props.transicionesPosibles.map((slug, i) => {
-        const hero = HERO_COLORES[slug] ?? { c1: '#0d84c9', c2: '#0a6ba6', variante: 'default' };
+    props.transicionesPosibles
+        .filter((slug) => !PERMISO_POR_ESTADO[slug] || puede(PERMISO_POR_ESTADO[slug]))
+        .map((slug, i) => {
+        const regreso = esRegresoDesdeSupervisada(slug);
+        const hero = regreso
+            ? { c1: '#ea580c', c2: '#c2410c', variante: 'default' }
+            : (HERO_COLORES[slug] ?? { c1: '#0d84c9', c2: '#0a6ba6', variante: 'default' });
         return {
             slug,
-            label: ETIQUETA_ESTADO[slug] ?? slug,
-            icono: ICONO_ESTADO[slug] ?? CheckCircleOutlined,
+            label: regreso ? 'Regresar a autorizada' : (ETIQUETA_ESTADO[slug] ?? slug),
+            icono: regreso ? UndoOutlined : (ICONO_ESTADO[slug] ?? CheckCircleOutlined),
             variante: hero.variante,
             color: hero.c1,
             color2: hero.c2,
@@ -760,8 +868,9 @@ const onMenuAccion = ({ key }) => {
 
                 <!-- COLUMNA DERECHA -->
                 <div class="col-der">
-                    <!-- Historial de estados -->
-                    <div class="card">
+                    <!-- Historial de estados: con 2+ responsables se oculta y
+                         solo queda "Avance por participante" (abajo). -->
+                    <div v-if="!modoMultiple" class="card">
                         <div class="card__head">
                             <div class="card__ico" style="--c: #e08a1e">
                                 <SwapOutlined />
@@ -775,8 +884,8 @@ const onMenuAccion = ({ key }) => {
                         </div>
                         <div class="card__body">
                             <div v-if="t?.historial_estados?.length" class="historial-estados">
-                                <article v-for="hh in t.historial_estados" :key="hh.id" class="hist-item"
-                                    :style="{ '--hc': colorEstadoHistorial(hh) }">
+                                <article v-for="hh in t.historial_estados" :key="hh.id" class="hist-item hist-item--clicable"
+                                    :style="{ '--hc': colorEstadoHistorial(hh) }" @click="abrirMovimiento(hh)">
                                     <div class="hist-item__main">
                                         <p v-if="hh.nota" class="hist-item__comentario">{{ hh.nota }}</p>
                                         <p v-else class="hist-item__comentario hist-item__comentario--vacio">
@@ -798,6 +907,11 @@ const onMenuAccion = ({ key }) => {
 
                                         <GaleriaEvidencias v-if="hh.evidencias?.length" :documentos="hh.evidencias"
                                             class="hist-item__fotos" />
+
+                                        <a v-if="hh.enlace" :href="hh.enlace" target="_blank" rel="noopener noreferrer"
+                                            class="hist-item__enlace">
+                                            <LinkOutlined /> {{ hh.enlace }}
+                                        </a>
                                     </div>
 
                                     <div class="hist-item__lado">
@@ -807,6 +921,11 @@ const onMenuAccion = ({ key }) => {
                                         <span v-if="etiquetaEstadoOrigen(hh)" class="hist-item__origen">
                                             desde <em>{{ etiquetaEstadoOrigen(hh) }}</em>
                                         </span>
+                                        <a-tooltip v-if="comentariosPorMovimiento[hh.id]?.length" title="Tiene comentario de supervisión">
+                                            <span class="hist-item__comentario-ic">
+                                                <MessageOutlined />
+                                            </span>
+                                        </a-tooltip>
                                     </div>
                                 </article>
                             </div>
@@ -846,7 +965,24 @@ const onMenuAccion = ({ key }) => {
                         <div class="card__body">
                             <a-list :data-source="avances" :locale="{ emptyText: 'Sin participantes' }">
                                 <template #renderItem="{ item }">
-                                    <a-list-item class="avance-item">
+                                    <!-- 2+ responsables: solo el nombre, el detalle va en el modal. -->
+                                    <a-list-item v-if="modoMultiple" class="avance-item avance-item--clicable"
+                                        @click="abrirParticipante(item)">
+                                        <a-list-item-meta>
+                                            <template #title>
+                                                <span class="avance-item__nombre-solo">{{ item.nombre }}</span>
+                                                <a-tag v-if="item.es_principal" color="blue">Principal</a-tag>
+                                            </template>
+                                        </a-list-item-meta>
+                                        <template #actions>
+                                            <a-tag v-if="item.acciones" color="green">Con avance</a-tag>
+                                            <a-tag v-else color="orange">Sin avance</a-tag>
+                                            <EyeOutlined />
+                                        </template>
+                                    </a-list-item>
+
+                                    <!-- Un solo responsable: se queda el detalle inline (ya se ve el historial completo igual). -->
+                                    <a-list-item v-else class="avance-item">
                                         <a-list-item-meta :title="item.nombre">
                                             <template #description>
                                                 <p v-if="item.ultimo" class="avance-item__nota">{{ item.ultimo.nota }}</p>
@@ -857,6 +993,10 @@ const onMenuAccion = ({ key }) => {
                                                 <p v-if="item.ultimo" class="avance-item__fecha">
                                                     Último avance · {{ fechaHora(item.ultimo.fecha) }}
                                                 </p>
+                                                <a v-if="item.ultimo?.enlace" :href="item.ultimo.enlace" target="_blank"
+                                                    rel="noopener noreferrer" class="hist-item__enlace">
+                                                    <LinkOutlined /> {{ item.ultimo.enlace }}
+                                                </a>
                                                 <GaleriaEvidencias v-if="item.ultimo?.evidencias?.length"
                                                     :documentos="item.ultimo.evidencias" class="hist-item__fotos" />
                                             </template>
@@ -886,8 +1026,14 @@ const onMenuAccion = ({ key }) => {
                         <component :is="ICONO_ESTADO[formEstado.estado] || SwapOutlined" />
                     </div>
                     <div class="modal-head__meta">
-                        <h2 class="modal-head__titulo">{{ ETIQUETA_ESTADO[formEstado.estado] || 'Cambiar estado' }}</h2>
-                        <p class="modal-head__sub">Registra este movimiento de la tarea.</p>
+                        <h2 class="modal-head__titulo">
+                            {{ esRegresoDesdeSupervisada(formEstado.estado) ? 'Regresar a autorizada' : (ETIQUETA_ESTADO[formEstado.estado] || 'Cambiar estado') }}
+                        </h2>
+                        <p class="modal-head__sub">
+                            {{ esRegresoDesdeSupervisada(formEstado.estado)
+                                ? 'No se borra nada de lo ya registrado: se abre una nueva vuelta de revisión con tu nota.'
+                                : 'Registra este movimiento de la tarea.' }}
+                        </p>
                     </div>
                     <button type="button" class="modal-head__close" :disabled="formEstado.processing" title="Cerrar"
                         @click="cerrarEstado">✕</button>
@@ -897,11 +1043,15 @@ const onMenuAccion = ({ key }) => {
                     <div class="row">
                         <label class="label">
                             <FileTextOutlined />
-                            {{ formEstado.estado === 'realizada'
-                                ? 'Nota de cierre'
+                            {{ formEstado.estado === 'completada'
+                                ? 'Nota de cierre de los trabajos'
                                 : formEstado.estado === 'cancelada'
                                     ? 'Motivo de la cancelación'
-                                    : 'Nota de avance' }}
+                                    : formEstado.estado === 'autorizada'
+                                        ? 'Nota de autorización'
+                                        : formEstado.estado === 'supervisada'
+                                            ? 'Nota de supervisión'
+                                            : 'Nota de avance' }}
                         </label>
                         <a-form :model="formEstado" layout="vertical">
                             <a-form-item name="nota" :validate-status="formEstado.errors.nota ? 'error' : undefined"
@@ -911,7 +1061,7 @@ const onMenuAccion = ({ key }) => {
                         </a-form>
                     </div>
 
-                    <div v-if="formEstado.estado === 'realizada' && pendientesAvance.length" class="row">
+                    <div v-if="formEstado.estado === 'completada' && pendientesAvance.length" class="row">
                         <div class="faltan">
                             <span class="faltan__ic">!</span>
                             <div class="faltan__txt">
@@ -933,6 +1083,15 @@ const onMenuAccion = ({ key }) => {
                         <CampoEvidencias v-model="formEstado.evidencias" :solo-imagenes="false" />
                         <p v-if="formEstado.errors.evidencias" class="error-msg">{{ formEstado.errors.evidencias }}</p>
                         <p v-if="formEstado.errors.estado" class="error-msg">{{ formEstado.errors.estado }}</p>
+                    </div>
+
+                    <div class="row">
+                        <label class="label">
+                            <LinkOutlined /> Enlace (opcional)
+                        </label>
+                        <a-input v-model:value="formEstado.enlace" placeholder="https://…"
+                            :status="formEstado.errors.enlace ? 'error' : undefined" />
+                        <p v-if="formEstado.errors.enlace" class="error-msg">{{ formEstado.errors.enlace }}</p>
                     </div>
                 </form>
 
@@ -986,6 +1145,15 @@ const onMenuAccion = ({ key }) => {
                         </label>
                         <CampoEvidencias v-model="formAvance.evidencias" :solo-imagenes="false" />
                     </div>
+
+                    <div class="row">
+                        <label class="label">
+                            <LinkOutlined /> Enlace (opcional)
+                        </label>
+                        <a-input v-model:value="formAvance.enlace" placeholder="https://…"
+                            :status="formAvance.errors.enlace ? 'error' : undefined" />
+                        <p v-if="formAvance.errors.enlace" class="error-msg">{{ formAvance.errors.enlace }}</p>
+                    </div>
                 </form>
 
                 <footer class="modal-footer">
@@ -997,6 +1165,134 @@ const onMenuAccion = ({ key }) => {
                         </template>
                         Guardar avance
                     </a-button>
+                </footer>
+            </div>
+        </a-modal>
+
+        <!-- ==========================================================
+             MODAL DETALLE DE UN MOVIMIENTO: lo que puso el responsable +
+             comentarios de supervisión de ESE movimiento (dentro, no aparte).
+             ========================================================== -->
+        <a-modal v-model:open="modalMovimiento" :footer="null" :closable="false" :width="640" centered
+            class="modal-tarea modal-estado" mask-closable @cancel="cerrarMovimiento">
+            <div v-if="movimientoActivo" class="modal-tarea__wrap" :style="{ '--mh1': colorEstadoHistorial(movimientoActivo), '--mh2': colorEstadoHistorial(movimientoActivo) }">
+                <header class="modal-head">
+                    <div class="modal-head__ico">
+                        <SwapOutlined />
+                    </div>
+                    <div class="modal-head__meta">
+                        <h2 class="modal-head__titulo">{{ etiquetaEstadoHistorial(movimientoActivo) }}</h2>
+                        <p class="modal-head__sub">
+                            {{ movimientoActivo.cambiado_por?.nombre ?? 'Sistema' }} · {{ fechaHora(movimientoActivo.cambiado_at) }}
+                        </p>
+                    </div>
+                    <button type="button" class="modal-head__close" title="Cerrar" @click="cerrarMovimiento">✕</button>
+                </header>
+
+                <div class="modal-body">
+                    <div class="row">
+                        <label class="label">
+                            <FileTextOutlined /> Lo que registró el responsable
+                        </label>
+                        <p v-if="movimientoActivo.nota" class="hist-item__comentario" style="margin: 0;">{{ movimientoActivo.nota }}</p>
+                        <p v-else class="hist-item__comentario hist-item__comentario--vacio" style="margin: 0;">Sin comentario</p>
+                        <GaleriaEvidencias v-if="movimientoActivo.evidencias?.length" :documentos="movimientoActivo.evidencias"
+                            class="hist-item__fotos" />
+                        <a v-if="movimientoActivo.enlace" :href="movimientoActivo.enlace" target="_blank" rel="noopener noreferrer"
+                            class="hist-item__enlace">
+                            <LinkOutlined /> {{ movimientoActivo.enlace }}
+                        </a>
+                    </div>
+
+                    <div v-if="puedeComentar || comentariosDelMovimiento.length" class="row comentarios-movimiento">
+                        <label class="label">
+                            <MessageOutlined /> Comentarios de supervisión
+                        </label>
+                        <p class="row__hint">Solo lo ven supervisión y los responsables de esta tarea.</p>
+
+                        <div v-if="comentariosDelMovimiento.length" class="comentario-lista">
+                            <article v-for="c in comentariosDelMovimiento" :key="c.id" class="comentario-item">
+                                <div class="comentario-item__cab">
+                                    <span class="comentario-item__avatar">{{ (c.usuario ?? 'S').charAt(0).toUpperCase() }}</span>
+                                    <span class="comentario-item__usuario">{{ c.usuario }}</span>
+                                    <span class="comentario-item__fecha">{{ fechaHora(c.fecha) }}</span>
+                                </div>
+                                <p class="comentario-item__cuerpo">{{ c.cuerpo }}</p>
+                            </article>
+                        </div>
+
+                        <form v-if="puedeComentar && !tareaCerrada" class="comentario-form" @submit.prevent="confirmarComentario">
+                            <a-textarea v-model:value="formComentario.cuerpo" :rows="2" show-count :maxlength="2000"
+                                placeholder="Escribe un comentario de supervisión…" />
+                            <p v-if="formComentario.errors.cuerpo" class="error-msg">{{ formComentario.errors.cuerpo }}</p>
+                            <a-button type="primary" size="small" html-type="submit" class="comentario-form__btn"
+                                :loading="formComentario.processing">
+                                Publicar
+                            </a-button>
+                        </form>
+                        <p v-else-if="puedeComentar && tareaCerrada" class="row__hint">
+                            La tarea ya está cerrada: no se pueden agregar más comentarios.
+                        </p>
+                    </div>
+                </div>
+
+                <footer class="modal-footer">
+                    <a-button size="large" @click="cerrarMovimiento">Cerrar</a-button>
+                </footer>
+            </div>
+        </a-modal>
+
+        <!-- ==========================================================
+             MODAL AVANCE DE UN PARTICIPANTE (cuando hay 2+ responsables)
+             ========================================================== -->
+        <a-modal v-model:open="modalParticipante" :footer="null" :closable="false" :width="640" centered
+            class="modal-tarea modal-estado" mask-closable @cancel="cerrarParticipante">
+            <div v-if="participanteActivo" class="modal-tarea__wrap">
+                <header class="modal-head">
+                    <div class="modal-head__ico" style="--mh1: #1f9e86; --mh2: #16806c">
+                        <UserOutlined />
+                    </div>
+                    <div class="modal-head__meta">
+                        <h2 class="modal-head__titulo">{{ participanteActivo.nombre }}</h2>
+                        <p class="modal-head__sub">
+                            {{ participanteActivo.es_principal ? 'Responsable principal · ' : '' }}
+                            {{ movimientosDelParticipante.length }} movimiento(s) registrado(s)
+                        </p>
+                    </div>
+                    <button type="button" class="modal-head__close" title="Cerrar" @click="cerrarParticipante">✕</button>
+                </header>
+
+                <div class="modal-body">
+                    <div v-if="movimientosDelParticipante.length" class="historial-estados">
+                        <article v-for="hh in movimientosDelParticipante" :key="hh.id" class="hist-item hist-item--clicable"
+                            :style="{ '--hc': colorEstadoHistorial(hh) }" @click="abrirMovimientoDesdeParticipante(hh)">
+                            <div class="hist-item__main">
+                                <p v-if="hh.nota" class="hist-item__comentario">{{ hh.nota }}</p>
+                                <p v-else class="hist-item__comentario hist-item__comentario--vacio">Sin comentario</p>
+                                <div class="hist-item__meta">
+                                    <span class="hist-item__fecha">{{ fechaHora(hh.cambiado_at) }}</span>
+                                </div>
+                                <GaleriaEvidencias v-if="hh.evidencias?.length" :documentos="hh.evidencias" class="hist-item__fotos" />
+                                <a v-if="hh.enlace" :href="hh.enlace" target="_blank" rel="noopener noreferrer" class="hist-item__enlace">
+                                    <LinkOutlined /> {{ hh.enlace }}
+                                </a>
+                            </div>
+                            <div class="hist-item__lado">
+                                <span class="hist-item__badge">{{ etiquetaEstadoHistorial(hh) }}</span>
+                                <a-tooltip v-if="comentariosPorMovimiento[hh.id]?.length" title="Tiene comentario de supervisión">
+                                    <span class="hist-item__comentario-ic"><MessageOutlined /></span>
+                                </a-tooltip>
+                            </div>
+                        </article>
+                    </div>
+                    <div v-else class="vacio-box">
+                        <UserOutlined />
+                        <span>Sin avance del usuario</span>
+                    </div>
+                </div>
+
+                <footer class="modal-footer">
+                    <a-button size="large" @click="cerrarParticipante">Cerrar</a-button>
                 </footer>
             </div>
         </a-modal>
@@ -2050,6 +2346,24 @@ const onMenuAccion = ({ key }) => {
     border-radius: 3px;
 }
 
+.hist-item--clicable {
+    cursor: pointer;
+}
+.hist-item--clicable:hover {
+    box-shadow: 0 2px 10px rgba(15, 37, 71, 0.1);
+}
+.hist-item__comentario-ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #ede9fe;
+    color: #7c3aed;
+    font-size: 13px;
+    margin-top: 4px;
+}
 .hist-item {
     position: relative;
     display: flex;
@@ -2078,8 +2392,80 @@ const onMenuAccion = ({ key }) => {
     gap: 8px;
 }
 
+.comentario-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px dashed #e2e8f0;
+}
+.comentario-form__btn {
+    align-self: flex-end;
+}
+.comentario-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.comentario-item {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #faf8ff;
+    border: 1px solid #ede9fe;
+}
+.comentario-item__cab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.comentario-item__avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.comentario-item__usuario {
+    font-weight: 700;
+    font-size: 12.5px;
+    color: #312e81;
+}
+.comentario-item__fecha {
+    margin-left: auto;
+    font-size: 11px;
+    color: #7b8a9c;
+    white-space: nowrap;
+}
+.comentario-item__cuerpo {
+    margin: 0;
+    font-size: 13px;
+    color: #1e1b4b;
+    white-space: pre-line;
+}
+
 .hist-item__fotos {
     margin-top: 10px;
+}
+
+.hist-item__enlace {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #0d84c9;
+    word-break: break-all;
+}
+
+.hist-item__enlace:hover {
+    text-decoration: underline;
 }
 
 .hist-item__comentario {
@@ -3013,6 +3399,20 @@ const onMenuAccion = ({ key }) => {
 .badge--green {
     background: #e7f7f2;
     color: #14705f;
+}
+
+.avance-item--clicable {
+    cursor: pointer;
+    border-radius: 10px;
+    transition: background 0.14s ease;
+}
+.avance-item--clicable:hover {
+    background: #f8fafc;
+}
+.avance-item__nombre-solo {
+    font-weight: 700;
+    color: #173a5f;
+    margin-right: 8px;
 }
 
 .avance-item__nota {

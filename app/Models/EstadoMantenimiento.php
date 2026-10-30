@@ -12,8 +12,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Estados del ciclo de una orden. Especificación v2.0 §7 + Propuesta SIGAM §7.3.
  * clave: solicitado | autorizado | asignado | en_proceso | realizado |
- *        supervisado | cerrado | cancelado | reprogramado |
+ *        autorizada | supervisado | cerrado | cancelado | reprogramado |
  *        en_espera_refaccion | fuera_de_servicio
+ * (`autorizado`: autoriza la SOLICITUD, antes de asignar técnico. `autorizada`:
+ * revisión de la orden ya realizada, antes de supervisarla — son dos cosas
+ * distintas, no es un error de escritura.)
  */
 class EstadoMantenimiento extends Model
 {

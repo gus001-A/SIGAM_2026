@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
+import dayjs from 'dayjs';
 import {
     ApartmentOutlined,
     CheckCircleOutlined,
@@ -41,15 +42,20 @@ const { filtros, orden, cargando, navegar, onCambioTabla } = useTablaInertia('ta
         responsable: props.filtros.responsable ?? '',
         prioridad_id: props.filtros.prioridad_id ?? undefined,
         clasificacion: props.filtros.clasificacion ?? undefined,
+        // Rango de fecha límite
         desde: props.filtros.desde ?? '',
         hasta: props.filtros.hasta ?? '',
+        // Rango de fecha de creación
+        creado_desde: props.filtros.creado_desde ?? '',
+        creado_hasta: props.filtros.creado_hasta ?? '',
         registrado_por: props.filtros.registrado_por ?? '',
     },
     orden: { campo: props.orden.campo ?? 'fecha_limite', dir: props.orden.dir ?? 'asc' },
+    per_page: 8,
 });
 
 let temporizador = null;
-const conVista = (extra = {}) => navegar({ vista: vista.value, ...extra });
+const conVista = (extra = {}) => navegar({ vista: vista.value, per_page: 8, ...extra });
 const filtrar = (ms = 350) => {
     clearTimeout(temporizador);
     temporizador = setTimeout(() => conVista({ page: 1 }), ms);
@@ -63,6 +69,7 @@ const limpiar = () => {
     conVista({ page: 1 });
 };
 const hayFiltros = () => Object.values(filtros).some((v) => v !== '' && v !== null && v !== undefined);
+
 const onCambio = (paginacion, f, sorter) => {
     clearTimeout(temporizador);
     onCambioTabla(paginacion, f, sorter);
@@ -74,19 +81,59 @@ const cambiarVista = (v) => {
     conVista({ page: 1 });
 };
 
+// Helpers para los dos range pickers
+const rangoLimite = computed({
+    get: () => [filtros.desde || null, filtros.hasta || null],
+    set: (v) => {
+        filtros.desde = v?.[0] || '';
+        filtros.hasta = v?.[1] || '';
+    },
+});
+const rangoCreacion = computed({
+    get: () => [filtros.creado_desde || null, filtros.creado_hasta || null],
+    set: (v) => {
+        filtros.creado_desde = v?.[0] || '';
+        filtros.creado_hasta = v?.[1] || '';
+    },
+});
+
+/* Presets para los range pickers (incluye botón "Hoy") */
+const presets = [
+    { label: 'Hoy', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+    { label: 'Ayer', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
+    { label: 'Últimos 7 días', value: [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')] },
+    { label: 'Últimos 30 días', value: [dayjs().subtract(29, 'day').startOf('day'), dayjs().endOf('day')] },
+    { label: 'Este mes', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+];
+
 const opcionesEstado = [
-    { value: 'pendiente', label: 'Pendiente' },
+    { value: 'asignada', label: 'Asignada' },
     { value: 'en_proceso', label: 'En proceso' },
-    { value: 'realizada', label: 'Realizada' },
+    { value: 'completada', label: 'Completada' },
+    { value: 'autorizada', label: 'Autorizada' },
+    { value: 'supervisada', label: 'Supervisada' },
+    { value: 'cerrada', label: 'Cerrada' },
+    { value: 'reprogramada', label: 'Reprogramada' },
     { value: 'cancelada', label: 'Cancelada' },
 ];
+const ESTADOS_ACTIVOS = ['asignada', 'en_proceso', 'completada', 'autorizada', 'supervisada', 'reprogramada'];
+const ESTADOS_COMPLETADOS = ['cerrada', 'cancelada'];
+/* El filtro solo debe ofrecer estados que de verdad puedan aparecer en la
+   pestaña actual (elegir uno que no aplica siempre daba 0 resultados). */
+const opcionesEstadoFiltro = computed(() =>
+    opcionesEstado.filter((o) => (vista.value === 'activas' ? ESTADOS_ACTIVOS : ESTADOS_COMPLETADOS).includes(o.value)),
+);
 
 /* Paleta de estados más viva y consistente */
 const ESTADO_META = {
-    pendiente:  { color: 'gold',  hex: '#e08a1e', soft: '#fdf3e6' },
-    en_proceso: { color: 'blue',  hex: '#0d84c9', soft: '#e6f2fb' },
-    realizada:  { color: 'green', hex: '#1f9e86', soft: '#e4f4ec' },
-    cancelada:  { color: 'red',   hex: '#d64545', soft: '#fdecec' },
+    asignada:    { color: 'gold',     hex: '#e08a1e', soft: '#fdf3e6' },
+    en_proceso:  { color: 'blue',     hex: '#0d84c9', soft: '#e6f2fb' },
+    completada:  { color: 'lime',     hex: '#1f9e86', soft: '#e4f4ec' },
+    autorizada:  { color: 'cyan',     hex: '#0ea5e9', soft: '#e0f2fe' },
+    supervisada: { color: 'geekblue', hex: '#7c3aed', soft: '#efe9fb' },
+    cerrada:     { color: 'green',    hex: '#16a34a', soft: '#dcfce7' },
+    reprogramada:{ color: 'purple',   hex: '#6b4bc9', soft: '#efe9fb' },
+    cancelada:   { color: 'red',      hex: '#d64545', soft: '#fdecec' },
 };
 const colorEstado = (e) => ESTADO_META[e]?.color ?? 'default';
 const hexEstado = (e) => ESTADO_META[e]?.hex ?? '#64748b';
@@ -98,9 +145,17 @@ const opcionesClasificacion = [
 ];
 const ICONO_CLASIFICACION = { proyecto: FolderOutlined, categoria: ApartmentOutlined };
 
+/* Paleta para clasificación (colores propios, distintos a los de estado) */
+const CLASIFICACION_META = {
+    general:   { hex: '#64748b', soft: '#eef2f7', border: '#cbd5e1', label: 'General' },
+    proyecto:  { hex: '#0d84c9', soft: '#e6f2fb', border: '#b6dcf5', label: 'Proyecto' },
+    categoria: { hex: '#7c3aed', soft: '#efe9fb', border: '#d6c7f0', label: 'Categoría' },
+};
+const clasificacionMeta = (c) => CLASIFICACION_META[c] ?? CLASIFICACION_META.general;
+
 const opciones = (l, label = 'nombre') => (l ?? []).map((o) => ({ label: o[label], value: o.id }));
 const opcionesFiltro = {
-    estado: computed(() => opcionesEstado),
+    estado: opcionesEstadoFiltro,
     prioridad_id: computed(() => opciones(props.catalogos.prioridades)),
     clasificacion: computed(() => opcionesClasificacion),
 };
@@ -108,13 +163,15 @@ const opcionesFiltro = {
 const columns = computed(() => [
     { title: 'Tarea', key: 'tarea', filtro: 'texto', filtroClave: 'descripcion', width: 300 },
     { title: 'Responsable(s)', key: 'responsables', filtro: 'texto', filtroClave: 'responsable', width: 190 },
-    { title: 'Fecha límite', key: 'fecha_limite', dataIndex: 'fecha_limite', sorter: true, width: 140 },
+    { title: 'Fecha límite', key: 'fecha_limite', dataIndex: 'fecha_limite', width: 140 },
     { title: 'Prioridad', key: 'prioridad', filtro: 'select', filtroClave: 'prioridad_id', width: 130 },
     { title: 'Clasificación', key: 'clasificacion', filtro: 'select', filtroClave: 'clasificacion', width: 170 },
     {
         title: 'Estado',
         key: 'estado',
-        filtro: vista.value === 'activas' ? 'select' : undefined,
+        dataIndex: 'estado',
+        sorter: true,
+        filtro: 'select',
         filtroClave: 'estado',
         width: 140,
     },
@@ -148,8 +205,8 @@ const tarjetas = computed(() => [
         soft: '#fdecec',
     },
     {
-        label: 'Pendientes',
-        valor: props.kpis.pendientes ?? 0,
+        label: 'Asignadas',
+        valor: props.kpis.asignadas ?? 0,
         icono: HourglassOutlined,
         color: '#e08a1e',
         color2: '#a86717',
@@ -164,8 +221,8 @@ const tarjetas = computed(() => [
         soft: '#efe9fb',
     },
     {
-        label: 'Realizadas',
-        valor: props.kpis.realizadas ?? 0,
+        label: 'Completadas',
+        valor: props.kpis.completadas ?? 0,
         icono: CheckCircleOutlined,
         color: '#1f9e86',
         color2: '#16806c',
@@ -182,13 +239,32 @@ const tarjetas = computed(() => [
         descripcion="Seguimiento de tareas administrativas: responsables, fechas límite y su avance hasta el cierre."
     >
         <template #acciones>
-            <a-range-picker
-                :value="[filtros.desde || null, filtros.hasta || null]"
-                value-format="YYYY-MM-DD"
-                :allow-empty="[true, true]"
-                placeholder="['Desde', 'Hasta']"
-                @change="(_, s) => { filtros.desde = s[0] || ''; filtros.hasta = s[1] || ''; aplicar(); }"
-            />
+            <!-- Fecha de creación -->
+            <div class="filtro-fecha">
+                <span class="filtro-fecha__lbl">Creación:</span>
+                <a-range-picker
+                    v-model:value="rangoCreacion"
+                    value-format="YYYY-MM-DD"
+                    :allow-empty="[true, true]"
+                    :placeholder="['Desde', 'Hasta']"
+                    :presets="presets"
+                    @change="aplicar"
+                />
+            </div>
+
+            <!-- Fecha límite -->
+            <div class="filtro-fecha">
+                <span class="filtro-fecha__lbl">Límite:</span>
+                <a-range-picker
+                    v-model:value="rangoLimite"
+                    value-format="YYYY-MM-DD"
+                    :allow-empty="[true, true]"
+                    :placeholder="['Desde', 'Hasta']"
+                    :presets="presets"
+                    @change="aplicar"
+                />
+            </div>
+
             <a-button v-if="hayFiltros()" @click="limpiar">
                 <template #icon><FilterOutlined /></template>
                 Limpiar filtros
@@ -266,6 +342,8 @@ const tarjetas = computed(() => [
                 :columns="columns"
                 :orden="orden"
                 :cargando="cargando"
+                :min-filas="12"
+                :filas-extra="2"
                 @cambio="onCambio"
                 @limpiar="limpiar"
             >
@@ -336,10 +414,27 @@ const tarjetas = computed(() => [
                     </template>
 
                     <template v-else-if="column.key === 'clasificacion'">
-                        <span v-if="record.clasificacion === 'general'" class="vacio">General</span>
-                        <span v-else class="clasificacion-chip">
-                            <component :is="ICONO_CLASIFICACION[record.clasificacion]" />
-                            {{ record.proyecto?.nombre ?? record.categoria_tarea?.nombre ?? '—' }}
+                        <span
+                            class="clasificacion-chip"
+                            :style="{
+                                '--cl-hex': clasificacionMeta(record.clasificacion).hex,
+                                '--cl-soft': clasificacionMeta(record.clasificacion).soft,
+                                '--cl-border': clasificacionMeta(record.clasificacion).border,
+                            }"
+                        >
+                            <component
+                                v-if="ICONO_CLASIFICACION[record.clasificacion]"
+                                :is="ICONO_CLASIFICACION[record.clasificacion]"
+                                class="clasificacion-chip__ico"
+                            />
+                            <span v-else class="clasificacion-chip__dot"></span>
+                            <span class="clasificacion-chip__txt">
+                                {{
+                                    record.clasificacion === 'general'
+                                        ? 'General'
+                                        : (record.proyecto?.nombre ?? record.categoria_tarea?.nombre ?? '—')
+                                }}
+                            </span>
                         </span>
                     </template>
 
@@ -383,6 +478,22 @@ const tarjetas = computed(() => [
 
 <style scoped>
 /* ==========================================================
+   Filtros de fecha
+   ========================================================== */
+.filtro-fecha {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.filtro-fecha__lbl {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* ==========================================================
    Botón Nueva tarea
    ========================================================== */
 .btn-nueva {
@@ -398,25 +509,25 @@ const tarjetas = computed(() => [
 }
 
 /* ==========================================================
-   KPIs vibrantes con gradientes — 5 tarjetas
+   KPIs vibrantes con gradientes — 5 tarjetas (compactas)
    ========================================================== */
 .kpis {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 11px;
-    margin-bottom: 14px;
+    gap: 9px;
+    margin-bottom: 12px;
 }
 
 .kpi {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 11px;
-    padding: 12px 14px;
+    gap: 9px;
+    padding: 8px 11px;
     background: #fff;
     border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    box-shadow: 0 2px 6px -3px rgba(15, 37, 71, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 2px 5px -3px rgba(15, 37, 71, 0.1);
     overflow: hidden;
     transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
@@ -424,23 +535,23 @@ const tarjetas = computed(() => [
 .kpi:hover {
     transform: translateY(-2px);
     border-color: var(--acc);
-    box-shadow: 0 8px 20px -10px rgba(15, 37, 71, 0.35);
+    box-shadow: 0 6px 16px -10px rgba(15, 37, 71, 0.35);
 }
 
 .kpi::before {
     content: '';
     position: absolute;
     inset: 0 auto 0 0;
-    width: 4px;
+    width: 3px;
     background: linear-gradient(180deg, var(--acc) 0%, var(--acc2) 100%);
 }
 
 .kpi__glow {
     position: absolute;
-    right: -30px;
-    top: -30px;
-    width: 90px;
-    height: 90px;
+    right: -25px;
+    top: -25px;
+    width: 70px;
+    height: 70px;
     border-radius: 50%;
     background: radial-gradient(circle, var(--soft) 0%, transparent 70%);
     opacity: 0.9;
@@ -450,17 +561,17 @@ const tarjetas = computed(() => [
 .kpi__icono {
     position: relative;
     z-index: 1;
-    width: 40px;
-    height: 40px;
-    border-radius: 11px;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 14px;
     color: #fff;
     background: linear-gradient(135deg, var(--acc) 0%, var(--acc2) 100%);
     flex-shrink: 0;
-    box-shadow: 0 4px 10px -3px rgba(15, 37, 71, 0.35);
+    box-shadow: 0 3px 8px -3px rgba(15, 37, 71, 0.35);
 }
 
 .kpi__txt {
@@ -470,15 +581,15 @@ const tarjetas = computed(() => [
 }
 
 .kpi__valor {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 800;
     color: #173a5f;
     line-height: 1.05;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.4px;
 }
 
 .kpi__etq {
-    font-size: 10.5px;
+    font-size: 9.5px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-weight: 800;
@@ -519,7 +630,7 @@ const tarjetas = computed(() => [
     box-shadow: inset 0 1px 2px rgba(15, 45, 80, 0.08);
     user-select: none;
     transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
 }
 
 .modo-switch--completadas {
@@ -622,7 +733,8 @@ const tarjetas = computed(() => [
 }
 
 /* ==========================================================
-   Tabla
+   Wrapper de la tabla (el alto lo controla DataTableInertia
+   vía las props `min-filas` / `filas-extra`)
    ========================================================== */
 .tabla-tareas {
     border-radius: 14px;
@@ -630,52 +742,6 @@ const tarjetas = computed(() => [
     border: 1px solid #e2e8f0;
     box-shadow: 0 1px 3px rgba(15, 37, 71, 0.06);
     background: #fff;
-}
-
-.tabla-tareas :deep(.ant-table-thead > tr > th) {
-    background: linear-gradient(180deg, #f5f8fb 0%, #eef3f8 100%) !important;
-    color: #173a5f !important;
-    font-weight: 800 !important;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    font-size: 11px;
-    border-bottom: 1px solid #dbe3ec !important;
-}
-
-.tabla-tareas :deep(.ant-table-thead > tr > th::before) {
-    background-color: #dbe3ec !important;
-}
-
-.tabla-tareas :deep(.ant-table-tbody > tr > td) {
-    border-bottom: 1px solid #eef2f7 !important;
-}
-
-.tabla-tareas :deep(.ant-table-tbody > tr:nth-child(even) > td) {
-    background: #fafbfd;
-}
-
-.tabla-tareas :deep(.ant-table-tbody > tr:hover > td) {
-    background: #eef4fb !important;
-    transition: background 0.14s ease;
-}
-
-.tabla-tareas :deep(.ant-table-cell-fix-right) {
-    background: inherit;
-    border-left: 1px solid #eef2f7;
-}
-
-.tabla-tareas :deep(.ant-table-tbody > tr:hover > td.ant-table-cell-fix-right) {
-    background: #eef4fb !important;
-}
-
-.tabla-tareas :deep(.ant-pagination .ant-pagination-item-active) {
-    border-color: #0d84c9;
-    background: #e6f2fb;
-}
-
-.tabla-tareas :deep(.ant-pagination .ant-pagination-item-active a) {
-    color: #0d84c9;
-    font-weight: 800;
 }
 
 /* ==========================================================
@@ -825,12 +891,46 @@ const tarjetas = computed(() => [
     color: #94a3b8;
 }
 
+/* ==========================================================
+   Clasificación con color por tipo
+   ========================================================== */
 .clasificacion-chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-weight: 600;
-    font-size: 12.5px;
-    color: #0f6fb0;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 11.5px;
+    line-height: 20px;
+    color: var(--cl-hex);
+    background: var(--cl-soft);
+    border: 1px solid var(--cl-border);
+    box-shadow: 0 1px 3px rgba(15, 37, 71, 0.05);
+    max-width: 100%;
+    transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.clasificacion-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px -3px rgba(15, 37, 71, 0.25);
+}
+.clasificacion-chip__ico {
+    font-size: 11px;
+    color: var(--cl-hex);
+    flex-shrink: 0;
+}
+.clasificacion-chip__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--cl-hex);
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+.clasificacion-chip__txt {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
 }
 </style>

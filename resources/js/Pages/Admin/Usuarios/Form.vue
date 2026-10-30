@@ -414,7 +414,6 @@ const cancelar = () =>
                                             v-model:value="form.especialidades_equipo"
                                             :options="opcionesTiposEquipo"
                                             mode="multiple"
-                                            :show-search="false"
                                             allow-clear
                                             placeholder="Sin especialidades de equipo"
                                         />
@@ -424,7 +423,6 @@ const cancelar = () =>
                                             v-model:value="form.especialidades_mantenimiento"
                                             :options="opcionesTiposMantenimiento"
                                             mode="multiple"
-                                            :show-search="false"
                                             allow-clear
                                             placeholder="Sin especialidades de mantenimiento"
                                         />

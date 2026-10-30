@@ -9,6 +9,7 @@ import { createApp, h } from 'vue';
 import Antd from 'ant-design-vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import iconos from './plugins/iconos';
+import selectBusqueda from './plugins/selectBusqueda';
 
 const appName = import.meta.env.VITE_APP_NAME || 'SIGAMM';
 
@@ -23,6 +24,7 @@ createInertiaApp({
         return createApp({ render: () => h(App, props) })
             .use(plugin)
             .use(ZiggyVue)
+            .use(selectBusqueda)
             .use(Antd)
             .use(iconos)
             .mount(el);

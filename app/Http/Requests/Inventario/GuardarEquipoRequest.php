@@ -35,7 +35,9 @@ class GuardarEquipoRequest extends FormRequest
         $id = $this->route('equipo')?->id;
 
         return [
-            'codigo_activo' => ['required', 'string', 'max:80', 'regex:'.self::RE_CODIGO, Rule::unique('equipos', 'codigo_activo')->ignore($id)],
+            'codigo_activo' => ['required', 'string', 'max:80', 'regex:'.self::RE_CODIGO,
+                // Único dentro de la sucursal: el mismo código puede repetirse en otra.
+                Rule::unique('equipos', 'codigo_activo')->where('sucursal_id', $this->input('sucursal_id'))->ignore($id)],
             'codigo_barras' => ['nullable', 'string', 'max:120', 'regex:'.self::RE_CODIGO],
             'descripcion' => ['required', 'string', 'max:255', 'regex:'.self::RE_TEXTO],
             'tipo_id' => ['nullable', 'integer', Rule::exists('tipos_equipo', 'id')],
@@ -74,6 +76,7 @@ class GuardarEquipoRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'codigo_activo.unique' => 'Ya existe un equipo con ese código en esta sucursal.',
             'codigo_activo.regex' => 'El código solo admite letras, números y . - _ / #.',
             'codigo_barras.regex' => 'El código de barras solo admite letras, números y . - _ / #.',
             'descripcion.regex' => 'La descripción no puede contener < > { } \\.',

@@ -3,23 +3,34 @@
 namespace App\Support;
 
 /**
- * Máquina de estados de una Tarea. Propuesta técnica SIGAM — anexo "TAREAS":
- * Pendiente → En proceso → Realizada, con Cancelada como salida desde
- * Pendiente o En proceso. Realizada y Cancelada son estados finales.
+ * Máquina de estados de una Tarea. Misma cadena final que una orden de
+ * mantenimiento (`CicloMantenimiento`):
+ *   Asignada → En proceso → Completada → Autorizada → Supervisada → Cerrada
+ * con Reprogramada/Cancelada disponibles en el camino. Si el supervisor no
+ * está de acuerdo al supervisar, regresa a Autorizada — no se borra nada de
+ * lo ya registrado, solo se agrega una nueva vuelta en el historial.
  */
 class CicloTarea
 {
     private const TRANSICIONES = [
-        'pendiente' => ['en_proceso', 'cancelada'],
-        'en_proceso' => ['realizada', 'cancelada'],
-        'realizada' => [],
+        'asignada' => ['en_proceso', 'reprogramada', 'cancelada'],
+        'en_proceso' => ['completada', 'reprogramada', 'cancelada'],
+        'completada' => ['autorizada'],
+        'autorizada' => ['supervisada', 'reprogramada'],
+        'supervisada' => ['cerrada', 'autorizada'],
+        'reprogramada' => ['asignada', 'en_proceso', 'cancelada'],
+        'cerrada' => [],
         'cancelada' => [],
     ];
 
     private const ETIQUETAS = [
-        'pendiente' => 'Pendiente',
+        'asignada' => 'Asignada',
         'en_proceso' => 'En proceso',
-        'realizada' => 'Realizada',
+        'completada' => 'Completada',
+        'autorizada' => 'Autorizada',
+        'supervisada' => 'Supervisada',
+        'cerrada' => 'Cerrada',
+        'reprogramada' => 'Reprogramada',
         'cancelada' => 'Cancelada',
     ];
 

@@ -90,6 +90,7 @@ class ReporteController extends Controller
         'en_espera_refaccion' => '#a86717',
         'fuera_de_servicio' => '#d64545',
         'realizado' => '#16a34a',
+        'autorizada' => '#0ea5e9',
         'supervisado' => '#7c3aed',
         'cerrado' => '#1f9e86',
         'reprogramado' => '#6b4bc9',
@@ -432,10 +433,14 @@ class ReporteController extends Controller
         $usuarios = Usuario::query()
             ->withCount([
                 'tareasAsignadas as asignadas' => fn (Builder $q) => $q->whereBetween('tareas.created_at', [$desde, $hasta]),
+                // "realizada_at" se pone al llegar a "completada" y ya no se
+                // toca después, aunque la tarea siga avanzando a autorizada/
+                // supervisada/cerrada — por eso se cuenta por la fecha, no
+                // por el estado exacto en el que esté ahora.
                 'tareasAsignadas as completadas' => fn (Builder $q) => $q
-                    ->whereBetween('tareas.created_at', [$desde, $hasta])->where('tareas.estado', 'realizada'),
+                    ->whereBetween('tareas.created_at', [$desde, $hasta])->whereNotNull('tareas.realizada_at'),
                 'tareasAsignadas as a_tiempo' => fn (Builder $q) => $q
-                    ->whereBetween('tareas.created_at', [$desde, $hasta])->where('tareas.estado', 'realizada')
+                    ->whereBetween('tareas.created_at', [$desde, $hasta])->whereNotNull('tareas.realizada_at')
                     ->whereRaw('date(tareas.realizada_at) <= tareas.fecha_limite'),
                 'tareasAsignadas as canceladas' => fn (Builder $q) => $q
                     ->whereBetween('tareas.created_at', [$desde, $hasta])->where('tareas.estado', 'cancelada'),

@@ -25,7 +25,7 @@ class Notificacion extends Model
      * de una funcionalidad ya retirada) queda fuera aunque exista en la BD.
      */
     public const TIPOS_VISIBLES = [
-        'tarea_asignada', 'tarea_modificada', 'tarea_proxima', 'tarea_vencida',
+        'tarea_asignada', 'tarea_modificada', 'tarea_proxima', 'tarea_vencida', 'tarea_comentario',
         'mantenimiento_asignado', 'mantenimiento_modificado', 'mantenimiento_reprogramado',
         'mantenimiento_proximo', 'mantenimiento_vencido',
         'plan_asignado', 'plan_modificado',

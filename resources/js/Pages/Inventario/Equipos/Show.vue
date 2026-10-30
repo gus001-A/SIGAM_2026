@@ -13,22 +13,26 @@ import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
 import FichaEncabezado from '@/Components/FichaEncabezado.vue';
 import ListaDocumentos from '@/Components/ListaDocumentos.vue';
 import ModalQr from '@/Components/ModalQr.vue';
+import ModalSolicitud from '@/Components/ModalSolicitud.vue';
 import ModalBajaEquipo from '@/Components/ModalBajaEquipo.vue';
 import ModalRestaurarEquipo from '@/Components/ModalRestaurarEquipo.vue';
 import ModalFicha from '@/Components/ModalFicha.vue';
 import { usePermisos } from '@/composables/usePermisos';
+import { urlListado } from '@/composables/useRegresoListado';
 
 const props = defineProps({
     equipo: { type: Object, required: true },
     estados: { type: Array, default: () => [] },
     mantenimientos: { type: Array, default: () => [] },
     solicitudes: { type: Array, default: () => [] },
+    prioridades: { type: Array, default: () => [] },
     sello: { type: Object, default: null },
 });
 
 const { puede } = usePermisos();
 const confirmar = ref(null);
 const modalQr = ref(null);
+const modalSolicitud = ref(null);
 const modalBaja = ref(null);
 const modalRestaurar = ref(null);
 const modalHistorial = ref(false);
@@ -123,9 +127,9 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
 
     <AppLayout>
         <div class="ficha-compacta">
-            <FichaEncabezado :titulo="equipo.codigo_activo" :subtitulo="equipo.descripcion" :icono="ToolOutlined"
+            <FichaEncabezado :titulo="equipo.descripcion || equipo.codigo_activo" :subtitulo="equipo.descripcion ? equipo.codigo_activo : ''":icono="ToolOutlined"
                 :color="equipo.estado?.color || '#1e5eb8'" volver="equipos.por_sucursal"
-                :volver-params="{ sucursal_id: equipo.sucursal_id }" :sello="sello">
+                :volver-url="urlListado('equipos', route('equipos.por_sucursal', { sucursal_id: equipo.sucursal_id }))" :sello="sello">
                 <template #tags>
                     <a-tag v-if="dadoDeBaja" color="error">
                         <StopOutlined /> Dado de baja
@@ -179,7 +183,7 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
                             type="button"
                             class="btn-hero btn-hero--default"
                             style="--hc: #e08a1e; --hc2: #a86717"
-                            @click="router.visit(route('solicitudes.create', { equipo_id: equipo.id }))"
+                            @click="modalSolicitud.abrir(equipo.id)"
                         >
                             <span class="btn-hero__ic">
                                 <FormOutlined />
@@ -619,6 +623,8 @@ const onMenuAccion = ({ key }) => key === 'baja' && modalBaja.value.abrir(props.
 
         <ConfirmarDialog ref="confirmar" />
         <ModalQr ref="modalQr" />
+        <ModalSolicitud v-if="puede('solicitudes.crear')" ref="modalSolicitud"
+            :equipos="[equipo]" :prioridades="prioridades" />
         <ModalBajaEquipo ref="modalBaja" />
         <ModalRestaurarEquipo ref="modalRestaurar" :estados="estados" />
         </AppLayout>

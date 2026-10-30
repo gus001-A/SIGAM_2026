@@ -19,13 +19,21 @@ class CicloMantenimiento
      */
     public const TRANSICIONES = [
         'solicitado' => ['autorizado', 'cancelado'],
+        // "autorizado" aquí es la autorización de la SOLICITUD (nace la orden,
+        // antes de asignar técnico). No confundir con "autorizada" más abajo.
         'autorizado' => ['asignado', 'cancelado', 'reprogramado'],
         'asignado' => ['en_proceso', 'reprogramado', 'cancelado'],
         'en_proceso' => ['en_espera_refaccion', 'fuera_de_servicio', 'realizado', 'reprogramado'],
         'en_espera_refaccion' => ['en_proceso', 'reprogramado', 'cancelado'],
         'fuera_de_servicio' => ['en_proceso', 'reprogramado'],
-        'realizado' => ['supervisado'],
-        'supervisado' => ['cerrado', 'en_proceso'],
+        // Completada (realizado) puede detectar que falta una refacción antes
+        // de seguir, o pasar directo a revisión (autorizada).
+        'realizado' => ['en_espera_refaccion', 'autorizada'],
+        'autorizada' => ['supervisado', 'reprogramado'],
+        // Si el supervisor no está de acuerdo, regresa a "autorizada" — no se
+        // borra nada de lo ya registrado, solo se agregan nuevas notas en las
+        // siguientes vueltas (bitácora de historial, siempre de solo-lectura).
+        'supervisado' => ['cerrado', 'autorizada'],
         'reprogramado' => ['asignado', 'en_proceso', 'cancelado'],
         'cerrado' => [],
         'cancelado' => [],
@@ -33,9 +41,9 @@ class CicloMantenimiento
 
     /** Marca de tiempo que se rellena al entrar a cada estado. */
     private const SELLOS = [
-        'autorizado' => 'autorizado_at',
         'en_proceso' => 'iniciado_at',
         'realizado' => 'completado_at',
+        'autorizada' => 'autorizada_at',
         'supervisado' => 'supervisado_at',
         'cerrado' => 'cerrado_at',
     ];
@@ -58,7 +66,7 @@ class CicloMantenimiento
      */
     public static function permiteGestionEjecucion(string $clave): bool
     {
-        return ! in_array($clave, ['realizado', 'supervisado', 'cerrado', 'cancelado'], true);
+        return ! in_array($clave, ['realizado', 'autorizada', 'supervisado', 'cerrado', 'cancelado'], true);
     }
 
     /**

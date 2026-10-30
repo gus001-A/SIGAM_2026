@@ -107,15 +107,20 @@ class CatalogosSeeder extends Seeder
         // clave, nombre, orden, es_terminal, es_abierto
         $estados = [
             ['solicitado', 'Solicitado', 10, false, true],
+            // "Autorizado": se autoriza la SOLICITUD y nace la orden, antes de
+            // asignar técnico. No cambió.
             ['autorizado', 'Autorizado', 20, false, true],
-            ['asignado', 'Asignado', 30, false, true],
+            ['asignado', 'Asignada', 30, false, true],
             ['en_proceso', 'En proceso', 40, false, true],
             ['en_espera_refaccion', 'En espera de refacción', 45, false, true],
-            ['realizado', 'Realizado', 50, false, true],
-            ['supervisado', 'Supervisado', 60, false, true],
-            ['cerrado', 'Cerrado', 70, true, false],
-            ['reprogramado', 'Reprogramado', 80, false, true],
-            ['cancelado', 'Cancelado', 90, true, false],
+            ['realizado', 'Completada', 50, false, true],
+            // "Autorizada": revisión de la orden ya completada, antes de que el
+            // supervisor la supervise y cierre. Distinto de "Autorizado" (arriba).
+            ['autorizada', 'Autorizada', 55, false, true],
+            ['supervisado', 'Supervisada', 60, false, true],
+            ['cerrado', 'Cerrada', 70, true, false],
+            ['reprogramado', 'Reprogramada', 80, false, true],
+            ['cancelado', 'Cancelada', 90, true, false],
             ['fuera_de_servicio', 'Equipo fuera de servicio', 95, false, true],
         ];
         foreach ($estados as [$clave, $nombre, $orden, $terminal, $abierto]) {

@@ -24,10 +24,12 @@ watch(
 );
 
 const accept = computed(() =>
-    props.soloImagenes ? '.jpg,.jpeg,.png,.webp,image/*' : '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp',
+    props.soloImagenes
+        ? '.jpg,.jpeg,.png,.webp,image/*'
+        : '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.odt,.ods,.odp,.jpg,.jpeg,.png,.webp',
 );
 const hint = computed(() =>
-    `${props.soloImagenes ? 'JPG, PNG o WEBP' : 'PDF, Word, JPG, PNG o WEBP'} · máx. 20 MB c/u · hasta ${props.maximo} archivos`,
+    `${props.soloImagenes ? 'JPG, PNG o WEBP' : 'PDF, Word, Excel, PowerPoint, CSV, texto o imagen'} · máx. 20 MB c/u · hasta ${props.maximo} archivos`,
 );
 const lleno = computed(() => lista.value.length >= props.maximo);
 

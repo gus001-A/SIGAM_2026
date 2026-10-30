@@ -25,7 +25,7 @@ class NotificarTareasVencidas extends Command
 
         $tareas = Tarea::query()
             ->with(['responsables' => fn ($q) => $q->wherePivotNull('desasignado_at')])
-            ->whereIn('estado', ['pendiente', 'en_proceso'])
+            ->whereNotIn('estado', ['cerrada', 'cancelada'])
             ->whereDate('fecha_limite', '<=', today()->addDays($diasAviso))
             ->get();
 

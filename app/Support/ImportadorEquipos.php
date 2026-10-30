@@ -204,7 +204,7 @@ class ImportadorEquipos
     private function validar(array $datos): array
     {
         $v = Validator::make($datos, [
-            'codigo_activo' => ['required', 'string', 'max:80', 'regex:'.self::RE_CODIGO, 'unique:equipos,codigo_activo'],
+            'codigo_activo' => ['required', 'string', 'max:80', 'regex:'.self::RE_CODIGO],
             'descripcion' => ['required', 'string', 'max:255', 'regex:'.self::RE_TEXTO],
             'codigo_barras' => ['nullable', 'string', 'max:120', 'regex:'.self::RE_CODIGO],
             'numero_serie' => ['nullable', 'string', 'max:255', 'regex:'.self::RE_CODIGO],
@@ -215,7 +215,6 @@ class ImportadorEquipos
             'garantia_hasta' => ['nullable', 'date', 'after_or_equal:fecha_adquisicion'],
             'valor_adquisicion' => ['nullable', 'numeric', 'min:0'],
         ], [
-            'codigo_activo.unique' => 'Ya existe un equipo con ese código.',
             'codigo_activo.regex' => 'El código solo admite letras, números y . - _ / #.',
             'descripcion.regex' => 'La descripción no puede contener < > { } \\.',
             'fecha_adquisicion.before_or_equal' => 'La fecha de adquisición no puede ser futura.',
@@ -224,8 +223,18 @@ class ImportadorEquipos
 
         $mensajes = $v->errors()->all();
 
-        if ($datos['sucursal'] && ! Sucursal::where('nombre', $this->mayus($datos['sucursal']))->exists()) {
+        $sucursalId = $datos['sucursal'] ? Sucursal::where('nombre', $this->mayus($datos['sucursal']))->value('id') : null;
+
+        if ($datos['sucursal'] && ! $sucursalId) {
             $mensajes[] = "La sucursal «{$datos['sucursal']}» no existe.";
+        }
+
+        // El código es único dentro de la sucursal (puede repetirse en otra).
+        if ($sucursalId && $datos['codigo_activo'] && DB::table('equipos')
+            ->where('sucursal_id', $sucursalId)
+            ->where('codigo_activo', $this->mayus((string) $datos['codigo_activo']))
+            ->exists()) {
+            $mensajes[] = 'Ya existe un equipo con ese código en esta sucursal.';
         }
 
         return $mensajes;

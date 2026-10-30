@@ -14,6 +14,8 @@ const props = defineProps({
     volver: { type: String, default: '' },
     // Parámetros opcionales para la ruta de "volver" (p. ej. { sucursal_id }).
     volverParams: { type: Object, default: () => ({}) },
+    // URL completa para "volver" (p. ej. el listado con sus filtros); tiene prioridad sobre `volver`.
+    volverUrl: { type: String, default: '' },
     // Componente de ícono de @ant-design/icons-vue.
     icono: { type: [Object, Function], default: null },
     // Alternativa al ícono: iniciales para el avatar.
@@ -43,7 +45,8 @@ const textoSello = computed(() => {
 
 <template>
     <div class="fe">
-        <button v-if="volver" type="button" class="fe__volver" @click="router.visit(route(volver, volverParams))">
+        <button v-if="volver || volverUrl" type="button" class="fe__volver"
+            @click="router.visit(volverUrl || route(volver, volverParams))">
             <ArrowLeftOutlined />
         </button>
 

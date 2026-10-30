@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     BankOutlined,
+    CameraOutlined,
     CheckCircleOutlined,
     ClockCircleOutlined,
     DeleteOutlined,
@@ -10,6 +11,7 @@ import {
     EditOutlined,
     EyeOutlined,
     FileTextOutlined,
+    PictureOutlined,
     PlusOutlined,
     QrcodeOutlined,
     StopOutlined,
@@ -22,12 +24,14 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import DataTableInertia from '@/Components/DataTableInertia.vue';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
 import ModalQr from '@/Components/ModalQr.vue';
+import ModalFicha from '@/Components/ModalFicha.vue';
 import ModalImportarEquipos from '@/Components/ModalImportarEquipos.vue';
 import ModalBajaEquipo from '@/Components/ModalBajaEquipo.vue';
 import ModalRestaurarEquipo from '@/Components/ModalRestaurarEquipo.vue';
 import CeldaRegistro from '@/Components/CeldaRegistro.vue';
 import { usePermisos } from '@/composables/usePermisos';
 import { useTablaInertia } from '@/composables/useTablaInertia';
+import { recordarListado } from '@/composables/useRegresoListado';
 
 const props = defineProps({
     resumen: { type: Array, default: () => [] },
@@ -136,15 +140,14 @@ const opcionesFiltro = {
 
 const columnas = computed(() => {
     const base = [
-        { title: 'Código', key: 'codigo_activo', dataIndex: 'codigo_activo', sorter: true, filtro: 'texto', filtroClave: 'codigo', width: 118 },
-        { title: 'Equipo', key: 'descripcion', dataIndex: 'descripcion', sorter: true, filtro: 'texto', filtroClave: 'descripcion', width: 190, ellipsis: true },
+        { title: 'Código', key: 'codigo_activo', dataIndex: 'codigo_activo', sorter: true, filtro: 'texto', filtroClave: 'codigo', width: 150 },
+        { title: 'Equipo', key: 'descripcion', dataIndex: 'descripcion', sorter: true, filtro: 'texto', filtroClave: 'descripcion', width: 180, ellipsis: true },
         { title: 'Tipo', key: 'tipo', filtro: 'select', filtroClave: 'tipo_id', width: 120, ellipsis: true },
         { title: 'Marca / modelo', key: 'marca', filtro: 'texto', filtroClave: 'marca', width: 130, ellipsis: true },
         { title: 'Serie', key: 'numero_serie', dataIndex: 'numero_serie', sorter: true, filtro: 'texto', filtroClave: 'serie', width: 108 },
         { title: 'Ubicación', key: 'ubicacion', filtro: 'select', filtroClave: 'ubicacion_id', width: 130, ellipsis: true },
         { title: 'Estado', key: 'estado', filtro: 'select', filtroClave: 'estado_id', width: 110 },
-        { title: 'Valor', key: 'valor_adquisicion', dataIndex: 'valor_adquisicion', sorter: true, filtro: 'texto', filtroClave: 'valor', align: 'right', width: 110 },
-        { title: 'Próx. mant.', key: 'proximo_mantenimiento', width: 100 },
+        { title: 'Valor', key: 'valor_adquisicion', dataIndex: 'valor_adquisicion', sorter: true, filtro: 'texto', filtroClave: 'valor', align: 'right', width: 92 },
     ];
 
     if (modoBajas.value) {
@@ -171,7 +174,11 @@ const tarjetas = computed(() => {
 });
 
 const ir = (ruta) => ruta && router.visit(route(ruta, { sucursal_id: sucursalActual.value?.id }));
-const irA = (ruta, params) => router.visit(route(ruta, params));
+// Al ir al expediente o a editar, recuerda la búsqueda actual para volver a ella.
+const irA = (ruta, params) => {
+    recordarListado('equipos');
+    router.visit(route(ruta, params));
+};
 
 const onKpiClick = (t) => {
     if (t.accion === 'bajas') {
@@ -183,6 +190,8 @@ const onKpiClick = (t) => {
 
 const confirmar = ref(null);
 const modalQr = ref(null);
+// Equipo cuya foto de referencia se está viendo (null = modal cerrado).
+const equipoFoto = ref(null);
 const modalImportar = ref(null);
 const modalBaja = ref(null);
 const modalRestaurar = ref(null);
@@ -279,6 +288,20 @@ const reactivar = (equipo) => modalRestaurar.value.abrir(equipo);
                                     @click="irA('equipos.show', record.id)">{{ record.codigo_activo }}</a>
                                 <span v-else class="link-equipo link-equipo--baja">{{ record.codigo_activo }}</span>
                             </template>
+                            <template v-else-if="column.key === 'descripcion'">
+                                <div class="celda-equipo">
+                                    <a-tooltip v-if="record.foto" title="Ver foto">
+                                        <button type="button" class="celda-equipo__foto celda-equipo__foto--con"
+                                            @click="equipoFoto = record">
+                                            <CameraOutlined />
+                                        </button>
+                                    </a-tooltip>
+                                    <span v-else class="celda-equipo__foto celda-equipo__foto--vacia" title="Sin foto">
+                                        <PictureOutlined />
+                                    </span>
+                                    <span class="celda-equipo__nombre" :title="record.descripcion">{{ record.descripcion }}</span>
+                                </div>
+                            </template>
                             <template v-else-if="column.key === 'tipo'">{{ record.tipo || 'No especificado' }}</template>
                             <template v-else-if="column.key === 'marca'">
                                 <span>{{ record.marca || 'No especificado' }}</span>
@@ -291,16 +314,8 @@ const reactivar = (equipo) => modalRestaurar.value.abrir(equipo);
                                 <span v-else>No especificado</span>
                             </template>
                             <template v-else-if="column.key === 'valor_adquisicion'">
-                                <span class="whitespace-nowrap">{{ moneda(record.valor_adquisicion) }}</span>
+                                <span class="whitespace-nowrap celda-valor">{{ record.valor_adquisicion == null ? '—' : moneda(record.valor_adquisicion) }}</span>
                             </template>
-                            <template v-else-if="column.key === 'proximo_mantenimiento'">
-                                <a-tag v-if="record.proximo_mantenimiento"
-                                    :color="new Date(record.proximo_mantenimiento) < new Date() ? 'error' : 'blue'">
-                                    {{ record.proximo_mantenimiento }}
-                                </a-tag>
-                                <span v-else class="opacity-50">No especificado</span>
-                            </template>
-
                             <template v-else-if="column.key === 'baja'">
                                 <div class="baja-cell">
                                     <a-tooltip :title="record.motivo_baja || 'Sin motivo registrado'">
@@ -385,6 +400,21 @@ const reactivar = (equipo) => modalRestaurar.value.abrir(equipo);
 
         <ConfirmarDialog ref="confirmar" />
         <ModalQr ref="modalQr" />
+
+        <!-- Foto de referencia del equipo, desde la tabla -->
+        <ModalFicha :show="!!equipoFoto" titulo="Foto de referencia"
+            :subtitulo="equipoFoto ? `${equipoFoto.codigo_activo} — ${equipoFoto.descripcion}` : ''"
+            :icono="PictureOutlined" color="#0d84c9" max-width="lg" @close="equipoFoto = null">
+            <div v-if="equipoFoto?.foto" class="foto-modal">
+                <img :src="route('documentos.ver', equipoFoto.foto.id)" alt="Foto del equipo" />
+            </div>
+            <template #footer>
+                <a v-if="equipoFoto?.foto" :href="route('documentos.download', equipoFoto.foto.id)"
+                    class="ant-btn ant-btn-default" target="_blank">Descargar</a>
+                <a v-if="equipoFoto?.foto" :href="route('documentos.ver', equipoFoto.foto.id)"
+                    class="ant-btn ant-btn-primary" target="_blank">Abrir en nueva pestaña</a>
+            </template>
+        </ModalFicha>
         <ModalImportarEquipos ref="modalImportar" />
         <ModalBajaEquipo ref="modalBaja" />
         <ModalRestaurarEquipo ref="modalRestaurar" :estados="catalogos.estados ?? []" />
@@ -670,6 +700,7 @@ const reactivar = (equipo) => modalRestaurar.value.abrir(equipo);
    Enlaces y celdas
    ========================================================== */
 .link-equipo {
+    white-space: nowrap;
     font-weight: 700;
     color: var(--sigam-navy);
     font-size: 13px;
@@ -923,5 +954,75 @@ const reactivar = (equipo) => modalRestaurar.value.abrir(equipo);
         padding: 12px;
         gap: 4px;
     }
+}
+
+/* Columna Equipo: miniatura de la foto + nombre */
+.celda-equipo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.celda-equipo__foto {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--sigam-borde, #e3e8ef);
+    border-radius: 6px;
+    overflow: hidden;
+    background: #f5f7fa;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+button.celda-equipo__foto {
+    cursor: zoom-in;
+    transition: box-shadow 0.15s, transform 0.15s;
+}
+button.celda-equipo__foto:hover {
+    transform: scale(1.06);
+    box-shadow: 0 2px 8px rgba(23, 58, 95, 0.18);
+}
+.celda-equipo__foto--con {
+    color: #0d84c9;
+    background: #e6f2fb;
+    border-color: #cfe3f2;
+    font-size: 13px;
+}
+button.celda-equipo__foto--con:hover {
+    background: #0d84c9;
+    color: #fff;
+}
+.celda-equipo__foto--vacia {
+    color: #b7c2cf;
+    font-size: 12px;
+}
+.celda-equipo__nombre {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.celda-valor {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Modal foto de referencia */
+.foto-modal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-height: 65vh;
+    overflow: hidden;
+}
+.foto-modal img {
+    max-width: 100%;
+    max-height: 65vh;
+    object-fit: contain;
+    display: block;
+    border-radius: 8px;
 }
 </style>

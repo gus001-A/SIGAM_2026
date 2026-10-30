@@ -16,7 +16,7 @@ class ObservacionMantenimiento extends Model
 
     const UPDATED_AT = null;
 
-    protected $fillable = ['mantenimiento_id', 'usuario_id', 'tipo', 'cuerpo', 'documento_evidencia_id'];
+    protected $fillable = ['mantenimiento_id', 'usuario_id', 'tipo', 'cuerpo', 'enlace', 'documento_evidencia_id'];
 
     protected function camposMayusculas(): array
     {

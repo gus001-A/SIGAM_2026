@@ -25,9 +25,10 @@ class Mantenimiento extends Model
 
     protected $fillable = [
         'folio', 'solicitud_id', 'plan_id', 'equipo_id', 'ubicacion_id', 'sucursal_id', 'tipo_id', 'prioridad_id', 'estado_id',
-        'programado_inicio', 'programado_fin', 'autorizado_at', 'iniciado_at', 'completado_at', 'supervisado_at', 'cerrado_at',
+        'programado_inicio', 'programado_fin', 'autorizado_at', 'iniciado_at', 'completado_at',
+        'autorizada_at', 'supervisado_at', 'cerrado_at',
         'problema_reportado', 'diagnostico', 'descripcion_trabajo', 'observaciones', 'condicion_final',
-        'costo_mano_obra', 'costo_otros', 'creado_por', 'autorizado_por', 'supervisor_id',
+        'costo_mano_obra', 'costo_otros', 'creado_por', 'autorizado_por', 'autorizada_por', 'supervisor_id',
     ];
 
     protected function casts(): array
@@ -38,6 +39,7 @@ class Mantenimiento extends Model
             'autorizado_at' => 'datetime',
             'iniciado_at' => 'datetime',
             'completado_at' => 'datetime',
+            'autorizada_at' => 'datetime',
             'supervisado_at' => 'datetime',
             'cerrado_at' => 'datetime',
             'costo_mano_obra' => 'decimal:2',
@@ -133,6 +135,12 @@ class Mantenimiento extends Model
     public function supervisor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'supervisor_id');
+    }
+
+    /** Quién autorizó la orden ya completada (paso "Autorizada", distinto de `autorizadoPor()`). */
+    public function autorizadaPor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'autorizada_por');
     }
 
     public function asignaciones(): HasMany

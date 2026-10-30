@@ -29,7 +29,25 @@ const abrir = async (id) => {
 };
 
 const descargarPdf = () => window.open(route('equipos.qr_pdf', equipoId.value), '_blank');
-const descargarImagen = () => window.open(route('equipos.qr_img', equipoId.value), '_blank');
+// Descarga directa del JPG (abrirlo en otra pestaña solo mostraba la imagen).
+const descargandoImagen = ref(false);
+const descargarImagen = async () => {
+    descargandoImagen.value = true;
+    try {
+        const { data } = await window.axios.get(route('equipos.qr_img', equipoId.value), { responseType: 'blob' });
+        const enlace = document.createElement('a');
+        enlace.href = URL.createObjectURL(data);
+        enlace.download = `qr-${(datos.value.codigo_activo || 'equipo').replace(/[^\w.-]+/g, '_')}.jpg`;
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+        setTimeout(() => URL.revokeObjectURL(enlace.href), 1000);
+    } catch (e) {
+        error.value = 'No se pudo descargar la imagen del código QR.';
+    } finally {
+        descargandoImagen.value = false;
+    }
+};
 
 const imprimir = () => {
     const v = window.open('', '_blank', 'width=480,height=640');
@@ -89,7 +107,7 @@ defineExpose({ abrir });
                 <template #icon><PrinterOutlined /></template>
                 Imprimir
             </a-button>
-            <a-button :disabled="cargando || !!error" @click="descargarImagen">
+            <a-button :disabled="cargando || !!error" :loading="descargandoImagen" @click="descargarImagen">
                 <template #icon><PictureOutlined /></template>
                 Imagen JPG
             </a-button>

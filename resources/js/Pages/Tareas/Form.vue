@@ -134,7 +134,7 @@ const colorAvatar = (i) => {
                     <h1 class="form-head__titulo">Nueva tarea</h1>
                     <p class="form-head__sub">
                         Describe la tarea, su fecha límite y a quién se le asigna. Una vez creada, pasa a
-                        <strong>Pendiente</strong>.
+                        <strong>Asignada</strong>.
                     </p>
                 </div>
                 <button type="button" class="form-head__cancel" @click="cancelar">

@@ -6,6 +6,7 @@ use App\Models\Concerns\ConvierteMayusculas;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 /**
@@ -21,7 +22,7 @@ class HistorialEstadoTarea extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'tarea_id', 'estado_origen', 'estado_destino', 'cambiado_por', 'nota', 'documento_evidencia_id', 'cambiado_at',
+        'tarea_id', 'estado_origen', 'estado_destino', 'cambiado_por', 'nota', 'enlace', 'documento_evidencia_id', 'cambiado_at',
     ];
 
     protected function camposMayusculas(): array
@@ -48,5 +49,11 @@ class HistorialEstadoTarea extends Model
     {
         return $this->morphToMany(Documento::class, 'movimiento', 'evidencias_movimiento', 'movimiento_id', 'documento_id')
             ->withTimestamps();
+    }
+
+    /** Comentarios de supervisión sobre este movimiento en particular. */
+    public function comentarios(): HasMany
+    {
+        return $this->hasMany(ComentarioTarea::class)->orderBy('created_at');
     }
 }

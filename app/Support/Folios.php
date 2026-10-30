@@ -29,23 +29,53 @@ class Folios
     }
 
     /**
-     * Sugerencia de código de activo para un equipo nuevo, formato EQ-001,
-     * EQ-002... Es solo una VISTA PREVIA (no reserva el consecutivo, para
-     * no dejar huecos si el usuario abre el formulario y no lo guarda) — el
-     * campo sigue siendo editable, así que un usuario puede aceptar esta
-     * sugerencia, escribir otro código a mano, o llenarlo con el lector de
-     * código de barras. La unicidad real la garantiza la validación normal
-     * del formulario al guardar.
+     * Sugerencia de código de activo para un equipo nuevo, con el distintivo
+     * de su sucursal: CODIGO_SUCURSAL-EQ-001, p. ej. "CSA-01-EQ-001". Cada
+     * sucursal lleva su propio consecutivo, de mínimo 3 dígitos pero sin tope
+     * (…-EQ-999 → …-EQ-1000). Toma el número más alto ya usado con ese
+     * prefijo en la sucursal (incluye equipos dados de baja, que siguen
+     * ocupando su código) + 1.
+     *
+     * Es solo una VISTA PREVIA (no reserva el consecutivo) — el campo sigue
+     * siendo editable. La unicidad real la garantiza la validación al guardar.
+     *
+     * @return array<int, string>  sucursal_id => código sugerido
      */
-    public static function previsualizarCodigoEquipo(): string
+    public static function codigosSugeridosEquipo(): array
     {
-        $consecutivo = DB::table('secuencias_folio')->where('llave', 'EQ')->value('consecutivo');
+        $codigosPorSucursal = DB::table('equipos')
+            ->where('codigo_activo', 'like', '%-EQ-%')
+            ->get(['sucursal_id', 'codigo_activo'])
+            ->groupBy('sucursal_id');
 
-        if ($consecutivo === null) {
-            $consecutivo = DB::table('equipos')->where('codigo_activo', 'like', 'EQ-%')->count();
-        }
+        return Sucursal::withTrashed()->get(['id', 'codigo', 'nombre'])
+            ->mapWithKeys(function (Sucursal $s) use ($codigosPorSucursal) {
+                $prefijo = self::prefijoEquipo($s);
+                $patron = '/^'.preg_quote($prefijo, '/').'-EQ-(\d{1,15})$/i';
+                $maximo = 0;
 
-        return sprintf('EQ-%03d', $consecutivo + 1);
+                foreach ($codigosPorSucursal->get($s->id, []) as $e) {
+                    if (preg_match($patron, $e->codigo_activo, $m)) {
+                        $maximo = max($maximo, (int) $m[1]);
+                    }
+                }
+
+                return [$s->id => sprintf('%s-EQ-%03d', $prefijo, $maximo + 1)];
+            })
+            ->all();
+    }
+
+    /**
+     * Distintivo de la sucursal para el código de sus equipos: su `codigo`
+     * (solo letras, números y guiones, en MAYÚSCULAS); si no tiene, las 4
+     * letras de su nombre.
+     */
+    private static function prefijoEquipo(Sucursal $sucursal): string
+    {
+        $codigo = Str::of((string) $sucursal->codigo)->ascii()->upper()
+            ->replaceMatches('/[^A-Z0-9-]+/', '-')->trim('-')->toString();
+
+        return $codigo !== '' ? $codigo : self::prefijoLetras($sucursal->nombre);
     }
 
     /**

@@ -21,7 +21,9 @@ import {
     MessageOutlined,
     PlusOutlined,
     StarFilled,
+    LinkOutlined,
     SwapOutlined,
+    UndoOutlined,
     TagOutlined,
     ToolOutlined,
     UserOutlined,
@@ -53,33 +55,33 @@ const confirmar = ref(null);
 const ETIQUETA_ESTADO = {
     autorizado: 'Autorizar', asignado: 'Marcar asignado', en_proceso: 'Iniciar trabajo',
     en_espera_refaccion: 'En espera de refacción', fuera_de_servicio: 'Equipo fuera de servicio',
-    realizado: 'Marcar realizado', supervisado: 'Supervisar', cerrado: 'Cerrar orden',
+    realizado: 'Marcar completada', autorizada: 'Autorizar', supervisado: 'Supervisar', cerrado: 'Cerrar orden',
     reprogramado: 'Reprogramar', cancelado: 'Cancelar orden',
 };
 const ICONO_ESTADO = {
     autorizado: CheckCircleOutlined, asignado: UserOutlined, en_proceso: ToolOutlined,
     en_espera_refaccion: ClockCircleOutlined, fuera_de_servicio: ToolOutlined,
-    realizado: CheckCircleOutlined, supervisado: FlagOutlined, cerrado: CheckCircleOutlined,
+    realizado: CheckCircleOutlined, autorizada: FileDoneOutlined, supervisado: FlagOutlined, cerrado: CheckCircleOutlined,
     reprogramado: CalendarOutlined, cancelado: DeleteOutlined,
 };
 
 const ESTADO_COLOR = {
     autorizado: 'cyan', asignado: 'blue', en_proceso: 'processing',
     en_espera_refaccion: 'orange', fuera_de_servicio: 'volcano', realizado: 'lime',
-    supervisado: 'geekblue', cerrado: 'green', reprogramado: 'purple', cancelado: 'red',
+    autorizada: 'cyan', supervisado: 'geekblue', cerrado: 'green', reprogramado: 'purple', cancelado: 'red',
 };
 
 const ESTADO_COLOR_HEX = {
     solicitado: '#64748b', autorizado: '#0ea5e9', asignado: '#0d84c9', en_proceso: '#e08a1e',
     en_espera_refaccion: '#a86717', fuera_de_servicio: '#d64545', realizado: '#16a34a',
-    supervisado: '#7c3aed', cerrado: '#1f9e86', reprogramado: '#6b4bc9', cancelado: '#991b1b',
+    autorizada: '#0ea5e9', supervisado: '#7c3aed', cerrado: '#1f9e86', reprogramado: '#6b4bc9', cancelado: '#991b1b',
 };
 
 const estadoColor = computed(() => ESTADO_COLOR[m.value.estado?.clave] ?? 'default');
 const estadoClave = computed(() => m.value.estado?.clave);
 const esCerrada = computed(() => ['cerrado', 'cancelado'].includes(estadoClave.value));
 const enProceso = computed(() => estadoClave.value === 'en_proceso');
-const puedeGestionarEjecucion = computed(() => !['realizado', 'supervisado', 'cerrado', 'cancelado'].includes(estadoClave.value));
+const puedeGestionarEjecucion = computed(() => !['realizado', 'autorizada', 'supervisado', 'cerrado', 'cancelado'].includes(estadoClave.value));
 
 const fecha = (v) => (v ? new Date(v).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'No especificado');
 const soloFecha = (v) => (v ? new Date(v).toLocaleDateString('es-MX') : 'No especificado');
@@ -206,13 +208,14 @@ const totalMateriales = computed(() => {
 
 // --- Cambiar estado ---
 const modalEstado = ref(false);
-const formEstado = useForm({ estado: null, nota: '', evidencias: [] });
+const formEstado = useForm({ estado: null, nota: '', evidencias: [], enlace: '' });
 const abrirEstado = (slug) => {
     formEstado.reset();
     formEstado.clearErrors();
     formEstado.estado = slug;
     formEstado.nota = '';
     formEstado.evidencias = [];
+    formEstado.enlace = '';
     modalEstado.value = true;
 };
 const cerrarEstado = () => {
@@ -220,7 +223,7 @@ const cerrarEstado = () => {
     formEstado.reset();
     formEstado.clearErrors();
 };
-const EVIDENCIA_OPCIONAL = ['supervisado', 'cerrado'];
+const EVIDENCIA_OPCIONAL = ['autorizada', 'supervisado', 'cerrado'];
 const confirmarEstado = () => {
     formEstado.clearErrors();
     if (!formEstado.nota?.trim()) {
@@ -241,9 +244,36 @@ const confirmarEstado = () => {
     });
 };
 
+/* El supervisor, al no estar de acuerdo, "regresa" la orden de Supervisada a
+   Autorizada: no borra nada, solo abre una nueva vuelta de revisión. Esa
+   misma transición (autorizada) también es el paso normal hacia adelante
+   desde Completada, así que aquí se distingue por el origen. */
+const esRegresoDesdeSupervisado = (slug) => estadoClave.value === 'supervisado' && slug === 'autorizada';
+const esReanudarDesdeEspera = (slug) => estadoClave.value === 'en_espera_refaccion' && slug === 'en_proceso';
+
+const modalEsRegreso = computed(() => esRegresoDesdeSupervisado(formEstado.estado));
+const modalTituloEstado = computed(() => {
+    if (modalEsRegreso.value) return 'Regresar a autorizada';
+    if (esReanudarDesdeEspera(formEstado.estado)) return 'Reanudar';
+    return ETIQUETA_ESTADO[formEstado.estado] || 'Cambiar estado';
+});
+const modalSubEstado = computed(() =>
+    modalEsRegreso.value
+        ? 'No se borra nada de lo ya registrado: se abre una nueva vuelta de revisión con tu nota.'
+        : 'Registra este movimiento de la orden.',
+);
+
+/* Si el usuario no tiene permiso para ese paso, ni se muestra el botón
+   (antes se mostraba igual y al hacer clic daba un 403). */
+const PERMISO_POR_ESTADO = {
+    autorizada: 'mantenimientos.supervisar',
+    supervisado: 'mantenimientos.supervisar',
+    cerrado: 'mantenimientos.cerrar',
+};
 const botonesTransicion = computed(() =>
     props.transicionesPosibles
         .filter((slug) => slug !== 'reprogramado' && slug !== 'autorizado')
+        .filter((slug) => !PERMISO_POR_ESTADO[slug] || puede(PERMISO_POR_ESTADO[slug]))
         .map((slug, i) => {
             const colorHex = ESTADO_COLOR_HEX[slug] || '#0d84c9';
             const colorMap = {
@@ -251,22 +281,27 @@ const botonesTransicion = computed(() =>
                 en_espera_refaccion: { c1: '#e08a1e', c2: '#a86717' },
                 fuera_de_servicio: { c1: '#d64545', c2: '#b91c1c' },
                 realizado: { c1: '#16a34a', c2: '#15803d' },
+                autorizada: { c1: '#0ea5e9', c2: '#0a85c2' },
                 supervisado: { c1: '#7c3aed', c2: '#6d28d9' },
                 cerrado: { c1: '#1f9e86', c2: '#16806c' },
                 cancelado: { c1: '#d64545', c2: '#b91c1c' },
                 asignado: { c1: '#0d84c9', c2: '#0a6ba6' },
             };
-            const colors = colorMap[slug] || { c1: colorHex, c2: colorHex };
+            const regreso = esRegresoDesdeSupervisado(slug);
+            const colors = regreso ? { c1: '#ea580c', c2: '#c2410c' } : (colorMap[slug] || { c1: colorHex, c2: colorHex });
+            let label = ETIQUETA_ESTADO[slug] ?? slug;
+            if (regreso) label = 'Regresar a autorizada';
+            else if (esReanudarDesdeEspera(slug)) label = 'Reanudar';
             return {
                 slug,
-                label: ETIQUETA_ESTADO[slug] ?? slug,
-                icono: ICONO_ESTADO[slug] ?? SwapOutlined,
-                variante: slug === 'cancelado' ? 'danger' : (i === 0 ? 'primary' : 'default'),
+                label,
+                icono: regreso ? UndoOutlined : (ICONO_ESTADO[slug] ?? SwapOutlined),
+                variante: slug === 'cancelado' ? 'danger' : (regreso ? 'default' : (i === 0 ? 'primary' : 'default')),
                 color: colors.c1,
                 color2: colors.c2,
                 deshabilitado: slug === 'realizado' && !tieneDiagnostico.value,
                 motivo: slug === 'realizado' && !tieneDiagnostico.value
-                    ? 'Captura primero el diagnóstico para poder marcar la orden como realizada.'
+                    ? 'Captura primero el diagnóstico para poder marcar la orden como completada.'
                     : '',
             };
         }),
@@ -908,6 +943,9 @@ const bitacoraConFoto = computed(() => (m.value.bitacora ?? []).filter((o) => o.
                                     </div>
                                     <p class="mb-item__cuerpo">{{ o.cuerpo }}</p>
                                     <GaleriaEvidencias v-if="o.evidencias?.length" :documentos="o.evidencias" class="mb-item__fotos" />
+                                    <a v-if="o.enlace" :href="o.enlace" target="_blank" rel="noopener noreferrer" class="mb-item__enlace">
+                                        <LinkOutlined /> {{ o.enlace }}
+                                    </a>
                                 </div>
                             </article>
                         </div>
@@ -1158,16 +1196,16 @@ const bitacoraConFoto = computed(() => (m.value.bitacora ?? []).filter((o) => o.
             <div class="modal-estado__wrap">
                 <header class="me-head">
                     <div class="me-head__ico">
-                        <component :is="ICONO_ESTADO[formEstado.estado] || SwapOutlined" />
+                        <component :is="modalEsRegreso ? UndoOutlined : (ICONO_ESTADO[formEstado.estado] || SwapOutlined)" />
                     </div>
                     <div class="me-head__meta">
                         <div class="me-head__row">
-                            <h2 class="me-head__titulo">{{ ETIQUETA_ESTADO[formEstado.estado] || 'Cambiar estado' }}</h2>
+                            <h2 class="me-head__titulo">{{ modalTituloEstado }}</h2>
                             <span class="me-head__badge">
                                 <SwapOutlined /> Cambio de estado
                             </span>
                         </div>
-                        <p class="me-head__sub">Registra este movimiento de la orden.</p>
+                        <p class="me-head__sub">{{ modalSubEstado }}</p>
                     </div>
                     <button type="button" class="me-head__close" :disabled="formEstado.processing" title="Cerrar"
                         @click="cerrarEstado">✕</button>
@@ -1201,14 +1239,31 @@ const bitacoraConFoto = computed(() => (m.value.bitacora ?? []).filter((o) => o.
                                 </span>
                                 <span class="step__sub">
                                     {{ EVIDENCIA_OPCIONAL.includes(formEstado.estado)
-                                        ? 'Adjunta una imagen que respalde este movimiento, si quieres.'
-                                        : 'Adjunta una imagen que respalde este movimiento.' }}
+                                        ? 'Adjunta una foto o documento que respalde este movimiento, si quieres.'
+                                        : 'Adjunta una foto o documento que respalde este movimiento.' }}
                                 </span>
                             </div>
                         </div>
                         <div class="step__body">
-                            <CampoEvidencias v-model="formEstado.evidencias" />
+                            <CampoEvidencias v-model="formEstado.evidencias" :solo-imagenes="false" />
                             <p v-if="formEstado.errors.evidencias" class="error-msg">{{ formEstado.errors.evidencias }}</p>
+                        </div>
+                    </section>
+
+                    <section class="step">
+                        <div class="step__head">
+                            <span class="step__num">3</span>
+                            <div class="step__meta">
+                                <span class="step__title">
+                                    <LinkOutlined /> Enlace <small>(opcional)</small>
+                                </span>
+                                <span class="step__sub">Pega un enlace que respalde este movimiento, si quieres.</span>
+                            </div>
+                        </div>
+                        <div class="step__body">
+                            <a-input v-model:value="formEstado.enlace" placeholder="https://…"
+                                :status="formEstado.errors.enlace ? 'error' : undefined" />
+                            <p v-if="formEstado.errors.enlace" class="error-msg">{{ formEstado.errors.enlace }}</p>
                         </div>
                     </section>
                 </form>
@@ -3290,6 +3345,21 @@ const bitacoraConFoto = computed(() => (m.value.bitacora ?? []).filter((o) => o.
 .mb-item__fotos {
     padding-left: 32px;
     margin-top: 2px;
+}
+
+.mb-item__enlace {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding-left: 32px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #0d84c9;
+    word-break: break-all;
+}
+
+.mb-item__enlace:hover {
+    text-decoration: underline;
 }
 
 .mb-item__cuerpo {

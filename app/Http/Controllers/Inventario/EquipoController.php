@@ -127,6 +127,9 @@ class EquipoController extends Controller
                     'ubicacion:id,nombre',
                     'estado:id,nombre,color',
                     'bajaPor:id,nombre',
+                    // Solo la foto de referencia, para el ícono "Ver foto" de la tabla.
+                    'documentos' => fn ($q) => $q->wherePivot('rol', 'foto_referencia')
+                        ->select('documentos.id', 'documentos.nombre_original'),
                 ])
                 ->when($texto('codigo'), fn (Builder $q, $v) => $q->where('codigo_activo', 'like', "%{$v}%"))
                 ->when($texto('descripcion'), fn (Builder $q, $v) => $q->where('descripcion', 'like', "%{$v}%"))
@@ -161,13 +164,13 @@ class EquipoController extends Controller
                 'ubicacion' => $e->ubicacion?->nombre,
                 'estado' => $e->estado,
                 'valor_adquisicion' => $e->valor_adquisicion,
-                'proximo_mantenimiento' => $e->planes()->min('proxima_fecha'),
                 'creado_por' => $creadores[$e->id]['usuario'] ?? null,
                 'creado_en' => $creadores[$e->id]['fecha'] ?? null,
                 'motivo_baja' => $e->motivo_baja,
                 'baja_por' => $e->bajaPor?->nombre,
                 'baja_en' => $e->baja_en,
                 'deleted_at' => $e->deleted_at,
+                'foto' => $e->documentos->first()?->only(['id', 'nombre_original']),
             ]);
         }
 
@@ -196,7 +199,7 @@ class EquipoController extends Controller
 
         return Inertia::render('Inventario/Equipos/Form', [
             'equipo' => null,
-            'codigoSugerido' => Folios::previsualizarCodigoEquipo(),
+            'codigosSugeridos' => Folios::codigosSugeridosEquipo(),
             'catalogos' => $this->catalogosForm(),
         ]);
     }
@@ -288,6 +291,8 @@ class EquipoController extends Controller
                 ->latest('id')
                 ->limit(20)
                 ->get(['id', 'folio', 'estado_id', 'descripcion', 'solicitado_at']),
+            // Para el modal "Solicitar servicio" (se abre sin salir de la ficha).
+            'prioridades' => \App\Models\Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre', 'color']),
         ]);
     }
 

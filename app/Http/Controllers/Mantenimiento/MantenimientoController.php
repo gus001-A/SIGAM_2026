@@ -39,6 +39,9 @@ class MantenimientoController extends Controller
 
     private const POR_PAGINA = 15;
 
+    /** Fotos, PDF y documentos de oficina (Word, Excel, PowerPoint, CSV, texto). */
+    private const MIMES_EVIDENCIA = 'pdf,jpg,jpeg,png,webp,doc,docx,xls,xlsx,ppt,pptx,csv,txt,odt,ods,odp';
+
     public function index(Request $request): Response
     {
         $this->authorize('mantenimientos.ver');
@@ -335,12 +338,14 @@ class MantenimientoController extends Controller
         $datos = $request->validate([
             'estado' => ['required', 'string'],
             'nota' => ['required', 'string', 'max:500'],
-            // La evidencia es obligatoria para avanzar, menos al supervisar.
+            // La evidencia es obligatoria para avanzar, menos en los pasos de
+            // revisión de oficina (autorizar, supervisar, cerrar).
             'evidencias' => [
-                Rule::requiredIf(fn () => ! in_array($request->input('estado'), ['supervisado', 'cerrado'], true)),
+                Rule::requiredIf(fn () => ! in_array($request->input('estado'), ['autorizada', 'supervisado', 'cerrado'], true)),
                 'array', 'max:'.Evidencias::MAXIMO,
             ],
-            'evidencias.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp'],
+            'evidencias.*' => ['file', 'max:20480', 'mimes:'.self::MIMES_EVIDENCIA],
+            'enlace' => ['nullable', 'url', 'max:2048'],
         ]);
 
         $origen = $mantenimiento->estado->clave;
@@ -354,7 +359,7 @@ class MantenimientoController extends Controller
             return back()->with('error', 'No se puede marcar como realizada: falta capturar el diagnóstico.');
         }
 
-        if (in_array($destino, ['supervisado', 'cerrado'], true)) {
+        if (in_array($destino, ['autorizada', 'supervisado', 'cerrado'], true)) {
             $this->authorize('mantenimientos.supervisar');
         }
         if ($destino === 'cerrado') {
@@ -371,6 +376,9 @@ class MantenimientoController extends Controller
 
             CicloMantenimiento::aplicarSello($mantenimiento, $destino);
             $mantenimiento->estado_id = $estadoDestino->id;
+            if ($destino === 'autorizada') {
+                $mantenimiento->autorizada_por = $request->user()->id;
+            }
             if ($destino === 'supervisado') {
                 $mantenimiento->supervisor_id = $request->user()->id;
             }
@@ -388,6 +396,8 @@ class MantenimientoController extends Controller
                 'tipo' => 'comentario',
                 'cuerpo' => "Se movió la orden a «{$estadoDestino->nombre}»."
                                 .(! empty($datos['nota']) ? " Nota: {$datos['nota']}" : ''),
+                // Nunca pasa por mayúsculas: dañaría la liga.
+                'enlace' => $datos['enlace'] ?? null,
                 'usuario_id' => $request->user()->id,
             ]);
 
@@ -412,7 +422,7 @@ class MantenimientoController extends Controller
             'programado_fin' => ['nullable', 'date', 'after:programado_inicio'],
             'motivo' => ['required', 'string', 'max:500'],
             'evidencias' => ['required', 'array', 'min:1', 'max:'.Evidencias::MAXIMO],
-            'evidencias.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp'],
+            'evidencias.*' => ['file', 'max:20480', 'mimes:'.self::MIMES_EVIDENCIA],
         ], [
             'programado_inicio.after_or_equal' => 'La nueva fecha no puede ser anterior a hoy.',
             'programado_fin.after' => 'La fecha de fin debe ser posterior a la de inicio.',

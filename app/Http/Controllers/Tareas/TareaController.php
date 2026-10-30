@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Tareas;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tareas\GuardarTareaRequest;
 use App\Models\CategoriaTarea;
+use App\Models\ComentarioTarea;
 use App\Models\HistorialEstadoTarea;
 use App\Models\Material;
 use App\Models\Prioridad;
@@ -28,13 +29,16 @@ use Inertia\Response;
  */
 class TareaController extends Controller
 {
-    private const ORDENABLES = ['fecha_limite', 'created_at', 'id'];
+    private const ORDENABLES = ['fecha_limite', 'created_at', 'id', 'estado'];
 
     private const POR_PAGINA = 15;
 
-    private const ESTADOS_ACTIVOS = ['pendiente', 'en_proceso'];
+    private const ESTADOS_ACTIVOS = ['asignada', 'en_proceso', 'completada', 'autorizada', 'supervisada', 'reprogramada'];
 
-    private const ESTADOS_COMPLETADOS = ['realizada', 'cancelada'];
+    private const ESTADOS_COMPLETADOS = ['cerrada', 'cancelada'];
+
+    /** Fotos, PDF y documentos de oficina (Word, Excel, PowerPoint, CSV, texto). */
+    private const MIMES_EVIDENCIA = 'pdf,jpg,jpeg,png,webp,doc,docx,xls,xlsx,ppt,pptx,csv,txt,odt,ods,odp';
 
     public function index(Request $request): Response
     {
@@ -46,10 +50,17 @@ class TareaController extends Controller
         $texto = fn (string $c): ?string => filled($request->query($c)) ? trim((string) $request->query($c)) : null;
         $vista = $request->query('vista') === 'completadas' ? 'completadas' : 'activas';
 
+        // Cantidad por página configurable (default 6, tope 100 para seguridad).
+        $perPage = (int) $request->query('per_page', 8);
+        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 8;
+
         // Alcance visible del usuario (sin filtros de la vista/búsqueda) para
         // los KPIs — así se quedan estables al cambiar de pestaña o filtrar.
+        // Supervisor y auditor ven todas (igual que superadministrador):
+        // necesitan poder encontrar cualquier tarea para dejar comentarios
+        // de supervisión, no solo las que crearon o les asignaron.
         $visibles = fn (Builder $q) => $q->when(
-            ! $usuario->hasRole('superadministrador'),
+            ! $usuario->hasAnyRole(['superadministrador', 'supervisor', 'auditor']),
             fn (Builder $w) => $w->where(fn (Builder $ww) => $ww
                 ->whereHas('responsables', fn (Builder $r) => $r
                     ->where('usuarios.id', $usuario->id)->whereNull('tarea_responsables.desasignado_at'))
@@ -60,10 +71,14 @@ class TareaController extends Controller
             'total' => Tarea::query()->tap($visibles)->count(),
             'vencidas' => Tarea::query()->tap($visibles)
                 ->whereIn('estado', self::ESTADOS_ACTIVOS)->whereDate('fecha_limite', '<', today())->count(),
-            'pendientes' => Tarea::query()->tap($visibles)->where('estado', 'pendiente')->count(),
+            'asignadas' => Tarea::query()->tap($visibles)->where('estado', 'asignada')->count(),
             'en_proceso' => Tarea::query()->tap($visibles)->where('estado', 'en_proceso')->count(),
-            'realizadas' => Tarea::query()->tap($visibles)->where('estado', 'realizada')->count(),
+            'completadas' => Tarea::query()->tap($visibles)->where('estado', 'completada')->count(),
             'canceladas' => Tarea::query()->tap($visibles)->where('estado', 'cancelada')->count(),
+            // Tareas ya completadas que están esperando el paso de autorizar o
+            // supervisar (botón "Por supervisar", solo para quien puede hacerlo).
+            'por_supervisar' => Tarea::query()->tap($visibles)
+                ->whereIn('estado', ['completada', 'autorizada'])->count(),
         ];
 
         $tareas = Tarea::query()
@@ -79,7 +94,12 @@ class TareaController extends Controller
             ->when($vista === 'activas', fn (Builder $q) => $q->whereIn('estado', self::ESTADOS_ACTIVOS))
             ->when($texto('descripcion'), fn (Builder $q, $v) => $q->where(fn (Builder $w) => $w
                 ->where('titulo', 'like', "%{$v}%")->orWhere('descripcion', 'like', "%{$v}%")))
-            ->when($vista === 'activas' && $texto('estado'), fn (Builder $q, $v) => $q->where('estado', $v))
+            // 👇 antes era "$vista === 'activas' && $texto('estado')": el `&&`
+            // entre un bool y un string da un bool, así que el filtro llegaba
+            // como `true` en vez del estado elegido y nunca encontraba nada.
+            // Ya no se limita a la vista "activas": también sirve para
+            // distinguir Cerrada de Cancelada dentro de "Completadas".
+            ->when($texto('estado'), fn (Builder $q, $v) => $q->where('estado', $v))
             ->when($request->integer('prioridad_id'), fn (Builder $q, $v) => $q->where('prioridad_id', $v))
             ->when($texto('clasificacion'), fn (Builder $q, $v) => $q->where('clasificacion', $v))
             ->when($request->integer('proyecto_id'), fn (Builder $q, $v) => $q->where('proyecto_id', $v))
@@ -89,16 +109,22 @@ class TareaController extends Controller
                 fn (Builder $r) => $r->whereNull('tarea_responsables.desasignado_at')
                     ->where(fn (Builder $u) => $u->where('nombre', 'like', "%{$v}%")->orWhere('apellidos', 'like', "%{$v}%")),
             ))
+            // Rango de fecha límite
             ->when($request->filled('desde'), fn (Builder $q) => $q->whereDate('fecha_limite', '>=', $request->query('desde')))
             ->when($request->filled('hasta'), fn (Builder $q) => $q->whereDate('fecha_limite', '<=', $request->query('hasta')))
+            // Rango de fecha de creación (created_at)
+            ->when($request->filled('creado_desde'), fn (Builder $q) => $q->whereDate('created_at', '>=', $request->query('creado_desde')))
+            ->when($request->filled('creado_hasta'), fn (Builder $q) => $q->whereDate('created_at', '<=', $request->query('creado_hasta')))
             ->when($vista === 'activas' && $request->boolean('vencidas'), fn (Builder $q) => $q
                 ->whereDate('fecha_limite', '<', today()))
+            ->when($vista === 'activas' && $request->boolean('por_supervisar'), fn (Builder $q) => $q
+                ->whereIn('estado', ['completada', 'autorizada']))
             ->when($texto('registrado_por'), fn (Builder $q, $v) => $q->whereIn(
                 'id',
                 Auditoria::idsCreadosPor(Tarea::class, $v),
             ))
             ->orderBy($orden, $dir)
-            ->paginate(self::POR_PAGINA)
+            ->paginate($perPage)
             ->withQueryString();
 
         $creadores = Auditoria::creadoPorMasivo(Tarea::class, $tareas->pluck('id'));
@@ -123,7 +149,13 @@ class TareaController extends Controller
             'tareas' => $tareas,
             'kpis' => $kpis,
             'vista' => $vista,
-            'filtros' => $request->only(['descripcion', 'estado', 'responsable', 'prioridad_id', 'clasificacion', 'proyecto_id', 'categoria_tarea_id', 'desde', 'hasta', 'vencidas', 'registrado_por']),
+            'filtros' => $request->only([
+                'descripcion', 'estado', 'responsable', 'prioridad_id', 'clasificacion',
+                'proyecto_id', 'categoria_tarea_id',
+                'desde', 'hasta',               // fecha límite
+                'creado_desde', 'creado_hasta', // fecha creación
+                'vencidas', 'por_supervisar', 'registrado_por',
+            ]),
             'orden' => ['campo' => $orden, 'dir' => $dir],
             'catalogos' => [
                 'usuarios' => Usuario::where('estado', 'activo')->orderBy('nombre')->get(['id', 'nombre', 'apellidos']),
@@ -151,7 +183,7 @@ class TareaController extends Controller
         $tarea = DB::transaction(function () use ($request) {
             $tarea = Tarea::create([
                 ...$request->datosClasificados(),
-                'estado' => 'pendiente',
+                'estado' => 'asignada',
                 'creado_por' => $request->user()->id,
             ]);
 
@@ -163,7 +195,7 @@ class TareaController extends Controller
 
             $tarea->historialEstados()->create([
                 'estado_origen' => null,
-                'estado_destino' => 'pendiente',
+                'estado_destino' => 'asignada',
                 'cambiado_por' => $request->user()->id,
                 'nota' => 'Tarea creada',
                 'cambiado_at' => now(),
@@ -192,6 +224,13 @@ class TareaController extends Controller
         $this->authorize('tareas.ver');
         $this->verificarPertenencia($tarea);
 
+        // Comentarios de supervisión: solo los escriben supervisor/auditor, y
+        // solo los ven ellos mismos y los responsables activos de la tarea —
+        // nadie más. Si no corresponde, ni siquiera se cargan de la BD.
+        $puedeComentar = $request->user()->can('tareas.comentar');
+        $esResponsable = $tarea->asignaciones()->whereNull('desasignado_at')->where('usuario_id', $request->user()->id)->exists();
+        $puedeVerComentarios = $puedeComentar || $esResponsable;
+
         $tarea->load([
             'asignaciones.usuario:id,nombre,apellidos,telefono',
             'asignaciones.asignadoPor:id,nombre',
@@ -209,6 +248,23 @@ class TareaController extends Controller
         $tarea->historialEstados->each(fn (HistorialEstadoTarea $hh) => $hh->evidencias
             ->each(fn ($doc) => $doc->setAttribute('url', $doc->url())));
 
+        // Comentarios agrupados por movimiento, en una sola consulta aparte
+        // (no se tocan las relaciones de `tarea`, así no hay riesgo de que se
+        // filtren sin querer si no corresponde).
+        $comentariosPorMovimiento = $puedeVerComentarios
+            ? ComentarioTarea::whereIn('historial_estado_tarea_id', $tarea->historialEstados->pluck('id'))
+                ->with('usuario:id,nombre,apellidos')
+                ->orderBy('created_at')
+                ->get()
+                ->groupBy('historial_estado_tarea_id')
+                ->map(fn ($grupo) => $grupo->map(fn (ComentarioTarea $c) => [
+                    'id' => $c->id,
+                    'cuerpo' => $c->cuerpo,
+                    'usuario' => $c->usuario?->nombre_completo ?? 'Sistema',
+                    'fecha' => $c->created_at?->toISOString(),
+                ])->values())
+            : (object) [];
+
         return Inertia::render('Tareas/Show', [
             'tarea' => $tarea,
             'retrasoDias' => $tarea->diasRetraso(),
@@ -219,8 +275,10 @@ class TareaController extends Controller
             'transicionesPosibles' => CicloTarea::siguientes($tarea->estado),
             'avances' => $this->resumenAvances($tarea),
             'pendientesAvance' => $tarea->participantesPendientes()->pluck('nombre_completo')->values(),
-            'soyParticipante' => $tarea->asignaciones()->whereNull('desasignado_at')->where('usuario_id', $request->user()->id)->exists(),
+            'soyParticipante' => $esResponsable,
             'soyPrincipal' => $this->esPrincipal($tarea, $request->user()->id),
+            'puedeComentar' => $puedeComentar,
+            'comentariosPorMovimiento' => $comentariosPorMovimiento,
             'catalogos' => [
                 'usuarios' => Usuario::where('estado', 'activo')->orderBy('nombre')->get(['id', 'nombre', 'apellidos']),
                 'prioridades' => Prioridad::activos()->orderBy('nivel')->get(['id', 'nombre']),
@@ -276,18 +334,23 @@ class TareaController extends Controller
         $reglas = [
             'nota' => ['required', 'string', 'max:1000'],
             'evidencias' => ['nullable', 'array', 'max:'.Evidencias::MAXIMO],
-            'evidencias.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx'],
+            'evidencias.*' => ['file', 'max:20480', 'mimes:'.self::MIMES_EVIDENCIA],
+            'enlace' => ['nullable', 'url', 'max:2048'],
             'cerrar_sin_esperar' => ['nullable', 'boolean'],
         ];
-        if ($destino === 'realizada') {
+        if (in_array($destino, ['autorizada', 'supervisada'], true)) {
+            $this->authorize('tareas.supervisar');
+        }
+        if ($destino === 'cerrada') {
             $this->authorize('tareas.cerrar');
         }
         $datos = $request->validate($reglas);
 
-        // En tareas compartidas, nadie cierra hasta que cada participante haya hecho algo.
-        // Solo el responsable principal puede cerrar sin esperar, y queda anotado.
+        // En tareas compartidas, nadie la da por completada hasta que cada
+        // participante haya hecho algo. Solo el responsable principal puede
+        // saltarse la espera, y queda anotado.
         $sinEsperar = collect();
-        if ($destino === 'realizada') {
+        if ($destino === 'completada') {
             $pendientes = $tarea->participantesPendientes();
             if ($pendientes->isNotEmpty()) {
                 $nombres = $pendientes->pluck('nombre_completo')->join(', ');
@@ -307,14 +370,18 @@ class TareaController extends Controller
 
         $nota = $datos['nota'];
         if ($sinEsperar->isNotEmpty()) {
-            $nota .= ' (Cerrada sin esperar a: '.$sinEsperar->pluck('nombre_completo')->join(', ').')';
+            $nota .= ' (Completada sin esperar a: '.$sinEsperar->pluck('nombre_completo')->join(', ').')';
         }
 
-        DB::transaction(function () use ($tarea, $origen, $destino, $nota, $request): void {
+        DB::transaction(function () use ($tarea, $origen, $destino, $nota, $datos, $request): void {
             $tarea->estado = $destino;
             match ($destino) {
                 'en_proceso' => $tarea->fill(['iniciada_at' => now(), 'nota_avance' => $nota]),
-                'realizada' => $tarea->fill(['realizada_at' => now(), 'nota_cierre' => $nota]),
+                'completada' => $tarea->fill(['realizada_at' => now(), 'nota_cierre' => $nota]),
+                'autorizada' => $tarea->fill(['autorizada_at' => now(), 'autorizado_por' => $request->user()->id]),
+                'supervisada' => $tarea->fill(['supervisada_at' => now(), 'supervisor_id' => $request->user()->id]),
+                'cerrada' => $tarea->fill(['cerrada_at' => now()]),
+                'reprogramada' => $tarea->fill(['reprogramada_at' => now()]),
                 'cancelada' => $tarea->fill(['cancelada_at' => now(), 'nota_cancelacion' => $nota]),
                 default => null,
             };
@@ -325,6 +392,8 @@ class TareaController extends Controller
                 'estado_destino' => $destino,
                 'cambiado_por' => $request->user()->id,
                 'nota' => $nota,
+                // Nunca pasa por mayúsculas: dañaría la liga.
+                'enlace' => $datos['enlace'] ?? null,
                 'cambiado_at' => now(),
             ]);
 
@@ -367,7 +436,8 @@ class TareaController extends Controller
         $datos = $request->validate([
             'nota' => ['required', 'string', 'max:1000'],
             'evidencias' => ['nullable', 'array', 'max:'.Evidencias::MAXIMO],
-            'evidencias.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx'],
+            'evidencias.*' => ['file', 'max:20480', 'mimes:'.self::MIMES_EVIDENCIA],
+            'enlace' => ['nullable', 'url', 'max:2048'],
         ]);
 
         DB::transaction(function () use ($tarea, $datos, $request, $usuario): void {
@@ -376,6 +446,8 @@ class TareaController extends Controller
                 'estado_destino' => $tarea->estado,
                 'cambiado_por' => $usuario->id,
                 'nota' => $datos['nota'],
+                // Nunca pasa por mayúsculas: dañaría la liga.
+                'enlace' => $datos['enlace'] ?? null,
                 'cambiado_at' => now(),
             ]);
 
@@ -391,6 +463,50 @@ class TareaController extends Controller
         );
 
         return back()->with('exito', 'Avance registrado.');
+    }
+
+    /**
+     * Comentario de supervisión: solo lo pueden escribir supervisor/auditor
+     * (permiso `tareas.comentar`). Solo lo ven ellos mismos y los responsables
+     * activos de la tarea — nadie más. No se edita ni se borra.
+     */
+    public function guardarComentario(Request $request, Tarea $tarea, HistorialEstadoTarea $historial): RedirectResponse
+    {
+        $this->authorize('tareas.comentar');
+        $this->verificarPertenencia($tarea);
+        abort_unless((int) $historial->tarea_id === (int) $tarea->id, 404);
+
+        // Los comentarios de supervisión son antes de cerrar la tarea. Una
+        // vez cerrada, los que ya existen se conservan, pero no se agregan más.
+        if ($tarea->estado === 'cerrada') {
+            return back()->with('error', 'La tarea ya está cerrada: no se pueden agregar más comentarios.');
+        }
+
+        $datos = $request->validate([
+            'cuerpo' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $usuario = $request->user();
+        $historial->comentarios()->create([
+            'tarea_id' => $tarea->id,
+            'usuario_id' => $usuario->id,
+            'cuerpo' => $datos['cuerpo'],
+        ]);
+
+        // Solo se avisa a los responsables (son los destinatarios de esto),
+        // nunca a otros supervisores/auditores que no participan en la tarea.
+        $tarea->responsables()
+            ->wherePivotNull('desasignado_at')
+            ->pluck('usuarios.id')
+            ->each(fn ($usuarioId) => Notificaciones::crear(
+                $usuarioId,
+                'tarea_comentario',
+                "Nuevo comentario de supervisión: {$tarea->titulo}",
+                "{$usuario->nombre_completo} dejó un comentario en un movimiento de tu tarea.",
+                ['ref' => "tarea_comentario:{$historial->id}:".now()->timestamp, 'url' => route('tareas.show', $tarea->id)],
+            ));
+
+        return back()->with('exito', 'Comentario publicado.');
     }
 
     /** Convierte un movimiento del historial (estado o avance) al formato de la bitácora. */
@@ -410,6 +526,7 @@ class TareaController extends Controller
             'usuario' => $h->cambiadoPor?->nombre_completo ?? 'Sistema',
             'fecha' => $h->cambiado_at?->toISOString(),
             'nota' => $h->nota,
+            'enlace' => $h->enlace,
             'cambios' => $cambios,
         ];
     }
@@ -445,6 +562,7 @@ class TareaController extends Controller
                     'acciones' => $tarea->historialEstados()->where('cambiado_por', $a->usuario_id)->count(),
                     'ultimo' => $ultimo ? [
                         'nota' => $ultimo->nota,
+                        'enlace' => $ultimo->enlace,
                         'fecha' => $ultimo->cambiado_at?->toISOString(),
                         'evidencias' => $ultimo->evidencias,
                     ] : null,
@@ -472,7 +590,9 @@ class TareaController extends Controller
         $usuario = request()->user();
 
         abort_unless(
-            $usuario->hasRole('superadministrador')
+            // Supervisor y auditor pueden abrir cualquier tarea: la necesitan
+            // para dejar comentarios de supervisión (ver `tareas.comentar`).
+            $usuario->hasAnyRole(['superadministrador', 'supervisor', 'auditor'])
                 || $tarea->creado_por === $usuario->id
                 || $tarea->responsables()->wherePivotNull('desasignado_at')->where('usuarios.id', $usuario->id)->exists(),
             403,

@@ -82,10 +82,12 @@ const hayPreview = computed(
         form.fecha_requerida,
 );
 
-const abrir = (equipoId = null) => {
+// `fecha` (YYYY-MM-DD, opcional): precarga la fecha requerida, p. ej. desde el calendario.
+const abrir = (equipoId = null, fecha = null) => {
     form.reset();
     form.clearErrors();
     if (equipoId) form.equipo_id = equipoId;
+    if (fecha && fecha >= mananaISO()) form.fecha_requerida = fecha;
     abierto.value = true;
 };
 

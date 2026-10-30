@@ -27,6 +27,7 @@ class Tarea extends Model
         'titulo', 'descripcion', 'fecha_limite', 'prioridad_id', 'clasificacion', 'proyecto_id', 'categoria_tarea_id',
         'estado', 'nota_avance', 'nota_cierre', 'nota_cancelacion',
         'costo', 'iniciada_at', 'realizada_at', 'cancelada_at', 'creado_por',
+        'autorizada_at', 'autorizado_por', 'supervisada_at', 'supervisor_id', 'cerrada_at', 'reprogramada_at',
     ];
 
     protected function casts(): array
@@ -37,6 +38,10 @@ class Tarea extends Model
             'iniciada_at' => 'datetime',
             'realizada_at' => 'datetime',
             'cancelada_at' => 'datetime',
+            'autorizada_at' => 'datetime',
+            'supervisada_at' => 'datetime',
+            'cerrada_at' => 'datetime',
+            'reprogramada_at' => 'datetime',
         ];
     }
 
@@ -70,6 +75,18 @@ class Tarea extends Model
         return $this->belongsTo(Usuario::class, 'creado_por');
     }
 
+    /** Quién autorizó la tarea ya completada (paso "Autorizada"). */
+    public function autorizadoPor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'autorizado_por');
+    }
+
+    /** Quién la supervisó (paso "Supervisada"). */
+    public function supervisor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'supervisor_id');
+    }
+
     /** Responsables activos e históricos (pivote con historial de asignación). */
     public function responsables(): BelongsToMany
     {
@@ -85,6 +102,12 @@ class Tarea extends Model
     public function historialEstados(): HasMany
     {
         return $this->hasMany(HistorialEstadoTarea::class)->orderBy('cambiado_at');
+    }
+
+    /** Comentarios de supervisión (solo supervisor/auditor escriben; ver TareaController). */
+    public function comentarios(): HasMany
+    {
+        return $this->hasMany(ComentarioTarea::class)->orderBy('created_at');
     }
 
     public function materiales(): HasMany
@@ -117,7 +140,10 @@ class Tarea extends Model
      */
     public function diasRetraso(): ?int
     {
-        if ($this->estado !== 'realizada' || blank($this->realizada_at) || blank($this->fecha_limite)) {
+        // `realizada_at` se pone al llegar a "completada" y ya no se toca
+        // después, aunque la tarea siga avanzando a autorizada/supervisada/
+        // cerrada — por eso no se exige que el estado sea exactamente ese.
+        if (blank($this->realizada_at) || blank($this->fecha_limite)) {
             return null;
         }
 

@@ -65,6 +65,34 @@ class EquiposTest extends TestCase
         $this->assertSame('220 V', $equipo->especificaciones['Voltaje']);
     }
 
+    public function test_el_codigo_es_unico_por_sucursal_y_puede_repetirse_en_otra(): void
+    {
+        $fundacion = Sucursal::create(['codigo' => 'S2', 'nombre' => 'Fundación', 'estado' => 'activo']);
+        Equipo::create(['codigo_activo' => '101', 'descripcion' => 'A', 'sucursal_id' => $this->sucursal->id]);
+
+        $this->actingAs($this->admin)->post(route('equipos.store'), [
+            'codigo_activo' => '101', 'descripcion' => 'B', 'sucursal_id' => $fundacion->id,
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($this->admin)->post(route('equipos.store'), [
+            'codigo_activo' => '101', 'descripcion' => 'C', 'sucursal_id' => $this->sucursal->id,
+        ])->assertSessionHasErrors('codigo_activo');
+
+        $this->assertSame(2, Equipo::where('codigo_activo', '101')->count());
+    }
+
+    public function test_el_codigo_sugerido_lleva_el_distintivo_y_consecutivo_de_la_sucursal_sin_tope(): void
+    {
+        $fundacion = Sucursal::create(['codigo' => 'FUN', 'nombre' => 'Fundación', 'estado' => 'activo']);
+        Equipo::create(['codigo_activo' => 'S1-EQ-999', 'descripcion' => 'A', 'sucursal_id' => $this->sucursal->id]);
+        Equipo::create(['codigo_activo' => 'S1-EQ-007', 'descripcion' => 'B', 'sucursal_id' => $this->sucursal->id])->delete();
+
+        $this->actingAs($this->admin)->get(route('equipos.create'))
+            ->assertInertia(fn ($p) => $p
+                ->where("codigosSugeridos.{$this->sucursal->id}", 'S1-EQ-1000')
+                ->where("codigosSugeridos.{$fundacion->id}", 'FUN-EQ-001'));
+    }
+
     public function test_asignar_plan_preventivo_al_dar_de_alta_un_equipo(): void
     {
         $tipoMantenimiento = TipoMantenimiento::where('categoria', 'preventivo')->firstOrFail();
@@ -104,6 +132,14 @@ class EquiposTest extends TestCase
         $equipo = Equipo::where('codigo_activo', 'EQ-011')->firstOrFail();
         $documento = $equipo->documentos()->wherePivot('rol', 'foto_referencia')->firstOrFail();
         $this->assertSame('foto_referencia', $documento->categoria);
+
+        // El listado manda la foto para el ícono "Ver foto" de la tabla.
+        Equipo::create(['codigo_activo' => 'EQ-SIN-FOTO', 'descripcion' => 'B', 'sucursal_id' => $this->sucursal->id]);
+        $this->actingAs($this->admin)
+            ->get(route('equipos.por_sucursal', ['sucursal_id' => $this->sucursal->id, 'orden' => 'codigo_activo']))
+            ->assertInertia(fn ($p) => $p
+                ->where('equipos.data.0.foto.id', $documento->id)
+                ->where('equipos.data.1.foto', null));
     }
 
     public function test_reemplaza_la_foto_de_referencia_al_editar_un_equipo(): void

@@ -81,10 +81,21 @@ class FlujoMantenimientoTest extends TestCase
             'evidencias' => [UploadedFile::fake()->image('realizado.jpg')],
         ])->assertRedirect();
 
-        // 5. No se puede cerrar sin pasar por supervisión.
+        // 5. No se puede saltar directo a supervisado: falta autorizar primero.
         $this->assertFalse(CicloMantenimiento::permite('realizado', 'cerrado'));
+        $this->assertFalse(CicloMantenimiento::permite('realizado', 'supervisado'));
 
-        // 6. El supervisor supervisa y cierra.
+        // 6. Alguien autoriza el trabajo ya completado (paso nuevo, distinto
+        //    de la autorización de la solicitud).
+        $this->actingAs($supervisor)->post(route('mantenimientos.transicion', $orden), [
+            'estado' => 'autorizada',
+            'nota' => 'Se autoriza el trabajo realizado.',
+        ])->assertRedirect();
+        $this->assertSame('autorizada', $orden->refresh()->estado->clave);
+        $this->assertNotNull($orden->autorizada_at);
+        $this->assertSame($supervisor->id, $orden->autorizada_por);
+
+        // 7. El supervisor supervisa y cierra.
         $this->actingAs($supervisor)->post(route('mantenimientos.transicion', $orden), [
             'estado' => 'supervisado',
             'nota' => 'Trabajo verificado en sitio.',
@@ -100,10 +111,56 @@ class FlujoMantenimientoTest extends TestCase
         $this->assertSame('cerrado', $orden->estado->clave);
         $this->assertNotNull($orden->cerrado_at);
         $this->assertSame($supervisor->id, $orden->supervisor_id);
-        // autorizado, asignado, en_proceso, realizado, supervisado, cerrado
-        $this->assertSame(6, $orden->historialEstados()->count());
-        // una evidencia por cada transición hecha vía transicion() (4: en_proceso, realizado, supervisado, cerrado)
+        // autorizado, asignado, en_proceso, realizado, autorizada, supervisado, cerrado
+        $this->assertSame(7, $orden->historialEstados()->count());
+        // una evidencia por cada transición con foto (en_proceso, realizado, supervisado, cerrado)
         $this->assertSame(4, $orden->documentos()->wherePivot('rol', 'evidencia')->count());
+    }
+
+    /**
+     * Si el supervisor no está de acuerdo al supervisar, regresa la orden a
+     * "autorizada" — sin borrar nada de lo ya registrado — y se vuelve a
+     * avanzar con una nueva nota que documenta la corrección.
+     */
+    public function test_supervisor_puede_regresar_a_autorizada_sin_borrar_el_historial(): void
+    {
+        $sucursal = Sucursal::create(['codigo' => 'S5', 'nombre' => 'Sucursal 5', 'estado' => 'activo']);
+        $equipo = Equipo::create(['codigo_activo' => 'EQ-5', 'descripcion' => 'Ventilador', 'sucursal_id' => $sucursal->id]);
+        $admin = Usuario::factory()->create();
+        $admin->assignRole('superadministrador');
+
+        $orden = Mantenimiento::create([
+            'folio' => 'MTO-TEST-4',
+            'equipo_id' => $equipo->id,
+            'sucursal_id' => $sucursal->id,
+            'tipo_id' => TipoMantenimiento::where('clave', 'correctivo')->value('id'),
+            'prioridad_id' => Prioridad::where('clave', 'normal')->value('id'),
+            'estado_id' => CicloMantenimiento::estado('realizado')->id,
+            'diagnostico' => 'Falla identificada.',
+            'descripcion_trabajo' => 'Reparación realizada.',
+            'completado_at' => now(),
+        ]);
+
+        $this->actingAs($admin)->post(route('mantenimientos.transicion', $orden), ['estado' => 'autorizada', 'nota' => 'Primera autorización.']);
+        $this->actingAs($admin)->post(route('mantenimientos.transicion', $orden), ['estado' => 'supervisado', 'nota' => 'Algo no cuadra.']);
+
+        $this->actingAs($admin)
+            ->post(route('mantenimientos.transicion', $orden), ['estado' => 'autorizada', 'nota' => 'Falta corregir una fuga.'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('autorizada', $orden->refresh()->estado->clave);
+
+        $this->actingAs($admin)->post(route('mantenimientos.transicion', $orden), ['estado' => 'supervisado', 'nota' => 'Ya corregido, segunda vuelta.']);
+        $this->actingAs($admin)
+            ->post(route('mantenimientos.transicion', $orden), ['estado' => 'cerrado', 'nota' => 'Conforme ahora sí.'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('cerrado', $orden->refresh()->estado->clave);
+
+        $notas = $orden->historialEstados()->orderBy('cambiado_at')->pluck('nota')->all();
+        $this->assertSame([
+            'PRIMERA AUTORIZACIÓN.', 'ALGO NO CUADRA.', 'FALTA CORREGIR UNA FUGA.',
+            'YA CORREGIDO, SEGUNDA VUELTA.', 'CONFORME AHORA SÍ.',
+        ], $notas);
     }
 
     public function test_no_cierra_sin_campos_minimos(): void
@@ -186,5 +243,39 @@ class FlujoMantenimientoTest extends TestCase
         $this->actingAs($admin)
             ->get(route('mantenimientos.show', $orden))
             ->assertInertia(fn ($p) => $p->where('retrasoDias', 4));
+    }
+
+    /** El enlace es opcional en un movimiento de la orden, y nunca se convierte a mayúsculas. */
+    public function test_un_movimiento_admite_enlace_y_documentos_de_oficina_sin_convertir_el_enlace_a_mayusculas(): void
+    {
+        $sucursal = Sucursal::create(['codigo' => 'S6', 'nombre' => 'Sucursal 6', 'estado' => 'activo']);
+        $equipo = Equipo::create(['codigo_activo' => 'EQ-6', 'descripcion' => 'Bomba', 'sucursal_id' => $sucursal->id]);
+        $admin = Usuario::factory()->create();
+        $admin->assignRole('superadministrador');
+
+        $orden = Mantenimiento::create([
+            'folio' => 'MTO-TEST-5',
+            'equipo_id' => $equipo->id,
+            'sucursal_id' => $sucursal->id,
+            'tipo_id' => TipoMantenimiento::where('clave', 'correctivo')->value('id'),
+            'prioridad_id' => Prioridad::where('clave', 'normal')->value('id'),
+            'estado_id' => CicloMantenimiento::estado('asignado')->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('mantenimientos.transicion', $orden), [
+                'estado' => 'en_proceso',
+                'nota' => 'Inicio con documentos',
+                'enlace' => 'https://ejemplo.com/Manual-Tecnico',
+                'evidencias' => [
+                    UploadedFile::fake()->create('cotizacion.xlsx', 100, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+                    UploadedFile::fake()->create('bitacora.csv', 10, 'text/csv'),
+                ],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $movimiento = $orden->observaciones()->latest('id')->first();
+        $this->assertSame('https://ejemplo.com/Manual-Tecnico', $movimiento->enlace);
+        $this->assertCount(2, $movimiento->evidencias);
     }
 }

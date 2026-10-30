@@ -129,6 +129,7 @@ Route::middleware(['auth'])->group(function (): void {
         ->only(['index', 'create', 'store', 'show', 'update', 'destroy']);
     Route::post('tareas/{tarea}/transicion', [TareaController::class, 'transicion'])->name('tareas.transicion');
     Route::post('tareas/{tarea}/avance', [TareaController::class, 'avance'])->name('tareas.avance');
+    Route::post('tareas/{tarea}/historial/{historial}/comentarios', [TareaController::class, 'guardarComentario'])->name('tareas.comentarios.store');
     Route::post('tareas/{tarea}/responsables', [TareaResponsableController::class, 'store'])->name('tareas.responsables.store');
     Route::delete('tareas/{tarea}/responsables/{responsable}', [TareaResponsableController::class, 'destroy'])->name('tareas.responsables.destroy');
     Route::post('tareas/{tarea}/materiales', [MaterialTareaController::class, 'store'])->name('tareas.materiales.store');

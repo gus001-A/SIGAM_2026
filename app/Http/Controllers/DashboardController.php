@@ -75,8 +75,8 @@ class DashboardController extends Controller
                     ->where('estado', 'activo')
                     ->count(),
                 'solicitudes_abiertas' => SolicitudMantenimiento::whereIn('estado_id', $abiertos)->count(),
-                'tareas_pendientes' => Tarea::whereIn('estado', ['pendiente', 'en_proceso'])->tap($soloMisTareas)->count(),
-                'tareas_vencidas' => Tarea::whereIn('estado', ['pendiente', 'en_proceso'])->whereDate('fecha_limite', '<', today())->tap($soloMisTareas)->count(),
+                'tareas_pendientes' => Tarea::whereNotIn('estado', ['cerrada', 'cancelada'])->tap($soloMisTareas)->count(),
+                'tareas_vencidas' => Tarea::whereNotIn('estado', ['cerrada', 'cancelada'])->whereDate('fecha_limite', '<', today())->tap($soloMisTareas)->count(),
             ],
             'agenda' => Mantenimiento::query()
                 ->with(['equipo:id,codigo_activo', 'ubicacion:id,nombre', 'tipo:id,nombre', 'prioridad:id,nombre,color', 'estado:id,nombre'])
@@ -109,7 +109,7 @@ class DashboardController extends Controller
                     'prioridad:id,nombre,color',
                     'responsables' => fn ($q) => $q->wherePivotNull('desasignado_at')->select('usuarios.id', 'usuarios.nombre'),
                 ])
-                ->whereIn('estado', ['pendiente', 'en_proceso'])
+                ->whereNotIn('estado', ['cerrada', 'cancelada'])
                 ->tap($soloMisTareas)
                 ->orderBy('fecha_limite')
                 ->limit(self::MAXIMO_POR_PANEL)

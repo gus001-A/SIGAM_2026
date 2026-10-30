@@ -23,6 +23,7 @@ import SelectCatalogo from '@/Components/SelectCatalogo.vue';
 import LectorCodigoBarras from '@/Components/LectorCodigoBarras.vue';
 import BotonTomarFoto from '@/Components/BotonTomarFoto.vue';
 import { useFormularioPestanas } from '@/composables/useFormularioPestanas';
+import { urlListado } from '@/composables/useRegresoListado';
 import {
     hoyISO,
     limpiarPegado,
@@ -37,7 +38,8 @@ import {
 
 const props = defineProps({
     equipo: { type: Object, default: null },
-    codigoSugerido: { type: String, default: '' },
+    // Código sugerido por sucursal: { sucursal_id: 'CSA-01-EQ-001' }.
+    codigosSugeridos: { type: Object, default: () => ({}) },
     catalogos: { type: Object, default: () => ({}) },
 });
 
@@ -45,7 +47,7 @@ const editando = computed(() => !!props.equipo);
 const ubicacionOriginal = props.equipo?.ubicacion_id ?? null;
 
 const form = useForm({
-    codigo_activo: props.equipo?.codigo_activo ?? props.codigoSugerido ?? '',
+    codigo_activo: props.equipo?.codigo_activo ?? '',
     codigo_barras: props.equipo?.codigo_barras ?? '',
     descripcion: props.equipo?.descripcion ?? '',
     tipo_id: props.equipo?.tipo_id ?? undefined,
@@ -150,6 +152,18 @@ const reglas = reactive({
     motivo_cambio_ubicacion: [reglaTexto()],
 });
 
+// Al crear, el código sugerido sigue a la sucursal elegida (lleva su
+// distintivo y su propio consecutivo). Solo se reemplaza si el usuario no escribió
+// otro código a mano.
+const sugerenciaDe = (id) => props.codigosSugeridos?.[id] ?? '';
+watch(() => form.sucursal_id, (nueva, anterior) => {
+    if (editando.value) return;
+    const actual = form.codigo_activo?.trim() ?? '';
+    if (!actual || actual === sugerenciaDe(anterior)) {
+        form.codigo_activo = sugerenciaDe(nueva);
+    }
+});
+
 const ubicacionesDeSucursal = computed(() =>
     (props.catalogos.ubicaciones ?? []).filter((u) => u.sucursal_id === Number(form.sucursal_id)),
 );
@@ -238,7 +252,7 @@ const enviar = () => {
 };
 
 const cancelar = () =>
-    router.visit(editando.value ? route('equipos.show', props.equipo.id) : route('equipos.por_sucursal'));
+    router.visit(editando.value ? route('equipos.show', props.equipo.id) : urlListado('equipos', route('equipos.por_sucursal')));
 </script>
 
 <template>
@@ -343,11 +357,11 @@ const cancelar = () =>
                                         <a-row :gutter="12">
                                             <a-col :xs="24" :sm="12">
                                                 <a-form-item label="Código del activo" name="codigo_activo"
-                                                    :extra="!editando ? 'Sugerido automáticamente; puedes escanearlo.' : null"
+                                                    :extra="!editando ? 'Se genera al elegir la sucursal (p. ej. CSA-01-EQ-001); puedes cambiarlo o escanearlo.' : null"
                                                     :validate-status="est('codigo_activo')"
                                                     :help="form.errors.codigo_activo">
                                                     <a-input v-model:value="form.codigo_activo"
-                                                        placeholder="p. ej. EQ-001" @keypress="soloCodigo"
+                                                        placeholder="Elige la sucursal para generarlo" @keypress="soloCodigo"
                                                         @paste="limpiarPegado('codigo')">
                                                         <template #prefix>
                                                             <BarcodeOutlined class="op-40" />
@@ -524,7 +538,7 @@ const cancelar = () =>
                                 <a-form-item label="Normas aplicables"
                                     extra="Normas o procedimientos que este equipo debe cumplir.">
                                     <a-select v-model:value="form.normas" :options="normasOpciones"
-                                        mode="multiple" :show-search="false" allow-clear />
+                                        mode="multiple" allow-clear />
                                 </a-form-item>
                                 <a-form-item label="Observaciones" name="notas"
                                     :validate-status="est('notas')" :help="form.errors.notas">

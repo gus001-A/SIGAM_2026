@@ -119,9 +119,11 @@ const hayPreview = computed(
         form.prioridad_id,
 );
 
-const abrir = () => {
+// `fecha` (YYYY-MM-DD, opcional): precarga la fecha límite, p. ej. desde el calendario.
+const abrir = (fecha = null) => {
     form.reset();
     form.clearErrors();
+    if (fecha && fecha >= hoyISO()) form.fecha_limite = fecha;
     visible.value = true;
 };
 
@@ -166,7 +168,7 @@ defineExpose({ abrir, cerrar });
                 <div class="modal-head__meta">
                     <h2 class="modal-head__titulo">Nueva tarea</h2>
                     <p class="modal-head__sub">
-                        Se creará en estado <strong>Pendiente</strong>.
+                        Se creará en estado <strong>Asignada</strong>.
                     </p>
                 </div>
                 <button

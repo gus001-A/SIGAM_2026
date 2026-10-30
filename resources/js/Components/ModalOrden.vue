@@ -70,9 +70,11 @@ const duracion = computed(() => {
     return { texto: `${dias} día${dias === 1 ? '' : 's'}`, color: '#1f9e86' };
 });
 
-const abrir = () => {
+// `fecha` (YYYY-MM-DD, opcional): precarga el inicio programado, p. ej. desde el calendario.
+const abrir = (fecha = null) => {
     form.reset();
     form.clearErrors();
+    if (fecha && fecha >= hoyISO()) form.programado_inicio = `${fecha}T09:00`;
     visible.value = true;
 };
 

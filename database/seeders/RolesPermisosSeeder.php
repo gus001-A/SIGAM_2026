@@ -28,7 +28,7 @@ class RolesPermisosSeeder extends Seeder
         'formatos' => ['ver', 'crear', 'editar', 'desactivar'],
         'solicitudes' => ['ver', 'crear', 'editar', 'asignar'],
         'mantenimientos' => ['ver', 'crear', 'editar', 'asignar', 'supervisar', 'cerrar', 'exportar'],
-        'tareas' => ['ver', 'crear', 'editar', 'asignar', 'cerrar', 'desactivar'],
+        'tareas' => ['ver', 'crear', 'editar', 'asignar', 'supervisar', 'cerrar', 'desactivar', 'comentar'],
         'documentos' => ['ver', 'crear', 'desactivar'],
         'reportes' => ['ver', 'exportar'],
         'auditoria' => ['ver', 'exportar'],
@@ -96,6 +96,9 @@ class RolesPermisosSeeder extends Seeder
             'auditor' => array_merge(
                 $soloVer(array_keys(self::MATRIZ)),
                 ['auditoria.exportar', 'reportes.exportar'],
+                // Única excepción a "solo ver": puede dejar comentarios de
+                // supervisión en una tarea, igual que el supervisor.
+                ['tareas.comentar'],
             ),
         ];
 
