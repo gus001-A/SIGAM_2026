@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import { DatabaseOutlined, SafetyCertificateOutlined, ToolOutlined } from '@ant-design/icons-vue';
 import { antdLocale, antTheme } from '@/theme';
+import { urlPublica } from '@/utils/urlPublica';
 
 defineProps({
     title: { type: String, default: 'SIGAMM' },
@@ -44,7 +45,7 @@ const destacados = [
                 <div class="au-brand__logo-card">
                     <img
                         v-if="logoExists"
-                        src="/images/logo-web-transparente.png"
+                        :src="urlPublica('images/logo-web-transparente.png')"
                         alt="SIGAMM"
                         class="au-brand__logo"
                         @error="logoExists = false"

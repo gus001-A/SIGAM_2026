@@ -28,6 +28,7 @@ import { usePermisos } from '@/composables/usePermisos';
 import ConfirmarDialog from '@/Components/ConfirmarDialog.vue';
 import PanelNotificaciones from '@/Components/PanelNotificaciones.vue';
 import { reproducirSonidoNotificacion } from '@/utils/sonidoNotificacion';
+import { urlPublica } from '@/utils/urlPublica';
 
 const props = defineProps({
     titulo: { type: String, default: '' },
@@ -281,7 +282,7 @@ watch(
                             <template #icon><MenuOutlined /></template>
                         </a-button>
                         <div class="app-nav__brand" @click="router.visit(route('dashboard'))">
-                            <img src="/images/logo-web-transparente.png" alt="SIGAMM" class="app-nav__logo" />
+                            <img :src="urlPublica('images/logo-web-transparente.png')" alt="SIGAMM" class="app-nav__logo" />
                         </div>
                     </div>
 
@@ -341,7 +342,7 @@ watch(
                 root-class-name="app-nav-drawer"
             >
                 <template #title>
-                    <img src="/images/logo-web-transparente.png" alt="SIGAMM" class="app-nav-drawer__logo" />
+                    <img :src="urlPublica('images/logo-web-transparente.png')" alt="SIGAMM" class="app-nav-drawer__logo" />
                 </template>
                 <a-menu
                     mode="inline"
