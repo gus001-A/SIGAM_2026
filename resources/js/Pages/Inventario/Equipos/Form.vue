@@ -22,6 +22,7 @@ import CampoFechaHora from '@/Components/CampoFechaHora.vue';
 import SelectCatalogo from '@/Components/SelectCatalogo.vue';
 import LectorCodigoBarras from '@/Components/LectorCodigoBarras.vue';
 import BotonTomarFoto from '@/Components/BotonTomarFoto.vue';
+import { comprimirImagen } from '@/utils/comprimirImagen';
 import { useFormularioPestanas } from '@/composables/useFormularioPestanas';
 import { urlListado } from '@/composables/useRegresoListado';
 import {
@@ -84,11 +85,13 @@ const cambiandoFoto = ref(false);
 const fotoPreviewUrl = ref(null);
 
 const antesDeSubirFoto = (file) => {
-    fotoLista.value = [file];
-    form.foto_referencia = file;
+    comprimirImagen(file).then((final) => {
+        fotoLista.value = [final];
+        form.foto_referencia = final;
 
-    if (fotoPreviewUrl.value) URL.revokeObjectURL(fotoPreviewUrl.value);
-    fotoPreviewUrl.value = URL.createObjectURL(file);
+        if (fotoPreviewUrl.value) URL.revokeObjectURL(fotoPreviewUrl.value);
+        fotoPreviewUrl.value = URL.createObjectURL(final);
+    });
 
     return false;
 };

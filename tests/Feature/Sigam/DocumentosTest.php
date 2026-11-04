@@ -127,4 +127,26 @@ class DocumentosTest extends TestCase
             ->get(route('documentos.ver', $documento))
             ->assertOk();
     }
+
+    public function test_sirve_el_archivo_completo_con_su_tipo_y_da_404_si_ya_no_existe(): void
+    {
+        $this->actingAs($this->admin)->post(route('documentos.store'), [
+            'archivo' => UploadedFile::fake()->createWithContent('reporte.pdf', '%PDF-1.4 contenido'),
+            'relacionable_tipo' => 'equipo',
+            'relacionable_id' => $this->equipo->id,
+        ])->assertRedirect();
+        $documento = $this->equipo->fresh()->documentos()->firstOrFail();
+
+        $vista = $this->actingAs($this->admin)->get(route('documentos.ver', $documento));
+        $vista->assertOk()->assertHeader('Content-Type', 'application/pdf')->assertHeader('Content-Length', '18');
+        $this->assertStringContainsString('inline', $vista->headers->get('Content-Disposition'));
+        $this->assertSame('%PDF-1.4 contenido', $vista->streamedContent());
+
+        $descarga = $this->actingAs($this->admin)->get(route('documentos.download', $documento));
+        $this->assertStringContainsString('attachment', $descarga->headers->get('Content-Disposition'));
+        $this->assertSame('%PDF-1.4 contenido', $descarga->streamedContent());
+
+        Storage::disk('local')->delete($documento->ruta);
+        $this->actingAs($this->admin)->get(route('documentos.ver', $documento))->assertNotFound();
+    }
 }

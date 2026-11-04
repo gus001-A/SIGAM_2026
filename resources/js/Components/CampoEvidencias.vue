@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { DeleteOutlined, FileDoneOutlined, InboxOutlined } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
 import BotonTomarFoto from '@/Components/BotonTomarFoto.vue';
+import { comprimirImagen } from '@/utils/comprimirImagen';
 
 /**
  * Varias fotos/archivos de evidencia para un avance (máximo `maximo`).
@@ -31,7 +32,9 @@ const accept = computed(() =>
 const hint = computed(() =>
     `${props.soloImagenes ? 'JPG, PNG o WEBP' : 'PDF, Word, Excel, PowerPoint, CSV, texto o imagen'} · máx. 20 MB c/u · hasta ${props.maximo} archivos`,
 );
-const lleno = computed(() => lista.value.length >= props.maximo);
+/* Fotos que se están comprimiendo (todavía no entran a `lista`). */
+const procesando = ref(0);
+const lleno = computed(() => lista.value.length + procesando.value >= props.maximo);
 
 const esImagen = (file) => !!file?.type?.startsWith('image/');
 
@@ -80,12 +83,19 @@ const agregar = (original) => {
         message.error('Solo se permiten imágenes (JPG, PNG o WEBP).');
         return false;
     }
-    if (lista.value.length >= props.maximo) {
+    if (lista.value.length + procesando.value >= props.maximo) {
         message.warning(`Máximo ${props.maximo} archivos por avance.`);
         return false;
     }
-    lista.value = [...lista.value, archivo];
-    emit('update:modelValue', lista.value);
+    // Se aparta el lugar mientras se comprime, para no rebasar el máximo al
+    // elegir varios archivos de golpe.
+    procesando.value++;
+    comprimirImagen(archivo)
+        .then((final) => {
+            lista.value = [...lista.value, final];
+            emit('update:modelValue', lista.value);
+        })
+        .finally(() => procesando.value--);
     return false;
 };
 
@@ -122,6 +132,8 @@ const quitar = (indice) => {
             @capturada="agregar"
         />
 
+        <p v-if="procesando" class="ce__procesando">Optimizando {{ procesando > 1 ? `${procesando} fotos` : 'foto' }}…</p>
+
         <div v-if="vistas.length" class="ce__cabecera">
             <span class="ce__contador">{{ vistas.length }} de {{ maximo }} archivos</span>
         </div>
@@ -147,6 +159,12 @@ const quitar = (indice) => {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+.ce__procesando {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0d6ca6;
 }
 .ce__cabecera {
     display: flex;

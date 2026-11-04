@@ -14,8 +14,10 @@ use App\Support\Documentos;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 /**
  * Gestión documental polimórfica. Especificación v2.0 §14.
@@ -72,12 +74,7 @@ class DocumentoController extends Controller
             403,
         );
 
-        abort_unless(Storage::disk($documento->disco)->exists($documento->ruta), 404);
-
-        return Storage::disk($documento->disco)->download(
-            $documento->ruta,
-            $documento->nombre_original,
-        );
+        return $this->servir($documento, 'attachment');
     }
 
     /** Sirve el archivo en línea (para previsualizar imágenes / PDF). */
@@ -88,13 +85,42 @@ class DocumentoController extends Controller
             403,
         );
 
-        abort_unless(Storage::disk($documento->disco)->exists($documento->ruta), 404);
+        return $this->servir($documento, 'inline');
+    }
 
-        return Storage::disk($documento->disco)->response(
-            $documento->ruta,
-            $documento->nombre_original,
-            ['Content-Type' => $documento->tipo_mime ?: 'application/octet-stream'],
-        );
+    /**
+     * Manda el archivo al navegador con UNA sola lectura al disco. En la nube
+     * cada consulta cuenta contra el límite diario gratuito, y
+     * `Storage::response()` hace hasta cuatro (existe, tipo, tamaño y
+     * descarga). El tipo y el tamaño ya están guardados en el documento, y si
+     * el archivo no existe la propia lectura falla y se responde 404.
+     */
+    private function servir(Documento $documento, string $disposicion): StreamedResponse
+    {
+        try {
+            $flujo = Storage::disk($documento->disco)->readStream($documento->ruta);
+        } catch (Throwable) {
+            $flujo = null;
+        }
+        abort_unless(is_resource($flujo), 404);
+
+        $respuesta = new StreamedResponse(function () use ($flujo): void {
+            fpassthru($flujo);
+            fclose($flujo);
+        });
+
+        $nombre = $documento->nombre_original ?: basename($documento->ruta);
+        $respuesta->headers->set('Content-Type', $documento->tipo_mime ?: 'application/octet-stream');
+        $respuesta->headers->set('Content-Disposition', $respuesta->headers->makeDisposition(
+            $disposicion,
+            $nombre,
+            str_replace(['%', '/', '\\'], '', Str::ascii($nombre)) ?: 'archivo',
+        ));
+        if ($documento->tamano > 0) {
+            $respuesta->headers->set('Content-Length', (string) $documento->tamano);
+        }
+
+        return $respuesta;
     }
 
     public function destroy(Documento $documento): RedirectResponse

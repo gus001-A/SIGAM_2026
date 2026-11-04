@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { DeleteOutlined, FileDoneOutlined, InboxOutlined } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
 import BotonTomarFoto from '@/Components/BotonTomarFoto.vue';
+import { comprimirImagen } from '@/utils/comprimirImagen';
 
 const props = defineProps({
     modelValue: { type: [Object, File], default: null },
@@ -47,10 +48,12 @@ const antesDeSubir = (file) => {
         return false;
     }
 
-    fileList.value = [file];
-    emit('update:modelValue', file);
-    limpiarPreview();
-    previewUrl.value = esImagen(file) ? URL.createObjectURL(file) : null;
+    comprimirImagen(file).then((final) => {
+        fileList.value = [final];
+        emit('update:modelValue', final);
+        limpiarPreview();
+        previewUrl.value = esImagen(final) ? URL.createObjectURL(final) : null;
+    });
     return false;
 };
 

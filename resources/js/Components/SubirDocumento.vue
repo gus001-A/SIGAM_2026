@@ -9,6 +9,7 @@ import {
     PictureOutlined,
 } from '@ant-design/icons-vue';
 import BotonTomarFoto from '@/Components/BotonTomarFoto.vue';
+import { comprimirImagen } from '@/utils/comprimirImagen';
 
 const props = defineProps({
     relacionableTipo: { type: String, required: true },
@@ -191,11 +192,13 @@ const cerrarImg = () => {
 
 const antesDeSubirImg = (file) => {
     if (!validarArchivo(file, 'img')) return false;
-    fileListImg.value = [file];
-    formImg.archivo = file;
-    if (previewUrlImg.value) URL.revokeObjectURL(previewUrlImg.value);
-    previewUrlImg.value = URL.createObjectURL(file);
-    if (!formImg.titulo) formImg.titulo = file.name.replace(/\.[^.]+$/, '');
+    comprimirImagen(file).then((final) => {
+        fileListImg.value = [final];
+        formImg.archivo = final;
+        if (previewUrlImg.value) URL.revokeObjectURL(previewUrlImg.value);
+        previewUrlImg.value = URL.createObjectURL(final);
+        if (!formImg.titulo) formImg.titulo = file.name.replace(/\.[^.]+$/, '');
+    });
     return false;
 };
 
