@@ -84,4 +84,47 @@ class DocumentosTest extends TestCase
             $this->assertSame(1, $entidad->fresh()->documentos()->count());
         }
     }
+
+    public function test_con_la_nube_configurada_los_archivos_se_guardan_y_sirven_desde_alla(): void
+    {
+        Storage::fake('s3');
+        config(['filesystems.documentos' => 's3']);
+
+        $this->actingAs($this->admin)->post(route('documentos.store'), [
+            'archivo' => UploadedFile::fake()->image('foto.jpg'),
+            'relacionable_tipo' => 'equipo',
+            'relacionable_id' => $this->equipo->id,
+        ])->assertRedirect();
+
+        $documento = $this->equipo->fresh()->documentos()->firstOrFail();
+        $this->assertSame('s3', $documento->disco);
+        Storage::disk('s3')->assertExists($documento->ruta);
+        Storage::disk('local')->assertMissing($documento->ruta);
+
+        $this->actingAs($this->admin)
+            ->get(route('documentos.ver', $documento))
+            ->assertOk();
+    }
+
+    public function test_el_comando_mueve_a_la_nube_los_documentos_que_siguen_en_el_servidor(): void
+    {
+        $this->actingAs($this->admin)->post(route('documentos.store'), [
+            'archivo' => UploadedFile::fake()->image('vieja.jpg'),
+            'relacionable_tipo' => 'equipo',
+            'relacionable_id' => $this->equipo->id,
+        ])->assertRedirect();
+        $documento = $this->equipo->fresh()->documentos()->firstOrFail();
+        $this->assertSame('local', $documento->disco);
+
+        Storage::fake('s3');
+        config(['filesystems.documentos' => 's3']);
+
+        $this->artisan('sigam:documentos-a-la-nube')->assertSuccessful();
+
+        $this->assertSame('s3', $documento->fresh()->disco);
+        Storage::disk('s3')->assertExists($documento->ruta);
+        $this->actingAs($this->admin)
+            ->get(route('documentos.ver', $documento))
+            ->assertOk();
+    }
 }

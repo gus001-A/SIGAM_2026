@@ -17,6 +17,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Disco de documentos y fotos
+    |--------------------------------------------------------------------------
+    |
+    | Dónde se guardan los archivos que se suben al sistema (evidencias, fotos
+    | de equipos, contratos, normas…). `local` = storage/app/private del
+    | servidor; `s3` = almacenamiento en la nube compatible con S3 (Cloudflare
+    | R2, AWS S3, Backblaze B2, DigitalOcean Spaces). Cada documento recuerda
+    | en qué disco quedó, así que los anteriores se siguen viendo al cambiarlo.
+    |
+    */
+
+    'documentos' => env('DOCUMENTOS_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |
@@ -56,7 +71,9 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-            'throw' => false,
+            // Si la nube falla al subir, que truene en vez de guardar un
+            // documento sin archivo.
+            'throw' => true,
             'report' => false,
         ],
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Documento;
 use App\Models\Proveedor;
 use App\Support\Auditoria;
+use App\Support\Documentos;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -121,17 +122,10 @@ class ProveedorController extends Controller
             $proveedor = Proveedor::create($datos);
 
             foreach ($request->file('documentos', []) as $archivo) {
-                $ruta = $archivo->store('documentos/'.now()->format('Y/m'), 'local');
-
                 $documento = Documento::create([
-                    'disco' => 'local',
-                    'ruta' => $ruta,
-                    'nombre_original' => $archivo->getClientOriginalName(),
+                    ...Documentos::guardar($archivo),
                     'titulo' => 'Contrato / documento del proveedor',
                     'categoria' => 'contrato',
-                    'tipo_mime' => $archivo->getClientMimeType(),
-                    'tamano' => $archivo->getSize(),
-                    'checksum' => hash_file('sha256', $archivo->getRealPath()),
                     'visibilidad' => 'privado',
                     'subido_por' => $request->user()->id,
                 ]);

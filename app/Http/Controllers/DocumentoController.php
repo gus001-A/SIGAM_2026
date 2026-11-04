@@ -10,6 +10,7 @@ use App\Models\Proveedor;
 use App\Models\SolicitudMantenimiento;
 use App\Models\Sucursal;
 use App\Models\Tarea;
+use App\Support\Documentos;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -51,19 +52,11 @@ class DocumentoController extends Controller
 
         $archivo = $request->file('archivo');
 
-        // Todos los documentos se guardan en el disco privado (local).
-        $disco = 'local';
-        $ruta = $archivo->store('documentos/'.now()->format('Y/m'), $disco);
-
+        // Disco privado: local o la nube, según `DOCUMENTOS_DISK`.
         $documento = Documento::create([
-            'disco' => $disco,
-            'ruta' => $ruta,
-            'nombre_original' => $archivo->getClientOriginalName(),
+            ...Documentos::guardar($archivo),
             'titulo' => $datos['titulo'] ?? null,
             'descripcion' => $datos['descripcion'] ?? null,
-            'tipo_mime' => $archivo->getClientMimeType(),
-            'tamano' => $archivo->getSize(),
-            'checksum' => hash_file('sha256', $archivo->getRealPath()),
             'subido_por' => $request->user()->id,
         ]);
 

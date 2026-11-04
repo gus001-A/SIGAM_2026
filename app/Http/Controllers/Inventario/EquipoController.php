@@ -541,17 +541,10 @@ class EquipoController extends Controller
         }
 
         $archivo = $request->file('foto_referencia');
-        $ruta = $archivo->store('documentos/'.now()->format('Y/m'), 'local');
-
         $documento = Documento::create([
-            'disco' => 'local',
-            'ruta' => $ruta,
-            'nombre_original' => $archivo->getClientOriginalName(),
+            ...Documentos::guardar($archivo),
             'titulo' => 'Foto de referencia',
             'categoria' => 'foto_referencia',
-            'tipo_mime' => $archivo->getClientMimeType(),
-            'tamano' => $archivo->getSize(),
-            'checksum' => hash_file('sha256', $archivo->getRealPath()),
             'visibilidad' => 'privado',
             'subido_por' => $request->user()->id,
         ]);
